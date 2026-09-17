@@ -1,12 +1,19 @@
 # Progress
 
+## 2026-09-17 21:39 — M0 native fail: iSH VDSO missing lld
+
+- Run `35225046741` failed in 5 minutes. Xcode 26.2 pin and iSH SHA passed. LAME and FFmpeg 6.1.2 packaged successfully.
+- Fail: `deps/build_ish.sh` ninja `[1/90] vdso/arm64/libvdso.so.elf` → Homebrew clang 23.1.0 `invalid linker name in argument '-fuse-ld=lld'`.
+- Not an iOS 15 Swift issue. App compile never started. Evidence step then failed because `$RUNNER_TEMP/m0` did not exist.
+- Fix: install Homebrew `lld`, put `ld.lld` on PATH, mkdir evidence dir. Re-run on `compat/ios15`.
+
 ## 2026-09-17 evening — M0 fork + baseline CI
 
 ### Baseline
 
 - Upstream remains `OpenMinis/OpenMinis` `4ef29002e88db1e20e462ec2ff46916e8a7dcb45`.
 - Disk ordinary availability recovered to about 1.2 GiB after cancelling the unrelated OpenClaw upgrade cleanup. Still no local Xcode.
-- User asked to continue OpenMinis, then said start, then asked why no new GitHub repository existed. That is authorization to create `doimty/OpenMinis` and push `compat/ios15` only.
+- User asked to continue OpenMinis, then said start, then asked why no new GitHub repository existed. 21:04: “我全部授权你，后续的话不用我同意.” Subsequent fork/commit/push to `doimty/OpenMinis` non-default branches, Actions, and compatibility code do not need another ask. Still do not push upstream `OpenMinis/OpenMinis` or `main`.
 
 ### This checkpoint
 

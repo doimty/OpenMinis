@@ -56,11 +56,16 @@ jobs:
       - name: Install native build tools
         run: |
           set -euo pipefail
-          brew install llvm libarchive pkg-config meson
-          export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+          # iSH VDSO uses Homebrew clang -fuse-ld=lld. llvm and lld are
+          # separate formulae; clang without ld.lld fails with
+          # "invalid linker name in argument '-fuse-ld=lld'".
+          brew install llvm lld libarchive pkg-config meson
+          export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
           command -v meson
           command -v ninja
           test -x /opt/homebrew/opt/llvm/bin/clang
+          command -v ld.lld
+          ld.lld --version | sed -n '1p'
 
       - name: Setup Go 1.25
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -77,7 +82,9 @@ jobs:
       - name: Build native iOS dependencies
         run: |
           set -euo pipefail
-          export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+          export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
+          command -v ld.lld
+          mkdir -p "$RUNNER_TEMP/m0"
           ./deps/build_lame.sh
           ./deps/build_ffmpeg.sh
           ./deps/build_ish.sh
@@ -106,6 +113,7 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m0"
           python3 - <<'PY'
           import hashlib, json, os, subprocess
           from pathlib import Path
