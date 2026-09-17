@@ -119,18 +119,19 @@ jobs:
             build \
             | tee "$RUNNER_TEMP/m0/xcodebuild.log"
 
-      - name: Probe iOS 15 deployment target
+      - name: Probe iOS 15 app target
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/m1"
           set +e
+          # Do not pass a global IPHONEOS_DEPLOYMENT_TARGET override: that
+          # forced FileProvider (kept at 16.0) down to 15 and hid app errors.
           xcodebuild \
             -project src/ios/Minis.xcodeproj \
             -scheme Minis \
             -configuration Debug \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/m1/DerivedData" \
-            IPHONEOS_DEPLOYMENT_TARGET=15.0 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY=- \
             CODE_SIGNING_REQUIRED=NO \

@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-09-17 22:42 — M1 method after first probe
+
+- Run `35232182546` failed as intended. 17 errors, all FileProvider `NSFileProviderRequest` / ItemVersion / ItemFields (iOS 16). Main app never compiled.
+- Method: peel compiler layers. Do not rewrite File Provider for iOS 15. Keep that extension at 16.0 so it stays out of the iOS 15 product. Lower only Minis + Share to 15.0. Recompile without a global deployment override so the next errors are NavigationStack / UIHostingConfiguration / PhotosPicker.
+- For those: add a narrow compatibility path, keep the iOS 16+ implementation behind availability. No global type-name shadowing. Repeat until `Minis.app` compiles at 15, then device runtime.
+- iOS 15 will not get Files-app mount, Live Activities, AlarmKit, App Intents, or CKSyncEngine sync. Local SQLite, chat, sandbox stay in scope.
+
 ## 2026-09-17 22:11 — starting M1 compiler probe
 
 - M0 remains the last green compile: run `35228590640`, unsigned Debug `Minis.app`, not iOS 15.
