@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-09-17 22:11 — starting M1 compiler probe
+
+- M0 remains the last green compile: run `35228590640`, unsigned Debug `Minis.app`, not iOS 15.
+- No Swift compatibility patches yet. Local inventory: 442 Swift files, NavigationStack 51/92, UIHostingConfiguration 6/35.
+- Next CI on `compat/ios15` caches native deps and runs `xcodebuild IPHONEOS_DEPLOYMENT_TARGET=15.0` to list real availability errors. Expected red. Do not treat that red as a toolchain regression.
+
+## 2026-09-17 21:54 — M0 baseline compile passed
+
+- Run `35228590640` **success** in 13m34s. Commit `838ddebf617b834d8b08b0b3ea74e04d8cdf6717`.
+- Evidence: Xcode 26.2 (`17C52`), iOS SDK 26.2, Swift 6.2.3, iSH `3f6384c70eefd1a370f121d3492a5f21f7767df9`, xcodebuild log 2,241,622 bytes, `** BUILD SUCCEEDED **`, `Minis.app` exists, Info.plist SHA256 `870883f6e6b0d44bc98b4e24e1abaee9c0775a13a4cf51ed9ca631b0a0500876`.
+- This is an unsigned Debug generic-iOS compile of unchanged upstream plus CI/docs. Not an iOS 15 runtime proof.
+- A 21:45 isolated check job likely timed out and is not the compile result. Next: M1 deployment-target / availability, without another full native rebuild unless the workflow changes.
+
 ## 2026-09-17 21:39 — M0 native fail: iSH VDSO missing lld
 
 - Run `35225046741` failed in 5 minutes. Xcode 26.2 pin and iSH SHA passed. LAME and FFmpeg 6.1.2 packaged successfully.
