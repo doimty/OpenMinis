@@ -42,6 +42,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// The bundle localized lookups should read from.
 ///
@@ -70,15 +71,65 @@ enum AppBundle {
 ///   - key: the localization key, i.e. the English source string.
 ///   - comment: translator context, kept so `genstrings`-style extraction and
 ///     the String Catalog continue to see it.
-func AppLocalized(_ key: String.LocalizationValue, comment: StaticString? = nil) -> String {
-    String(localized: key, bundle: AppBundle.current, comment: comment)
+func AppLocalized(_ key: String, comment: StaticString? = nil) -> String {
+    // Bundle.localizedString honours the in-app language swizzle and is
+    // available on iOS 15. Do not take String.LocalizationValue /
+    // LocalizedStringResource here: interpolated literals pick the iOS 16
+    // resource type and fail availability checks.
+    _ = comment
+    return AppBundle.current.localizedString(forKey: key, value: key, table: nil)
 }
 
-/// `LocalizedStringResource` overload, for call sites that already hold a
-/// resource (App Intents build these) rather than a literal key.
+/// `LocalizedStringResource` overload, for App Intents call sites.
+@available(iOS 16.0, *)
 func AppLocalized(_ resource: LocalizedStringResource) -> String {
-    // A LocalizedStringResource carries its own bundle reference, so it cannot
-    // be re-pointed the way a literal key can. Resolve it as-is rather than
-    // pretending the override applies.
     String(localized: resource)
+}
+
+/// Navigation stack that keeps the iOS 16+ API on 16+ and uses NavigationView
+/// on iOS 15. Do not globally shadow `NavigationStack`.
+struct CompatNavigationStack<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        if #available(iOS 16.0, *) {
+            NavigationStack { content }
+        } else {
+            NavigationView { content }
+                .navigationViewStyle(StackNavigationViewStyle())
+        }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func compatHiddenScrollBackground() -> some View {
+        if #available(iOS 16.0, *) {
+            self.scrollContentBackground(.hidden)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func compatPresentationDetentsMediumLarge() -> some View {
+        if #available(iOS 16.0, *) {
+            self.presentationDetents([.medium, .large])
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func compatPresentationDetentsFraction75() -> some View {
+        if #available(iOS 16.0, *) {
+            self.presentationDetents([.fraction(0.75)])
+        } else {
+            self
+        }
+    }
 }

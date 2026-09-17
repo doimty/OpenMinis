@@ -12,7 +12,7 @@ struct SessionMemoryView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 // Section 1: Auto-injected memories
                 Section {
@@ -274,19 +274,17 @@ private struct MemoryContentView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if fileURL != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    if isEditing {
-                        Button("Save") {
-                            save()
-                        }
-                    } else {
-                        Button {
-                            editedContent = content
-                            isEditing = true
-                        } label: {
-                            Image(systemName: "pencil")
-                        }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if isEditing {
+                    Button("Save") {
+                        save()
+                    }
+                } else if fileURL != nil {
+                    Button {
+                        editedContent = content
+                        isEditing = true
+                    } label: {
+                        Image(systemName: "pencil")
                     }
                 }
             }

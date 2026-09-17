@@ -60,19 +60,8 @@ struct MemoryManagementView: View {
         .navigationTitle("Memory")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if #available(iOS 17.0, *), iCloudSyncEnabled {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            Task { await forceSyncMemory() }
-                        } label: {
-                            Label(AppLocalized("Force iCloud Sync"),
-                                  systemImage: "arrow.triangle.2.circlepath.icloud")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                iCloudMemoryToolbar
             }
         }
         .overlay(alignment: .top) {
@@ -140,6 +129,24 @@ struct MemoryManagementView: View {
         }
 
         memoryFiles = items
+    }
+
+    @ViewBuilder
+    private var iCloudMemoryToolbar: some View {
+        if #available(iOS 17.0, *) {
+            if iCloudSyncEnabled {
+                Menu {
+                    Button {
+                        Task { await forceSyncMemory() }
+                    } label: {
+                        Label(AppLocalized("Force iCloud Sync"),
+                              systemImage: "arrow.triangle.2.circlepath.icloud")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
     }
 
     private func deleteFiles(at offsets: IndexSet) {
