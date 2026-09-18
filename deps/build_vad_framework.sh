@@ -83,36 +83,32 @@ rm -rf "$XCFW"
 mkdir -p "$XCFW/ios-arm64/RealTimeCutVADCXXLibrary.framework"
 cp -R "$FRAMEWORK/." "$XCFW/ios-arm64/RealTimeCutVADCXXLibrary.framework/"
 
-# create-xcframework is unreliable in this pipeline (its output was
-# redirected and the failure was invisible); assemble the xcframework
-# directory tree directly. The slice directory name comes from the built
-# framework's Info.plist platform+arch (iPhoneOS/arm64 -> ios-arm64).
-cat > "$XCFW/Info.plist" <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>RealTimeCutVADCXXLibrary</string>
-    <key>CFBundleIdentifier</key>
-    <string>RealTimeCutVADCXXLibrary</string>
-    <key>CFBundleName</key>
-    <string>RealTimeCutVADCXXLibrary</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>CFBundlePackageType</key>
-    <string>XCFramework</string>
-    <key>CFBundleSupportedPlatforms</key>
-    <array>
-        <string>iPhoneOS</string>
-    </array>
-    <key>MinimumOSVersion</key>
-    <string>15.0</string>
-</dict>
-</plist>
-PLIST
+# The xcframework wrapper Info.plist is NOT the framework's plist: SwiftPM
+# reads AvailableLibraries (LibraryIdentifier/LibraryPath/Supported-*
+# Platform/Architectures) and CFBundlePackageType=XFWKIT to locate the
+# slice. Generate it with plistlib so the shape matches what
+# xcodebuild -create-xcframework emits (hand-written XML with framework
+# keys like CFBundleExecutable/MinimumOSVersion is invalid here).
+python3 - "$XCFW" <<'PY'
+import plistlib, sys
+from pathlib import Path
+xcf = Path(sys.argv[1])
+info = {
+    'CFBundlePackageType': 'XFWKIT',
+    'AvailableLibraries': [{
+        'LibraryIdentifier': 'ios-arm64',
+        'LibraryPath': 'RealTimeCutVADCXXLibrary.framework',
+        'SupportedArchitectures': ['arm64'],
+        'SupportedPlatform': 'ios',
+    }],
+}
+(xcf / 'Info.plist').write_bytes(plistlib.dumps(info))
+loaded = plistlib.loads((xcf / 'Info.plist').read_bytes())
+libs = loaded['AvailableLibraries']
+assert libs[0]['LibraryIdentifier'] == 'ios-arm64'
+assert libs[0]['LibraryPath'] == 'RealTimeCutVADCXXLibrary.framework'
+print('wrote xcframework wrapper Info.plist (AvailableLibraries ios-arm64)')
+PY
 
 BIN="$XCFW/ios-arm64/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary"
 test -f "$BIN"

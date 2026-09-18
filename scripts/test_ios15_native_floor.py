@@ -400,6 +400,29 @@ class LocalPackageIntegrationTests(unittest.TestCase):
         self.assertIn("grep -Fq '** BUILD SUCCEEDED **'", script)
         self.assertNotIn("grep -q '** BUILD SUCCEEDED **'", script)
 
+    def test_build_vad_script_writes_xcframework_wrapper_plist(self):
+        # Xcode 26/SwiftPM rejects a local binaryTarget that is a plain
+        # .framework dir, and a hand-written framework-style wrapper plist
+        # (CFBundleExecutable/MinimumOSVersion) does not describe slices, so
+        # package resolution still fails. The wrapper plist must be the
+        # xcframework shape: CFBundlePackageType=XFWKIT plus an
+        # AvailableLibraries array with LibraryIdentifier/LibraryPath/
+        # SupportedArchitectures/SupportedPlatform, generated with plistlib.
+        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text()
+        self.assertIn('CFBundlePackageType', script)
+        self.assertIn('XFWKIT', script)
+        self.assertIn('AvailableLibraries', script)
+        self.assertIn('LibraryIdentifier', script)
+        self.assertIn('LibraryPath', script)
+        self.assertIn('SupportedArchitectures', script)
+        self.assertIn('SupportedPlatform', script)
+        self.assertIn('plistlib.dumps', script)
+        # framework-style wrapper keys would be wrong here
+        self.assertNotIn('<key>CFBundleExecutable</key>', script)
+        self.assertNotIn('MinimumOSVersion</key>', script)
+        # framework must land under the expected slice dir
+        self.assertIn('ios-arm64/RealTimeCutVADCXXLibrary.framework', script)
+
 
 if __name__ == '__main__':
     unittest.main()
