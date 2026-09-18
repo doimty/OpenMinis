@@ -13,12 +13,22 @@ import CoreLocation
 
 @objc public class WeatherOffloadBridge: NSObject {
 
+    private static func weatherUnavailableError() -> Error {
+        NSError(domain: "WeatherOffloadBridge", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "WeatherKit requires iOS 16.0 or newer.",
+        ])
+    }
+
     @objc public static func fetchWeather(
         forLatitude lat: Double,
         longitude lng: Double,
         completion: @escaping (NSDictionary?, Error?) -> Void
     ) {
         let location = CLLocation(latitude: lat, longitude: lng)
+        guard #available(iOS 16.0, *) else {
+            completion(nil, WeatherOffloadBridge.weatherUnavailableError())
+            return
+        }
         let service = WeatherService.shared
 
         Task {

@@ -132,6 +132,26 @@ extension View {
     }
 
     @ViewBuilder
+    func compatToolbarVisibility(_ visibility: Visibility, for placement: ToolbarPlacement) -> some View {
+        if #available(iOS 16.0, *) { toolbar(visibility, for: placement) }
+        else { self } // Visible navbar is the iOS 15 default.
+    }
+
+    /// `TextField(_:text:axis:)` is iOS 16+. Drop the axis on legacy targets;
+    /// multiline appearance is preserved by the caller's lineLimit.
+    @ViewBuilder
+    func compatTextFieldAxis(_ title: LocalizedStringKey, text: Binding<String>, axis: Axis) -> some View {
+        if #available(iOS 16.0, *) { TextField(title, text: text, axis: axis) }
+        else { TextField(title, text: text) }
+    }
+
+    @ViewBuilder
+    func compatLineLimit(_ range: ClosedRange<Int>) -> some View {
+        if #available(iOS 16.0, *) { lineLimit(range) }
+        else { lineLimit(range.upperBound) }
+    }
+
+    @ViewBuilder
     func compatHiddenScrollBackground() -> some View {
         if #available(iOS 16.0, *) {
             self.scrollContentBackground(.hidden)
