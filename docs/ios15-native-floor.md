@@ -5,7 +5,8 @@
 - App baseline: `aa21abcbecf2030004e6675dbb8ee6cd2f2e6721`, `doimty/OpenMinis:compat/ios15`.
 - Full app compile and nine-file15/16 compatibility smoke passed in run35357606053. Log2,275,679 bytes, SHA256 `df8ddb6377eb3ffca26dfe6139661ea7a61158083b9845da05a2f23192df7f61`, xcodebuild exit0.
 - Rclone was rebuilt from source with15.0 device/simulator flags; its higher-minimum linker warnings went11→0. Other existing native build scripts target14.0.
-- One link-floor warning remains: `RealTimeCutVADCXXLibrary` minimum15.6 at app log17992. The current workflow uploads logs only, not an audited/installable app.
+- The one remaining link-floor warning (`RealTimeCutVADCXXLibrary` minimum15.6 at app log17992) now has a validated source-build route: run **35375830915 / `4cc72bc`** produced an APPROVED probe (9 gates ok, exit0). Built framework is `platform ios / arch arm64 / minimum 15.0 / sdk 26.2`, plist `MinimumOSVersion 15.0`, all 7 C entrypoints exported as `T` symbols (incl. 5-arg continuing-PCM `_set_vad_callback`), dependency closure clean (self + CoreFoundation/Foundation/CoreML + libc++/libSystem/libobjc), real upstream `VADWrapper.m` compiles against it at `arm64-apple-ios15.0`. Evidence: `reports/openminis-ios15/run-35375830915-af6ERo/evidence/evidence.json`, SHA256 `42633aadf79cf9592e81f61079fe6ac0e7d3c473e32ab27460f024b1bfd82759`. Binary SHA256 `2fa4125cf5e232609d1e00b1301258724bd0d6ced32c7ae3379375dbeb18d596`.
+- The probe uploads evidence only (no framework, no IPA, no app change). **Next gate: integrate the rebuilt 15.0 framework into the app** (swap the SPM prebuilt 15.6 `binaryTarget` for a pinned 15.0-built artifact) and re-verify the app build drops the 17992 warning; then produce an installable IPA and run M3 device acceptance.
 
 ## Source of truth and ownership
 
