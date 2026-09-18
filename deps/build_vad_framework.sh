@@ -93,22 +93,36 @@ python3 - "$XCFW" <<'PY'
 import plistlib, sys
 from pathlib import Path
 xcf = Path(sys.argv[1])
+# Byte-for-byte the shape `xcodebuild -create-xcframework` emits (verified
+# against the real onnxruntime.xcframework from the pinned upstream release):
+# CFBundlePackageType is XFWK (NOT XFWKIT) and XCFrameworkFormatVersion=1.0
+# is REQUIRED. Without XCFrameworkFormatVersion, Xcode 26 reports "Failed to
+# decode XCFramework Info.plist ... because it is missing".
 info = {
-    'CFBundlePackageType': 'XFWKIT',
     'AvailableLibraries': [{
         'LibraryIdentifier': 'ios-arm64',
         'LibraryPath': 'RealTimeCutVADCXXLibrary.framework',
         'SupportedArchitectures': ['arm64'],
         'SupportedPlatform': 'ios',
     }],
+    'CFBundlePackageType': 'XFWK',
+    'XCFrameworkFormatVersion': '1.0',
 }
-(xcf / 'Info.plist').write_bytes(plistlib.dumps(info))
+(xcf / 'Info.plist').write_bytes(plistlib.dumps(info, fmt=plistlib.FMT_XML, sort_keys=False))
 loaded = plistlib.loads((xcf / 'Info.plist').read_bytes())
+assert loaded['XCFrameworkFormatVersion'] == '1.0'
+assert loaded['CFBundlePackageType'] == 'XFWK'
 libs = loaded['AvailableLibraries']
 assert libs[0]['LibraryIdentifier'] == 'ios-arm64'
 assert libs[0]['LibraryPath'] == 'RealTimeCutVADCXXLibrary.framework'
-print('wrote xcframework wrapper Info.plist (AvailableLibraries ios-arm64)')
+print('wrote xcframework wrapper Info.plist (XFWK + format 1.0, ios-arm64 slice)')
 PY
+
+# Validate the wrapper plist the way Xcode will (plutil exists on the macOS
+# runner). A bad shape fails here, not after a full app build.
+plutil -lint "$XCFW/Info.plist" >/dev/null
+plutil -extract XCFrameworkFormatVersion raw -o - "$XCFW/Info.plist" | grep -qx '1.0' || {
+  echo 'error: xcframework wrapper Info.plist missing XCFrameworkFormatVersion=1.0' >&2; exit 1; }
 
 BIN="$XCFW/ios-arm64/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary"
 test -f "$BIN"

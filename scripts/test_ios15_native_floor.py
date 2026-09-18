@@ -402,22 +402,24 @@ class LocalPackageIntegrationTests(unittest.TestCase):
 
     def test_build_vad_script_writes_xcframework_wrapper_plist(self):
         # Xcode 26/SwiftPM rejects a local binaryTarget that is a plain
-        # .framework dir, and a hand-written framework-style wrapper plist
-        # (CFBundleExecutable/MinimumOSVersion) does not describe slices, so
-        # package resolution still fails. The wrapper plist must be the
-        # xcframework shape: CFBundlePackageType=XFWKIT plus an
-        # AvailableLibraries array with LibraryIdentifier/LibraryPath/
-        # SupportedArchitectures/SupportedPlatform, generated with plistlib.
+        # .framework dir, and a hand-written wrapper plist must match the
+        # real `xcodebuild -create-xcframework` shape: CFBundlePackageType is
+        # XFWK (not XFWKIT) and XCFrameworkFormatVersion=1.0 is REQUIRED.
+        # Without the format version, Xcode 26 fails with "Failed to decode
+        # XCFramework Info.plist ... because it is missing" even though the
+        # plist file exists. Also require the AvailableLibraries slice keys.
         script = (self.ROOT / 'deps/build_vad_framework.sh').read_text()
-        self.assertIn('CFBundlePackageType', script)
-        self.assertIn('XFWKIT', script)
-        self.assertIn('AvailableLibraries', script)
+        self.assertIn('XCFrameworkFormatVersion', script)
+        self.assertIn("'1.0'", script)
+        self.assertIn("'CFBundlePackageType'", script)
+        self.assertIn("'XFWK'", script)
         self.assertIn('LibraryIdentifier', script)
         self.assertIn('LibraryPath', script)
         self.assertIn('SupportedArchitectures', script)
         self.assertIn('SupportedPlatform', script)
         self.assertIn('plistlib.dumps', script)
-        # framework-style wrapper keys would be wrong here
+        # The old wrong shape (XFWKIT without format version) must not return
+        self.assertNotIn("'XFWKIT'", script)
         self.assertNotIn('<key>CFBundleExecutable</key>', script)
         self.assertNotIn('MinimumOSVersion</key>', script)
         # framework must land under the expected slice dir
