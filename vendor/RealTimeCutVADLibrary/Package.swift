@@ -38,7 +38,7 @@ let package = Package(
         ),
         .binaryTarget(
             name: "RealTimeCutVADCXXLibrary",
-            path: "Frameworks/RealTimeCutVADCXXLibrary.framework"
+            path: "Frameworks/RealTimeCutVADCXXLibrary.xcframework"
         ),
     ]
 )

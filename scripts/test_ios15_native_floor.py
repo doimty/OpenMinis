@@ -368,7 +368,7 @@ class LocalPackageIntegrationTests(unittest.TestCase):
 
     def test_vendored_package_uses_local_binary_path(self):
         manifest = (self.ROOT / 'vendor/RealTimeCutVADLibrary/Package.swift').read_text()
-        self.assertIn('path: "Frameworks/RealTimeCutVADCXXLibrary.framework"', manifest)
+        self.assertIn('path: "Frameworks/RealTimeCutVADCXXLibrary.xcframework"', manifest)
         self.assertNotIn('url:', manifest)
         self.assertNotIn('RealTimeCutVADLibraryForXCFramework', manifest)
 

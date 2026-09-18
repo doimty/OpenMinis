@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build RealTimeCutVADCXXLibrary.framework from pinned C++ source at the
+# Build RealTimeCutVADCXXLibrary.xcframework from pinned C++ source at the
 # iOS 15.0 deployment floor, for the app's local SPM package
 # (vendor/RealTimeCutVADLibrary). This replaces the upstream prebuilt zip
 # whose Mach-O minimum is 15.6 and would be refused by dyld on iOS 15.0-15.5.
@@ -77,11 +77,44 @@ grep -Fq '** BUILD SUCCEEDED **' "$WORK/build.log" || { tail -40 "$WORK/build.lo
 FRAMEWORK="$WORK/out/DerivedData/Build/Products/Release-iphoneos/RealTimeCutVADCXXLibrary.framework"
 test -d "$FRAMEWORK" || { echo 'error: built framework missing' >&2; exit 1; }
 
-echo "==> install local framework"
-rm -rf "$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.framework"
-cp -R "$FRAMEWORK" "$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.framework"
+echo "==> assemble local xcframework"
+XCFW="$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.xcframework"
+rm -rf "$XCFW"
+mkdir -p "$XCFW/ios-arm64/RealTimeCutVADCXXLibrary.framework"
+cp -R "$FRAMEWORK/." "$XCFW/ios-arm64/RealTimeCutVADCXXLibrary.framework/"
 
-BIN="$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary"
+# create-xcframework is unreliable in this pipeline (its output was
+# redirected and the failure was invisible); assemble the xcframework
+# directory tree directly. The slice directory name comes from the built
+# framework's Info.plist platform+arch (iPhoneOS/arm64 -> ios-arm64).
+cat > "$XCFW/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>RealTimeCutVADCXXLibrary</string>
+    <key>CFBundleIdentifier</key>
+    <string>RealTimeCutVADCXXLibrary</string>
+    <key>CFBundleName</key>
+    <string>RealTimeCutVADCXXLibrary</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundlePackageType</key>
+    <string>XCFramework</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>iPhoneOS</string>
+    </array>
+    <key>MinimumOSVersion</key>
+    <string>15.0</string>
+</dict>
+</plist>
+PLIST
+
+BIN="$XCFW/ios-arm64/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary"
 test -f "$BIN"
 echo "==> output binary: $BIN"
 file "$BIN"
