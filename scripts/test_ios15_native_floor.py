@@ -192,5 +192,59 @@ class FloorTests(unittest.TestCase):
         self.assertFalse(any(Path('/tmp').glob('vad-probe-*')))
 
 
+class RealOutputRegressionTests(unittest.TestCase):
+    def test_real_otool_l_does_not_require_h(self):
+        text = MODERN.replace('Mach header\n', '').replace(
+            '      magic cputype cpusubtype caps filetype ncmds sizeofcmds flags\n', '').replace(
+            'MH_MAGIC_64 ARM64 ALL 0x00 DYLIB 2 72 NOUNDEFS DYLDLINK\n', '')
+        result = audit_metadata(text, 'arm64', PLIST_OK, output=True)
+        self.assertTrue(result['ok'], result['errors'])
+
+    def test_earlier_high_archive_member_is_not_overwritten(self):
+        text = MODERN.replace('/tmp/F.framework/F', '/tmp/S.a(duplicate.o)').replace(
+            'minos 15.0', 'minos 16.0') + MODERN.replace('/tmp/F.framework/F', '/tmp/S.a(duplicate.o)')
+        result = audit_metadata(text, 'arm64', None, output=True)
+        self.assertFalse(result['ok'])
+        self.assertEqual(len(result['images']), 2)
+
+    def test_simulator_is_not_device(self):
+        result = audit_metadata(MODERN.replace('platform IOS', 'platform IOSSIMULATOR'),
+                                'arm64', PLIST_OK, output=True)
+        self.assertFalse(result['ok'])
+
+    def test_patch_minimum_cannot_be_dropped(self):
+        result = audit_metadata(MODERN.replace('minos 15.0', 'minos 15.0.1'),
+                                'arm64', PLIST_OK, output=True)
+        self.assertFalse(result['ok'])
+
+    def test_unknown_architecture_is_not_approved(self):
+        no_arch = MODERN.replace('MH_MAGIC_64 ARM64 ALL', 'MH_MAGIC_64  ALL')
+        result = audit_metadata(no_arch, '', PLIST_OK, output=True)
+        self.assertFalse(result['ok'])
+
+    def test_duplicate_minimum_is_not_last_value_wins(self):
+        text = MODERN.replace('minos 15.0', 'minos 16.0\n    minos 15.0')
+        self.assertFalse(audit_metadata(text, 'arm64', PLIST_OK, output=True)['ok'])
+
+    def test_toolchain_prefix_is_not_added_twice(self):
+        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text()
+        self.assertFalse('^Xcode ${EXPECTED_XCODE' in script,
+                         'workflow value already includes the Xcode prefix')
+        self.assertFalse('Build version ${EXPECTED_XCODE_BUILD' in script,
+                         'workflow value already includes the Build version prefix')
+
+    def test_metadata_failure_reaches_cli_exit_code(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'load.txt').write_text(MIN_15_6)
+            (root / 'arch.txt').write_text('arm64')
+            result = subprocess.run([sys.executable,
+                str(Path(__file__).parent / 'audit_ios15_native_floor.py'),
+                '--input', str(root / 'load.txt'), '--arch', str(root / 'arch.txt')],
+                capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+
+
 if __name__ == '__main__':
     unittest.main()

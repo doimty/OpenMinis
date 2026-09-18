@@ -86,8 +86,10 @@ note '=== toolchain ==='
 xcrun --sdk iphoneos --show-sdk-version > "$WORK/sdk-version.txt" 2>&1
 note "iphoneos SDK: $(cat "$WORK/sdk-version.txt")"
 TOOLCHAIN_RC=0
-grep -q "^Xcode ${EXPECTED_XCODE:-}$" "$WORK/xcode-version.txt" || TOOLCHAIN_RC=1
-grep -q "Build version ${EXPECTED_XCODE_BUILD:-}$" "$WORK/xcode-version.txt" || TOOLCHAIN_RC=1
+# The workflow env vars already carry the full strings ("Xcode 26.2",
+# "Build version 17C52"), so match them verbatim without re-adding prefixes.
+grep -q "^${EXPECTED_XCODE:-}$" "$WORK/xcode-version.txt" || TOOLCHAIN_RC=1
+grep -q "^${EXPECTED_XCODE_BUILD:-}$" "$WORK/xcode-version.txt" || TOOLCHAIN_RC=1
 [ "$(cat "$WORK/sdk-version.txt")" = "${EXPECTED_IOS_SDK:-}" ] || TOOLCHAIN_RC=1
 gate toolchain "$TOOLCHAIN_RC"
 [ "$TOOLCHAIN_RC" -eq 0 ] || exit 1
