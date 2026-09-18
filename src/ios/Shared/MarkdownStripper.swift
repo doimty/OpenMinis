@@ -2,6 +2,17 @@ import Foundation
 
 enum MarkdownStripper {
 
+    // Same deliberately simple pattern used by the renderer's diagnostics;
+    // this is not the Markdown parser and must not change rendering semantics.
+    private static let imageSyntax = try! NSRegularExpression(pattern: #"!\[([^\]]*)\]\(([^)]+)\)"#)
+
+    static func imageSyntaxMatches(in input: String) -> [String] {
+        guard input.contains("![") else { return [] }
+        let text = input as NSString
+        return imageSyntax.matches(in: input, range: NSRange(input.startIndex..<input.endIndex, in: input))
+            .map { text.substring(with: $0.range) }
+    }
+
     static func plainText(_ input: String) -> String {
         var s = input
 

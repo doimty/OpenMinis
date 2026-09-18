@@ -199,6 +199,25 @@ struct CompatUnevenRoundedRectangle: Shape {
     }
 }
 
+extension ToolbarItemPlacement {
+    static var compatSecondaryAction: ToolbarItemPlacement {
+        if #available(iOS 16.0, *) { return .secondaryAction }
+        return .navigationBarTrailing
+    }
+}
+
+extension Shape {
+    @ViewBuilder
+    func compatFillGradient(_ color: Color) -> some View {
+        if #available(iOS 16.0, *) {
+            fill(color.gradient)
+        } else {
+            fill(LinearGradient(colors: [color.opacity(0.8), color],
+                                startPoint: .top, endPoint: .bottom))
+        }
+    }
+}
+
 private struct LegacyFontWeight: ViewModifier {
     @Environment(\.font) private var inheritedFont
     let weight: Font.Weight

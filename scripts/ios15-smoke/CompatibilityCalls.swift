@@ -4,6 +4,7 @@ import WebKit
 import Speech
 import FileProvider
 import UserNotifications
+import AVFoundation
 
 // Exercise production adapters and real call shapes, not copied backports.
 // This proves type/availability contracts only, not on-device rendering.
@@ -59,9 +60,22 @@ struct ExistingSheetAdapters: View {
             } detail: {
                 CompatAnyShape(CompatUnevenRoundedRectangle(
                     bottomLeadingRadius: 16, bottomTrailingRadius: 16))
-                    .fill(Color.blue)
+                    .compatFillGradient(.blue)
                     .compatOnGeometryChange(for: CGFloat.self, of: { $0.size.width }) { _ in }
             }
+        }
+    }
+}
+
+func thumbnailAndImageDiagnosticsCalls(generator: AVAssetImageGenerator) async throws {
+    _ = try await ThumbnailCache.videoFrame(using: generator, at: .zero)
+    _ = MarkdownStripper.imageSyntaxMatches(in: "中文😀 ![图](x.png)")
+}
+
+struct SecondaryToolbarCalls: View {
+    var body: some View {
+        Text("Group").toolbar {
+            ToolbarItem(placement: .compatSecondaryAction) { Button("Copy") {} }
         }
     }
 }

@@ -4341,7 +4341,7 @@ final class VideoAttachment: NSTextAttachment {
 
             var thumb: UIImage?
             do {
-                let (cgImage, _) = try await generator.image(at: .zero)
+                let cgImage = try await ThumbnailCache.videoFrame(using: generator, at: .zero)
                 thumb = UIImage(cgImage: cgImage)
             } catch {
                 // Fallback: no thumbnail
@@ -7790,10 +7790,9 @@ struct SelectableMarkdownView: UIViewRepresentable {
         // becomes a measurable chunk of every updateUIView pass (and
         // updateUIView runs on each SwiftUI body re-evaluation, so it
         // multiplies during streaming and self-sizing measurement loops).
-        let imageMatches = markdown.ranges(of: /!\[([^\]]*)\]\(([^)]+)\)/)
+        let imageMatches = MarkdownStripper.imageSyntaxMatches(in: markdown)
         if !imageMatches.isEmpty {
-            for match in imageMatches {
-                let matchStr = String(markdown[match])
+            for matchStr in imageMatches {
                 imgLogger.info("[MinisImage][StreamParse] image markdown found: \(matchStr)")
             }
             let imageBlockCount = content.blocks.flatMap { Self.collectImageNodes(from: $0) }.count

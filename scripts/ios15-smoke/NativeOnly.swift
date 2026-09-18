@@ -4,6 +4,7 @@ import WebKit
 import Speech
 import FileProvider
 import UserNotifications
+import AVFoundation
 
 // Negative controls use the actual rejected API shapes. This entire file must
 // type-check at 16, and diagnose availability (not bad syntax) at 15.
@@ -73,6 +74,23 @@ func nativeFileProviderControl() {
     let domain = NSFileProviderDomain(identifier: NSFileProviderDomainIdentifier("smoke"), displayName: "Smoke")
     NSFileProviderManager.remove(domain, mode: .removeAll) { _, _ in }
     UNUserNotificationCenter.current().setBadgeCount(0) { _ in }
+}
+
+struct NativeDecorationControl: View {
+    var body: some View {
+        Circle().fill(Color.orange.gradient).toolbar {
+            ToolbarItem(placement: .secondaryAction) { Button("Copy") {} }
+        }
+    }
+}
+
+func nativeVideoFrameControl(generator: AVAssetImageGenerator) async throws {
+    _ = try await generator.image(at: .zero)
+}
+
+func nativeImageRegexControl(_ text: String) {
+    let pattern = try! Regex(#"!\[([^\]]*)\]\(([^)]+)\)"#)
+    _ = text.ranges(of: pattern)
 }
 
 struct NativeOptionalToolbarControl: View {

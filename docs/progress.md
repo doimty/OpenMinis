@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-09-18 — e26f9fd rendering API follow-up
+
+- Locked local/fork e26f9fd; run35336915696 failed18:56:04 in full app, while expanded15/16 smoke passed (including FileProvider/badge controls). Nonempty875010-byte log, exit65 and fixed-toolchain provenance: reports/openminis-ios15/run-35336915696-Gef7b2/. The previous app-startup diagnostics no longer appear.
+- Five diagnostics at four call shapes: toolbar secondaryAction, Color.gradient, async AVAssetImageGenerator.image(at:), and markdown.ranges(of: Regex). A whole-tree scan found no additional direct uses of these shapes outside the four diagnosed sites.
+- Plan: native secondaryAction/gradient retained on16+, older trailing toolbar/explicit gradient on15; video generation stays asynchronous using the existing callback API below16, with the same generator transform/size and caller-owned cache/onLoad; Foundation regex replaces ONLY diagnostic image-token scanning, not cmark rendering. Test full-range Unicode handling and compare actual helper output against the old Swift regex on the macOS runner.
+- Read the video attachment task, cache/notification path, existing callback-based video player, shared ThumbnailCache and MarkdownStripper. Minimal seams: add a static frame-loader helper to existing ThumbnailCache and image-token helper to existing MarkdownStripper (both already in app target). Extend real compiler smoke to those production files and exact failing API controls.
+- Success requires positive15/16 compiler checks, Foundation fixture equivalence and fresh full build. Independent failure signals: synchronous decode on UI, changed cache keys/size metadata/onLoad notifications, missing or duplicate continuation completion, image diagnostics corrupt CJK/emoji ranges, or a hidden copy action on15. Do not treat diagnostic error counts as a completion percentage.
+- Implemented and reviewed the six-file production diff. The two supporting files already have all four Xcode project references. Local structural test failed before edits and passes after:10/10; parser8/8; toolbar fixtures7/7 and zero findings; shell/diff checks pass and nine modified/new Swift files have no added parse errors. Test fixtures use the same Swift Regex engine via its constructor (the local parser does not understand the bare literal); no compiler error was suppressed. Real Apple smoke now includes eight production/support files and a host Foundation comparison for13 fixtures; those new cloud results remain pending.
+
 ## 2026-09-18 — f27b5a7 app-startup integration boundary
 
 - Fresh local/fork baseline is f27b5a7; run35332863701 failed at18:08:10 with four diagnostics in MinisApp (domain initializer, badge API, replicated-domain removeAll). Expanded smoke passed15/16. The pre-existing local badge branch is retained; no new push occurred through18:46.

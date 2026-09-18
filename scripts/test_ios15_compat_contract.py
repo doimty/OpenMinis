@@ -95,6 +95,15 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertEqual(app.count("UNUserNotificationCenter.current().setBadgeCount(0)"), 1)
         self.assertIn("UIApplication.shared.applicationIconBadgeNumber = 0", app)
 
+    def test_markdown_rendering_uses_legacy_safe_media_and_image_scan(self):
+        source = (ROOT / "src/ios/Views/Chat/SelectableMarkdownView.swift").read_text()
+        self.assertNotIn("markdown.ranges(of:", source)
+        self.assertNotIn("try await generator.image(at:", source)
+        self.assertIn("MarkdownStripper.imageSyntaxMatches(in: markdown)", source)
+        self.assertIn("ThumbnailCache.videoFrame(using: generator, at: .zero)", source)
+        self.assertIn("generator.appliesPreferredTrackTransform = true", source)
+        self.assertIn("generator.maximumSize = CGSize(width: 400, height: 400)", source)
+
 
 if __name__ == "__main__":
     unittest.main()
