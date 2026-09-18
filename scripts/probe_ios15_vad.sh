@@ -124,7 +124,12 @@ gate clone_wrapper "$CLONE_WRAPPER_RC"
 
 # --------------------------------------------------- download inputs (Mac) ----
 note '=== download pinned native inputs (macOS runner only) ==='
-mkdir -p "$WORK/inputs" "$WORK/native/Frameworks"
+mkdir -p "$WORK/inputs" "$WORK/src/native/Frameworks"
+# The native Xcode project references the input XCFrameworks at the repo-
+# relative path Frameworks/... (exactly what the upstream README instructs:
+# "Download and extract the required XCFrameworks into the Frameworks/
+# directory"). Extract into the temp clone's Frameworks/ so the build can
+# find them; the clone lives in RUNNER_TEMP and nothing else is written.
 ONNX_ZIP="$WORK/inputs/onnxruntime.xcframework.zip"
 APM_ZIP="$WORK/inputs/webrtc_audio_processing.xcframework.zip"
 curl -fsSL --retry 2 --max-time 900 -o "$ONNX_ZIP" "${ONNX_URL:?}"
@@ -139,7 +144,7 @@ DOWNLOAD_RC=0
 gate downloads "$DOWNLOAD_RC"
 [ "$DOWNLOAD_RC" -eq 0 ] || exit 1
 
-python3 - "$ONNX_ZIP" "$APM_ZIP" "$WORK/native/Frameworks" <<'PY'
+python3 - "$ONNX_ZIP" "$APM_ZIP" "$WORK/src/native/Frameworks" <<'PY'
 import sys, zipfile
 from pathlib import Path
 for archive, dest in [(sys.argv[1], Path(sys.argv[3])),
@@ -151,7 +156,7 @@ PY
 
 # --------------------------------------------------- structural inputs -------
 note '=== structural probe: xcframeworks ==='
-python3 - "$WORK/native/Frameworks" > "$WORK/inputs-structure.json" <<'PY'
+python3 - "$WORK/src/native/Frameworks" > "$WORK/inputs-structure.json" <<'PY'
 import json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
@@ -174,7 +179,7 @@ gate inputs_structure "$STRUCT_RC"
 # ------------------------------------------------------ audit inputs --------
 note '=== audit selected input slices (device arm64) ==='
 PROBE_SCRIPTS="$(pwd)/scripts" python3 - \
-  "$WORK/native/Frameworks" > "$WORK/inputs-audit.json" <<'PY'
+  "$WORK/src/native/Frameworks" > "$WORK/inputs-audit.json" <<'PY'
 import json, os, plistlib, subprocess, sys
 from pathlib import Path
 root = Path(sys.argv[1])
@@ -326,7 +331,9 @@ note '=== compile real upstream wrapper against rebuilt framework ==='
 WRAPPER_SRC="$WORK/src/wrapper/RealTimeCutVADLibrary/src"
 mkdir -p "$WORK/wrapper-build"
 SDK_PATH="$(xcrun --sdk iphoneos --show-sdk-path)"
-"$DEVELOPER_DIR/usr/bin/clang" -x objective-c \
+# clang lives under Toolchains/XcodeDefault.xctoolchain, not $DEVELOPER_DIR/usr/bin;
+# xcrun resolves it from the pinned DEVELOPER_DIR.
+xcrun --sdk iphoneos clang -x objective-c \
   -target arm64-apple-ios15.0 \
   -isysroot "$SDK_PATH" \
   -fobjc-arc -fmodules \
