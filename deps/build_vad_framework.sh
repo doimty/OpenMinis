@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build RealTimeCutVADCXXLibrary.xcframework from pinned C++ source at the
+# Build RealTimeCutVADCXXLibrary.framework from pinned C++ source at the
 # iOS 15.0 deployment floor, for the app's local SPM package
 # (vendor/RealTimeCutVADLibrary). This replaces the upstream prebuilt zip
 # whose Mach-O minimum is 15.6 and would be refused by dyld on iOS 15.0-15.5.
@@ -72,15 +72,13 @@ echo "==> xcodebuild: device arm64, explicit 15.0, signing off"
 grep -q '** BUILD SUCCEEDED **' "$WORK/build.log" || { tail -40 "$WORK/build.log"; echo 'error: VAD build failed' >&2; exit 1; }
 
 FRAMEWORK="$WORK/out/DerivedData/Build/Products/Release-iphoneos/RealTimeCutVADCXXLibrary.framework"
-test -d "$FRAMEWORK"
+test -d "$FRAMEWORK" || { echo 'error: built framework missing' >&2; exit 1; }
 
-echo "==> create local xcframework"
-rm -rf "$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.xcframework"
-"$DEVELOPER_DIR/usr/bin/xcodebuild" -create-xcframework \
-  -framework "$FRAMEWORK" \
-  -output "$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.xcframework" > "$WORK/create.log" 2>&1
+echo "==> install local framework"
+rm -rf "$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.framework"
+cp -R "$FRAMEWORK" "$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.framework"
 
-BIN="$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.xcframework/ios-arm64/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary"
+BIN="$VENDOR_FRAMEWORKS/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary"
 test -f "$BIN"
 echo "==> output binary: $BIN"
 file "$BIN"
