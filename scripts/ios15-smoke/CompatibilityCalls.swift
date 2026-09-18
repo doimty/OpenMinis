@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import WebKit
+import Speech
 
 // Exercise production adapters and real call shapes, not copied backports.
 // This proves type/availability contracts only, not on-device rendering.
@@ -87,4 +88,20 @@ func hostingAndWebKitCalls() {
     if #available(iOS 15.4, *) { webConfiguration.preferences.isElementFullscreenEnabled = true }
     if #available(iOS 16.0, *) { _ = UITextView(usingTextLayoutManager: true) }
     else { _ = UITextView() }
+}
+
+@MainActor
+func speechRequestCalls(url: URL) {
+    let request = SFSpeechURLRecognitionRequest(url: url)
+    request.shouldReportPartialResults = true
+    if #available(iOS 16.0, *) { request.addsPunctuation = true }
+    request.taskHint = .dictation
+}
+
+func cancellableTimerCalls() async {
+    try? await Task.sleep(nanoseconds: 200_000_000)
+    guard !Task.isCancelled else { return }
+    let settleMillis = 1200
+    try? await Task.sleep(nanoseconds: UInt64(settleMillis) * 1_000_000)
+    guard !Task.isCancelled else { return }
 }

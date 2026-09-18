@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import WebKit
+import Speech
 
 // Negative controls use the actual rejected API shapes. This entire file must
 // type-check at 16, and diagnose availability (not bad syntax) at 15.
@@ -54,4 +55,14 @@ func nativeWebKitControl() {
     let configuration = WKWebViewConfiguration()
     configuration.preferences.isElementFullscreenEnabled = true
     _ = UITextView(usingTextLayoutManager: true)
+}
+
+@MainActor
+func nativeSpeechControl(url: URL) {
+    let request = SFSpeechURLRecognitionRequest(url: url)
+    request.addsPunctuation = true
+}
+
+func nativeTimerControl() async throws {
+    try await Task.sleep(for: .milliseconds(200))
 }

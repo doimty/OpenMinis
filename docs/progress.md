@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-09-18 — 5419af1 full-build follow-up: voice punctuation and timer API availability
+
+- Locked local/fork baseline `5419af10b82cc1ae599824d02702d87cbbb35699`, clean tree. Run `35327969342` failed at 17:11:58 in the full app probe, not in the compatibility smoke.
+- Fresh artifacts: `reports/openminis-ios15/run-35327969342-5pqmzP/`; 816042-byte xcodebuild log, exit 65, versions match the Xcode26.2/17C52/iSH pin. `actions.log` lines 483/520 explicitly show all six production compatibility files passing type-check at 15 and 16. NativeOnly's availability errors are the expected negative control, not a failing smoke.
+- Actual nine diagnostics: one `addsPunctuation` (VoiceProvider+System), plus four Duration-based Task.sleep sites emitting two diagnostics each (VoiceProviderResolver and SpeechPlayerControl). Inventory found four more identical sleep calls in AIChatView that this stopped build did not diagnose.
+- Narrow plan: guard only automatic speech punctuation at iOS16; preserve transcription and every other request option on 15. Convert all eight millisecond sleeps to the existing project-wide Task.sleep(nanoseconds:) convention, with the same intervals, Task ownership, try?/cancellation guards and delayed side effects. Do not introduce another clock abstraction or alter debounce policy.
+- Hypotheses: (1) unguarded iOS16 request property and Duration clock API are the cause, directly evidenced; (2) incomplete compiler batches explain the additional four identical source calls; (3) environment drift is ruled out by matching versions and successful 15/16 smoke. Replayed the frozen compiler log; no speculative bisection or runtime instrumentation is needed.
+- Before source fixes, extend structural regression checks to fail on Duration sleeps in chat/voice and to verify the eight exact intervals plus post-sleep cancellation guards. Add the speech/timer call shapes to the Apple-compiler positive/negative fixtures. Those checks do not replace a fresh full build.
+- Success: old nine diagnostics absent from a new pinned build, smoke remains green, full xcodebuild zero required for M1. Independent failures: milliseconds accidentally treated as nanoseconds, lost Task cancellation, speech recognition itself disabled on iOS15, or expected negative-control errors reported as new app failures. Device acceptance remains outstanding.
+- Implemented the one-property availability guard and all eight sleep conversions in four source files. Reviewed the production diff: Task ownership, interval values, cancellation checks and subsequent actions are otherwise unchanged.
+- Local regression evidence: new checks failed on 5419af1 (three new methods, including interval subcases); after the source fixes all 6 structural tests and all 8 parser tests pass. Bash syntax, whitespace and six changed Swift files' syntax delta pass; unlike the earlier ad-hoc scanner this delta check exits nonzero on new parser errors. The new Speech/Duration positive/negative compiler fixtures await the next cloud run.
+
 ## 2026-09-18 17:10 — compiler batch 2: f644f41 + five diagnosed + inventory sweep
 
 - Baseline f644f41, run 35316524791 failed (5 diagnostics). Evidence in reports/openminis-ios15/run-35316524791-tZZ8D9/; replayed by scripts/ios15_build_log.py. Plan: docs/ios15-compiler-batch.md.
