@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-09-18 — c3eacb9 full-build follow-up: conditional toolbar builders
+
+- Baseline local/fork `c3eacb9a9315e9e3d59a30fd447d8cba83acc567`, clean before this batch. Run `35330747608` failed at 17:43:04 in the full app, while expanded iOS15/16 smoke passed. Artifact `reports/openminis-ios15/run-35330747608-M8WlyJ/` has 800024-byte log, exit65, matching versions; actions.log lines519/556 confirm smoke PASS. The nine speech/timer diagnostics no longer appear.
+- Two reported diagnostics come from ONE `if hasChanges { ToolbarItem { Save } }` in SkillFileDetailView. `ToolbarContentBuilder.buildIf`/Optional ToolbarContent needs iOS16; this is not the same builder as conditional Button content inside a ToolbarItem.
+- Read the enclosing editor/save action and all toolbar-declaration owners. AST sweep (nearest closure/builder ownership, existing availability awareness) found eight legacy-visible conditional toolbar owners, including the reported editor and seven others. Extend `plan_ios15_adapters.py --check-toolbars` plus seven scanner fixtures; prove eight findings/exit1 before production edits.
+- Plan: keep each ToolbarItem unconditional and move visibility/branching into its ViewBuilder content. Preserve placements, actions, disable conditions, and all destructive-action confirmation dialogs; never wrap the entire editor/form in a state-dependent parent branch. Named multi-select toolbar follows the same rule for Cancel/Add/Done. No new compatibility abstraction needed.
+- Hypotheses: result-builder availability, directly supported by compiler diagnostics; stopped compiler batches explain seven unreported owners; toolchain drift contradicted by matching provenance and passed smoke. Bisection/runtime instrumentation would not add evidence here. Add exact optional/if-else toolbar cases to compiler negative controls and fixed item-content forms to positive controls.
+- Success: scanner zero, scanner tests pass, expanded Apple smoke passes15/16, then full app exit0 required. Failures independent of compilation: unchanged editor exposes Save, running backup exposes Delete, disconnected remote exposes Save Here, multi-select actions lose placement/disabled state, or a conditional parent rebuild resets editor state. Those visibility paths still require device acceptance after compile.
+- Applied the eight narrowly scoped builder rearrangements; reviewed the full production diff to confirm only nesting changed, not callbacks/guards/confirmations. Local evidence: toolbar AST findings 8→0, scanner fixtures 7/7, structural suite6/6, parser8/8, shell syntax/diff checks pass, ten changed Swift files have no increased parse-error count. The AST checker uses the existing local tree-sitter environment; CI remains the real Apple smoke/full-build gate, with no new pip/network dependency.
+
 ## 2026-09-18 — 5419af1 full-build follow-up: voice punctuation and timer API availability
 
 - Locked local/fork baseline `5419af10b82cc1ae599824d02702d87cbbb35699`, clean tree. Run `35327969342` failed at 17:11:58 in the full app probe, not in the compatibility smoke.

@@ -52,6 +52,44 @@ def guarded(node, data):
     return False
 
 
+def toolbar_conditionals(data, parser):
+    """Find conditionals owned by ToolbarContentBuilder, not an item's ViewBuilder.
+
+    Availability scanning is an aid only; the Apple compiler remains the gate.
+    A nested Button/Menu/ToolbarItem closure owns its own ViewBuilder, so stop
+    at the nearest closure instead of flagging every `if` beneath a toolbar.
+    """
+    stack = [parser.parse(data).root_node]
+    found = []
+    while stack:
+        node = stack.pop()
+        stack.extend(reversed(node.children))
+        if node.type not in {'if_statement', 'switch_statement'} or guarded(node, data):
+            continue
+        parent = node.parent
+        owner = None
+        while parent is not None:
+            if parent.type == 'lambda_literal':
+                suffix = parent.parent
+                call = suffix.parent if suffix else None
+                if call and call.type == 'call_expression':
+                    nav = next((c for c in call.named_children if c.type == 'navigation_expression'), None)
+                    if nav:
+                        tail = next((c for c in reversed(nav.named_children) if c.type == 'navigation_suffix'), None)
+                        if tail and tail.text.strip() == b'.toolbar':
+                            owner = 'toolbar closure'
+                break
+            if parent.type in {'property_declaration', 'function_declaration'}:
+                if any(c.type == 'modifiers' and b'@ToolbarContentBuilder' in c.text for c in parent.named_children):
+                    owner = 'ToolbarContentBuilder declaration'
+                break
+            parent = parent.parent
+        if owner:
+            found.append({'line': node.start_point.row + 1, 'owner': owner,
+                          'condition': node.text.splitlines()[0].decode('utf-8')})
+    return found
+
+
 def replacements(data, parser):
     root = parser.parse(data).root_node
     stack = [root]
@@ -118,10 +156,23 @@ def exact_edits(data, changes):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--output-dir', required=True, type=Path)
+    mode = ap.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--output-dir', type=Path)
+    mode.add_argument('--check-toolbars', action='store_true',
+                      help='Report legacy-visible ToolbarContentBuilder conditionals and fail if any remain')
     args = ap.parse_args()
     repo = Path(__file__).resolve().parents[1]
     parser = Parser(Language(tree_sitter_swift.language()))
+    if args.check_toolbars:
+        findings = {}
+        for path in sorted((repo / 'src/ios').rglob('*.swift')):
+            if any(part in {'MinisTests', 'MinisUITests', 'AgentWidget', 'FileProvider'} for part in path.parts):
+                continue
+            matches = toolbar_conditionals(path.read_bytes(), parser)
+            if matches:
+                findings[str(path.relative_to(repo))] = matches
+        print(json.dumps({'files': len(findings), 'findings': findings}, indent=2))
+        raise SystemExit(bool(findings))
     plans = []
     counts = {}
     for path in sorted((repo / 'src/ios').rglob('*.swift')):

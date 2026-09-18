@@ -30,7 +30,7 @@ if check 15.0 "$fixture/NativeOnly.swift" > "$work/native-ios15.log" 2>&1; then
   echo 'FAIL: native iOS 16 controls unexpectedly type-checked at iOS 15' >&2
   exit 1
 fi
-for symbol in LabeledContent NavigationStack presentationDetents persistentSystemOverlays UnevenRoundedRectangle contextMenu isElementFullscreenEnabled addsPunctuation sleep milliseconds; do
+for symbol in LabeledContent NavigationStack presentationDetents persistentSystemOverlays UnevenRoundedRectangle contextMenu isElementFullscreenEnabled addsPunctuation sleep milliseconds buildIf; do
   if ! grep -E "error: '.*${symbol}.*' is only available in iOS" "$work/native-ios15.log" >/dev/null; then
     cat "$work/native-ios15.log" >&2
     echo "FAIL: negative control did not diagnose $symbol availability" >&2

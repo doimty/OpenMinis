@@ -105,3 +105,28 @@ func cancellableTimerCalls() async {
     try? await Task.sleep(nanoseconds: UInt64(settleMillis) * 1_000_000)
     guard !Task.isCancelled else { return }
 }
+
+struct ConditionalToolbarCalls: View {
+    let dirty: Bool
+    let multi: Bool
+    let emptySelection: Bool
+    let isLive: Bool
+
+    var body: some View {
+        Text("Editor").toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                if multi { Button("Cancel") {} }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if dirty { Button("Save") {} }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                if multi { Button("Add") {}.disabled(emptySelection) }
+                else { Button("Done") {} }
+            }
+            ToolbarItem(placement: .bottomBar) {
+                if !isLive { Button("Delete", role: .destructive) {} }
+            }
+        }
+    }
+}

@@ -66,3 +66,28 @@ func nativeSpeechControl(url: URL) {
 func nativeTimerControl() async throws {
     try await Task.sleep(for: .milliseconds(200))
 }
+
+struct NativeOptionalToolbarControl: View {
+    let dirty: Bool
+    var body: some View {
+        Text("Editor").toolbar {
+            if dirty {
+                ToolbarItem(placement: .navigationBarTrailing) { Button("Save") {} }
+            }
+        }
+    }
+}
+
+struct NativeBranchToolbarControl: View {
+    let multi: Bool
+    var body: some View {
+        Text("Models").toolbar {
+            if multi {
+                ToolbarItem(placement: .navigationBarLeading) { Button("Cancel") {} }
+                ToolbarItem(placement: .navigationBarTrailing) { Button("Add") {} }
+            } else {
+                ToolbarItem(placement: .navigationBarTrailing) { Button("Done") {} }
+            }
+        }
+    }
+}
