@@ -80,7 +80,7 @@ struct DragDropCompatibilityCalls: View {
         Text("Sidebar")
             .compatDraggable(sessionIds.first ?? "")
             .compatDropDestination(for: String.self,
-                action: { values in
+                action: { values, _ in
                     guard !values.isEmpty else { return false }
                     return true
                 },

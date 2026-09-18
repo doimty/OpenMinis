@@ -4580,7 +4580,7 @@ struct ContentView: View {
             // folder — the drag gesture works both directions, otherwise
             // moving out would still require a trip through the menu.
             .compatDropDestination(for: String.self,
-                action: { sessionIds in
+                action: { sessionIds, _ in
                     Task { @MainActor in
                         await ChatStore.shared.setFolder(nil, forSessions: sessionIds)
                         refreshSessionList()
@@ -4790,7 +4790,7 @@ struct ContentView: View {
         .id("folderHeader-\(group.folderId ?? "")")
         .listRowInsets(EdgeInsets())
         .compatDropDestination(for: String.self,
-            action: { sessionIds in
+            action: { sessionIds, _ in
                 guard let fid = group.folderId else { return false }
                 Task { @MainActor in
                     await ChatStore.shared.setFolder(fid, forSessions: sessionIds)

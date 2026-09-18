@@ -242,13 +242,13 @@ extension View {
     @ViewBuilder
     func compatDropDestination(
         for payloadType: String.Type,
-        action: @escaping ([String]) -> Bool,
+        action: @escaping ([String], CGPoint) -> Bool,
         isTargeted: @escaping (Bool) -> Void
     ) -> some View {
         if #available(iOS 16.0, *) {
             dropDestination(for: payloadType, action: action, isTargeted: isTargeted)
         } else {
-            LegacyStringDropTarget(content: self, action: action, isTargeted: isTargeted)
+            LegacyStringDropTarget(content: self, action: { values in action(values, .zero) }, isTargeted: isTargeted)
         }
     }
 
