@@ -262,24 +262,66 @@ def audit_metadata(otool_text, arch_text, plist, output=False):
     return {'ok': not errors, 'errors': errors}
 
 
-def audit_dependencies(text):
-    """Parse `otool -Iv` and return exported/imported symbol and library lines."""
+REQUIRED_EXPORTS = frozenset((
+    '_create_vad_instance', '_destroy_vad_instance', '_set_vad_callback',
+    '_set_vad_sample_rate', '_set_vad_threshold', '_set_vad_model',
+    '_process_vad_audio',
+))
+
+
+def audit_dependencies(nm_text, deps_text):
+    """Validate C ABI exports and dynamic dependency closure.
+
+    nm_text: `nm -gU` output — the actual global defined-symbol table.
+    deps_text: `otool -L` output — the dynamic dependency list.
+
+    Required C entrypoints (the 5-arg continuing-PCM callback ABI plus the
+    surrounding instance API) must be GLOBAL DEFINED symbols: an nm line of
+    the form '<addr> T <name>' (T = text section, lowercase t = local, U =
+    undefined). Indirect-symbol/stub tables (otool -Iv) are NOT exports and
+    must never count. The dynamic dependency closure must be limited to the
+    framework itself plus system frameworks/libraries; an unapproved native
+    dependency (e.g. @rpath/onnxruntime.framework) is an error.
+    """
     exports = []
-    imports = []
-    libraries = []
-    for line in text.splitlines():
-        if re.search(r'\b(_set_vad_callback|_create_vad_instance|'
-                     r'_destroy_vad_instance|_set_vad_sample_rate|'
-                     r'_set_vad_threshold|_set_vad_model|'
-                     r'_process_vad_audio)\b', line):
+    exports_error = []
+    export_names = set()
+    for line in nm_text.splitlines():
+        fields = line.split()
+        if len(fields) < 2:
+            continue
+        # nm -gU lines: '<address> <type> <name>'. 'U' is undefined
+        # (imported), lowercase types are local/hidden — neither is an export.
+        kind = fields[1]
+        name = fields[2] if len(fields) > 2 else ''
+        if kind.isupper() and name in REQUIRED_EXPORTS:
             exports.append(line.strip())
-        if re.search(r'\b(_?dyld_stub_binder)\b', line):
-            imports.append(line.strip())
+            export_names.add(name)
+    missing = sorted(REQUIRED_EXPORTS - export_names)
+    if missing:
+        exports_error.append(
+            'missing required C entrypoint(s): ' + ', '.join(missing))
+
+    libraries = []
+    deps_error = []
+    for line in deps_text.splitlines():
         if '.framework/' in line or '.dylib' in line or '/usr/lib/' in line:
             libraries.append(line.strip())
+    allowed_prefixes = (
+        '@rpath/RealTimeCutVADCXXLibrary.framework',
+        '/System/Library/Frameworks/',
+        '/usr/lib/',
+    )
+    for line in libraries:
+        stripped = line.lstrip()
+        if not any(stripped.startswith(prefix) for prefix in allowed_prefixes):
+            deps_error.append('unapproved dynamic dependency: ' + stripped)
+
+    errors = exports_error + deps_error
     return {
+        'ok': not errors,
+        'errors': errors,
         'export_lines': exports,
-        'import_lines': imports,
         'library_lines': libraries,
     }
 

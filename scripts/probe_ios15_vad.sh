@@ -36,18 +36,27 @@ sha256_file() {
 
 # Evidence is assembled on EVERY exit path, including early gate failures.
 summarize() {
-  python3 - "$WORK" <<'PY'
+  python3 - "$WORK" "$PROBE_EXIT" <<'PY'
 import json, os, sys
 from pathlib import Path
 work = Path(sys.argv[1])
+process_exit = int(sys.argv[2])
 status = {}
 for line in (work / 'status.txt').read_text().splitlines():
     key, value = line.split('=', 1)
     status[key] = int(value)
+# All gates must have run and passed, and the script must have exited 0.
+REQUIRED_GATES = ('toolchain', 'clone_native', 'clone_wrapper', 'downloads',
+                   'inputs_structure', 'inputs_audit', 'build', 'output_audit',
+                   'wrapper_abi')
+approved = (process_exit == 0
+            and set(REQUIRED_GATES) <= set(status)
+            and all(status.get(gate, 1) == 0 for gate in REQUIRED_GATES))
 evidence = {
     'probe': 'ios15-vad-probe',
     'status': status,
-    'approved': all(value == 0 for value in status.values()),
+    'process_exit': process_exit,
+    'approved': approved,
     'device_arm64_only': True,
     'slices_built': ['iphoneos/arm64'],
     'inputs': {
@@ -57,26 +66,31 @@ evidence = {
         'wrapper_source_sha': os.environ.get('WRAPPER_CXX_SHA', ''),
     },
 }
+# Distinct names avoid macOS case-insensitive collisions (-l vs -L are the
+# same file on APFS) and keep every probe artifact off the filesystem-name
+# path. Never truncate evidence: a truncated build log could hide the real
+# failure and still look green.
 for path in ('xcode-version.txt', 'sdk-version.txt', 'settings.txt',
              'inputs-audit.json', 'inputs-structure.json', 'out/build.log',
-             'out/output-audit.json', 'out/output-otool-l.txt',
-             'out/output-otool-Iv.txt', 'out/output-otool-L.txt',
+             'out/output-audit.json', 'out/output-otool-loadcmds.txt',
+             'out/output-nm.txt', 'out/output-otool-deps.txt',
              'out/output-file.txt', 'out/output-binary.sha256',
              'wrapper-build/compile.log', 'wrapper-build/VADWrapper.o.sha256'):
     file_path = work / path
     if file_path.exists():
         evidence[path.replace('/', '_')] = file_path.read_text(
-            errors='replace')[:200000]
+            errors='replace')
 evidence_dir = work / 'evidence'
 evidence_dir.mkdir(exist_ok=True)
 (evidence_dir / 'evidence.json').write_text(
     json.dumps(evidence, indent=1) + '\n')
-print('VERDICT: ' + ('APPROVED' if evidence['approved'] else 'NOT APPROVED'))
+print('VERDICT: ' + ('APPROVED' if approved else 'NOT APPROVED'))
 for key, value in status.items():
     print('  %s: %s' % (key, 'ok' if value == 0 else 'FAIL(%d)' % value))
 PY
 }
-trap summarize EXIT
+PROBE_EXIT=0
+trap 'PROBE_EXIT=$?; summarize' EXIT
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:?}"
 
@@ -287,9 +301,11 @@ if [ -n "$FRAMEWORK" ] && [ "$BUILD_RC" -eq 0 ]; then
   BINARY="$FRAMEWORK/RealTimeCutVADCXXLibrary"
   PLIST="$FRAMEWORK/Info.plist"
   file "$BINARY" > "$WORK/out/output-file.txt"
-  otool -l "$BINARY" > "$WORK/out/output-otool-l.txt" 2>&1
-  otool -Iv "$BINARY" > "$WORK/out/output-otool-Iv.txt" 2>&1
-  otool -L "$BINARY" > "$WORK/out/output-otool-L.txt" 2>&1
+  # Distinct file names: -l vs -L are the same file on macOS's case-
+  # insensitive APFS, so otool -l and otool -L must never share a base name.
+  otool -l "$BINARY" > "$WORK/out/output-otool-loadcmds.txt" 2>&1
+  nm -gU "$BINARY" > "$WORK/out/output-nm.txt" 2>&1
+  otool -L "$BINARY" > "$WORK/out/output-otool-deps.txt" 2>&1
   sha256_file "$BINARY" > "$WORK/out/output-binary.sha256"
   sha256_file "$PLIST" > "$WORK/out/output-plist.sha256"
   PROBE_SCRIPTS="$(pwd)/scripts" python3 - "$WORK/out" "$FRAMEWORK" \
@@ -302,7 +318,7 @@ from audit_ios15_native_floor import audit_dependencies, audit_image
 binary = framework / 'RealTimeCutVADCXXLibrary'
 plist = plistlib.loads((framework / 'Info.plist').read_bytes())
 audit = audit_image(
-    (out / 'output-otool-l.txt').read_text(errors='replace'),
+    (out / 'output-otool-loadcmds.txt').read_text(errors='replace'),
     (out / 'output-file.txt').read_text(errors='replace'),
     str(binary))
 audit['plist'] = plist
@@ -312,14 +328,17 @@ if plist_min is not None:
     parts = [int(part) for part in str(plist_min).split('.')]
     plist_minimum_ok = (parts[0], parts[1] if len(parts) > 1 else 0) <= (15, 0)
 audit['plist_minimum_ok'] = plist_minimum_ok
+# Exports come from `nm -gU` (the actual external symbol table), not from
+# otool -Iv, whose indirect-symbol table is about stubs, not definitions.
 audit['exports'] = audit_dependencies(
-    (out / 'output-otool-Iv.txt').read_text(errors='replace'))
+    (out / 'output-nm.txt').read_text(errors='replace'),
+    (out / 'output-otool-deps.txt').read_text(errors='replace'))
 print(json.dumps(audit, indent=1))
 PY
   OUTPUT_RC=0
   python3 -c 'import json,sys
 d=json.load(open(sys.argv[1]))
-ok = d["plist_minimum_ok"] and not d["errors"] and any("set_vad_callback" in l for l in d["exports"]["export_lines"])
+ok = d["plist_minimum_ok"] and not d["errors"] and d["exports"]["ok"]
 sys.exit(0 if ok else 1)' "$WORK/out/output-audit.json" || OUTPUT_RC=1
 else
   printf '{"error": "no framework produced"}' > "$WORK/out/output-audit.json"

@@ -74,16 +74,18 @@ PLIST_OK = {
     'MinimumOSVersion': '15.0',
     'CFBundleSupportedPlatforms': ['iPhoneOS'],
 }
-EXPORTS = """F(F):
-  - _create_vad_instance
-  - _set_vad_callback
-  - _set_vad_sample_rate
-  - _set_vad_threshold
-  - _set_vad_model
-  - _process_vad_audio
-  - _dyld_stub_binder
-  - framework RealTimeCutVADCXXLibrary
-  - /usr/lib/libSystem.B.dylib
+# Actual `nm -gU` shape. Indirect-symbol tables are NOT export tables.
+EXPORTS = """0000000000001000 T _create_vad_instance
+0000000000001010 T _destroy_vad_instance
+0000000000001020 T _set_vad_callback
+0000000000001030 T _set_vad_sample_rate
+0000000000001040 T _set_vad_threshold
+0000000000001050 T _set_vad_model
+0000000000001060 T _process_vad_audio
+"""
+DEPENDENCIES = """/tmp/RealTimeCutVADCXXLibrary:
+    @rpath/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary (compatibility version 1.0.0, current version 1.0.0)
+    /usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
 """
 MIN_15_6 = MODERN.replace('minos 15.0', 'minos 15.6')
 LEGACY_15_6 = LEGACY.replace('version 15.0', 'version 15.6')
@@ -154,7 +156,8 @@ class FloorTests(unittest.TestCase):
         self.assertTrue(any('platform' in error for error in result['errors']))
 
     def test_continuing_pcm_callback_exports_present(self):
-        parsed = audit_dependencies(EXPORTS)
+        parsed = audit_dependencies(EXPORTS, DEPENDENCIES)
+        self.assertEqual(parsed['errors'], [])
         self.assertTrue(parsed['export_lines'])
         self.assertTrue(any('set_vad_callback' in line for line in parsed['export_lines']))
         self.assertTrue(any('process_vad_audio' in line for line in parsed['export_lines']))
@@ -257,6 +260,73 @@ class RealOutputRegressionTests(unittest.TestCase):
                 '--input', str(root / 'load.txt'), '--arch', str(root / 'arch.txt')],
                 capture_output=True, text=True, timeout=10)
             self.assertNotEqual(result.returncode, 0)
+
+
+class OutputEvidenceRegressionTests(unittest.TestCase):
+    def test_evidence_paths_are_unique_on_case_insensitive_filesystems(self):
+        import re
+        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text()
+        paths = set(re.findall(r'\$WORK/(out/[^"\s]+\.txt)', script))
+        folded = {}
+        for path in paths:
+            folded.setdefault(path.casefold(), set()).add(path)
+        collisions = [sorted(paths) for paths in folded.values() if len(paths) > 1]
+        self.assertEqual(collisions, [], 'macOS -l/-L files must not overwrite each other')
+
+    def test_undefined_callback_is_not_an_export(self):
+        text = EXPORTS.replace('0000000000001020 T _set_vad_callback',
+                               '                 U _set_vad_callback')
+        parsed = audit_dependencies(text, DEPENDENCIES)
+        self.assertTrue(parsed['errors'])
+        self.assertFalse(any('_set_vad_callback' in line for line in parsed['export_lines']))
+
+    def test_indirect_symbol_table_is_not_export_evidence(self):
+        indirect = 'Indirect symbols for (__TEXT,__stubs) 1 entries\n0x1000 31 _set_vad_callback\n'
+        parsed = audit_dependencies(indirect, DEPENDENCIES)
+        self.assertFalse(parsed['export_lines'])
+        self.assertTrue(parsed['errors'])
+
+    def test_missing_required_c_entrypoint(self):
+        text = '\n'.join(line for line in EXPORTS.splitlines() if 'destroy_vad_instance' not in line)
+        self.assertTrue(audit_dependencies(text, DEPENDENCIES)['errors'])
+
+    def test_unaudited_native_dependency_rejected(self):
+        deps = DEPENDENCIES + '    @rpath/onnxruntime.framework/onnxruntime (compatibility version 1.0.0)\n'
+        self.assertTrue(audit_dependencies(EXPORTS, deps)['errors'])
+
+    def _summarize(self, work, statuses, exit_code=0):
+        import subprocess, sys
+        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text()
+        body = script.split('summarize() {', 1)[1].split("<<'PY'\n", 1)[1].split('\nPY\n', 1)[0]
+        (work / 'status.txt').write_text(statuses)
+        subprocess.run([sys.executable, '-', str(work), str(exit_code)], input=body,
+                       capture_output=True, text=True, check=True, timeout=10)
+        import json
+        return json.loads((work / 'evidence/evidence.json').read_text())
+
+    def test_partial_gate_list_cannot_approve(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = self._summarize(Path(tmp), 'toolchain=0\n')
+            self.assertFalse(summary['approved'])
+
+    def test_nonzero_process_cannot_approve(self):
+        statuses = ''.join(f'{name}=0\n' for name in (
+            'toolchain', 'clone_native', 'clone_wrapper', 'downloads', 'inputs_structure',
+            'inputs_audit', 'build', 'output_audit', 'wrapper_abi'))
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = self._summarize(Path(tmp), statuses, 1)
+            self.assertFalse(summary['approved'])
+
+    def test_evidence_is_not_truncated(self):
+        import json as _json
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            (work / 'out').mkdir()
+            content = 'start\n' + 'x' * 210000 + '\nBUILD SUCCEEDED\n'
+            (work / 'out/build.log').write_text(content)
+            self._summarize(work, 'toolchain=0\n')
+            evidence = _json.loads((work / 'evidence/evidence.json').read_text())
+            self.assertEqual(evidence['out_build.log'], content)
 
 
 if __name__ == '__main__':
