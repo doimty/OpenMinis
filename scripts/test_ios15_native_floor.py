@@ -391,6 +391,15 @@ class LocalPackageIntegrationTests(unittest.TestCase):
         workflow = (self.ROOT / '.github/workflows/ios15-m0-baseline.yml').read_text()
         self.assertIn('1648fc13a04a90521a2ef3887885ef2506208605', workflow)
 
+    def test_build_vad_script_success_marker_is_fixed_string(self):
+        # `**` is an invalid BRE repetition operator: `grep '** BUILD
+        # SUCCEEDED **'` fails with "repetition-operator operand invalid" on
+        # BSD grep (macOS) even when xcodebuild succeeded, so the native-deps
+        # step misreports a green VAD build as failed. Must be grep -Fq.
+        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text()
+        self.assertIn("grep -Fq '** BUILD SUCCEEDED **'", script)
+        self.assertNotIn("grep -q '** BUILD SUCCEEDED **'", script)
+
 
 if __name__ == '__main__':
     unittest.main()

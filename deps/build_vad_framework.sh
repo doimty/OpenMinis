@@ -69,7 +69,10 @@ echo "==> xcodebuild: device arm64, explicit 15.0, signing off"
   IPHONEOS_DEPLOYMENT_TARGET=15.0 \
   CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO \
   build > "$WORK/build.log" 2>&1
-grep -q '** BUILD SUCCEEDED **' "$WORK/build.log" || { tail -40 "$WORK/build.log"; echo 'error: VAD build failed' >&2; exit 1; }
+# Fixed-string match: the `*` characters are BRE repetition operators, so a
+# plain `grep '** BUILD SUCCEEDED **'` fails with "repetition-operator operand
+# invalid" on BSD grep (macOS) even when the build succeeded.
+grep -Fq '** BUILD SUCCEEDED **' "$WORK/build.log" || { tail -40 "$WORK/build.log"; echo 'error: VAD build failed' >&2; exit 1; }
 
 FRAMEWORK="$WORK/out/DerivedData/Build/Products/Release-iphoneos/RealTimeCutVADCXXLibrary.framework"
 test -d "$FRAMEWORK" || { echo 'error: built framework missing' >&2; exit 1; }
