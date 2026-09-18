@@ -262,6 +262,19 @@ extension View {
             self
         }
     }
+
+    /// iOS 16+ pins the row separator to the row's leading edge so centred
+    /// hint rows still draw a full-width divider. The legacy List has no
+    /// equivalent guide, so the separator follows the content's own leading
+    /// edge on older systems.
+    @ViewBuilder
+    func compatListRowSeparatorLeading() -> some View {
+        if #available(iOS 16.0, *) {
+            alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+        } else {
+            self
+        }
+    }
 }
 
 /// onDrop's isTargeted is a Binding, not a callback. A tiny owning view
