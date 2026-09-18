@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-09-18 17:10 — compiler batch 2: f644f41 + five diagnosed + inventory sweep
+
+- Baseline f644f41, run 35316524791 failed (5 diagnostics). Evidence in reports/openminis-ios15/run-35316524791-tZZ8D9/; replayed by scripts/ios15_build_log.py. Plan: docs/ios15-compiler-batch.md.
+- Fixed the five diagnosed calls: WebPreviewSheet WebKit fullscreen (gated 15.4) + persistentSystemOverlays (compat), ToolLiveSheet UnevenRoundedRectangle (CompatUnevenRoundedRectangle), two CollectionViewMessageListV3 contextMenu previews (compatContextMenu keeps all actions on 15, drops only preview).
+- Compatibility layer repairs: removed duplicate compatLineLimit; retired compatToolbarVisibility (leaked ToolbarPlacement) and compatTextFieldAxis (silently single-line); added CompatMultilineTextField (native vertical TextField 16+, TextEditor 15+), CompatAnyShape, CompatUnevenRoundedRectangle, compatNavigationBarHidden, compatPersistentSystemOverlays, compatContextMenu, compatFontWeight.
+- Swept remaining same-shape call sites: multiline TextFields in ContentView folder sheet, MCPFormSheet, ProviderInstanceDetailView, InlineVoiceInputView; UnevenRoundedRectangle selection band and folder shapes in ContentView; View.fontWeight on Images/Buttons (AIChatView/ContentView/AssistantBlockView/BackupSettingsView); Locale.language.languageCode to compatLanguageCode; ShareLink and UITextView(usingTextLayoutManager:) in LogManagementView/MinisMediaViews.
+- Added scripts/test_ios15_compat_contract.py (3 structural guards, fail on baseline), extended NativeOnly negative control to the real rejected shapes, CompatibilityCalls to the production adapters; check script now type-checks all six Shared modules at 15 and 16.
+- Workflow now runs contract tests + real SwiftUI smoke before the app probe; smoke/contract failure keeps the job red.
+- Local checks: 3/3 contract, 8/8 parser, bash -n, tree-sitter delta clean, git diff --check clean. Awaiting cloud compile gate. M3 device acceptance still outstanding.
+
 ## 2026-09-18 13:50 — batch compatibility complete, pushing for compile gate
 
 - 兼容层落地（6 个 Shared 文件，pbxproj 已全部注册：BuildFile/FileReference/Group/Sources 各 4 处引用齐全，含 LegacyFlowLayoutTests 的同步目录豁免确认）：

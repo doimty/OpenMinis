@@ -208,6 +208,7 @@ struct LogDetailView: View {
     let name: String
     @State private var content: String = ""
     @State private var isLoading = true
+    @State private var showShareSheet = false
 
     var body: some View {
         Group {
@@ -221,9 +222,16 @@ struct LogDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: url)
+                if #available(iOS 16.0, *) {
+                    ShareLink(item: url)
+                } else {
+                    Button { showShareSheet = true } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                }
             }
         }
+        .sheet(isPresented: $showShareSheet) { LogShareSheet(urls: [url]) }
         .task {
             let fileURL = url
             let loaded = await Task.detached(priority: .userInitiated) {
@@ -241,7 +249,12 @@ private struct LogTextView: UIViewRepresentable {
     let text: String
 
     func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView(usingTextLayoutManager: true)
+        let textView: UITextView
+        if #available(iOS 16.0, *) {
+            textView = UITextView(usingTextLayoutManager: true)
+        } else {
+            textView = UITextView()
+        }
         textView.isEditable = false
         textView.isSelectable = true
         textView.backgroundColor = .clear

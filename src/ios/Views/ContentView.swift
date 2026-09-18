@@ -286,18 +286,18 @@ private struct FolderSurface: ViewModifier {
             : UIColor(red: 252/255.0, green: 252/255.0, blue: 252/255.0, alpha: 1)
     })
 
-    private var shape: AnyShape {
+    private var shape: CompatAnyShape {
         switch kind {
         case .lone:
-            return AnyShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            return CompatAnyShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         case .top:
-            return AnyShape(UnevenRoundedRectangle(
+            return CompatAnyShape(CompatUnevenRoundedRectangle(
                 topLeadingRadius: 16, bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0, topTrailingRadius: 16, style: .continuous))
         case .middle:
-            return AnyShape(Rectangle())
+            return CompatAnyShape(Rectangle())
         case .bottom:
-            return AnyShape(UnevenRoundedRectangle(
+            return CompatAnyShape(CompatUnevenRoundedRectangle(
                 topLeadingRadius: 0, bottomLeadingRadius: 16,
                 bottomTrailingRadius: 16, topTrailingRadius: 0, style: .continuous))
         }
@@ -366,12 +366,12 @@ private struct FolderCardBackground: ViewModifier {
     let isDropTarget: Bool
     let isExpanded: Bool
 
-    private var dropShape: AnyShape {
+    private var dropShape: CompatAnyShape {
         isExpanded
-            ? AnyShape(UnevenRoundedRectangle(
+            ? CompatAnyShape(CompatUnevenRoundedRectangle(
                 topLeadingRadius: 16, bottomLeadingRadius: 0,
                 bottomTrailingRadius: 0, topTrailingRadius: 16, style: .continuous))
-            : AnyShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            : CompatAnyShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     func body(content: Content) -> some View {
@@ -574,8 +574,7 @@ private struct FolderPickerSheet: View {
                     // One-sentence auto-grouping context (≤100 chars). Typed
                     // here or prefilled by AI Suggest; never shown in the
                     // list, editable later from Rename Group.
-                    TextField("Description (optional, guides auto-grouping)", text: $newFolderDesc, axis: .vertical)
-                        .lineLimit(1...2)
+                    CompatMultilineTextField("Description (optional, guides auto-grouping)", text: $newFolderDesc, lineLimit: 1...2)
                         .font(.subheadline)
                         .onChange(of: newFolderDesc) { v in
                             if v.count > 100 { newFolderDesc = String(v.prefix(100)) }
@@ -608,7 +607,7 @@ private struct FolderPickerSheet: View {
                         Spacer()
                         Button("Create", action: createIfNamed)
                             .buttonStyle(.borderless)
-                            .fontWeight(.semibold)
+                            .compatFontWeight(.semibold)
                             .disabled(trimmedName.isEmpty || duplicateFolder != nil)
                     }
                     // [T-folder-duplicate-name] Name already taken. Says so, and
@@ -3018,7 +3017,7 @@ struct ContentView: View {
                                             // container's bottom radii so it stays
                                             // wrapped by the corners.
                                             if isSessionHighlighted(session.id) {
-                                                UnevenRoundedRectangle(
+                                                CompatUnevenRoundedRectangle(
                                                     topLeadingRadius: 0,
                                                     bottomLeadingRadius: isLast ? 16 : 0,
                                                     bottomTrailingRadius: isLast ? 16 : 0,
@@ -6861,7 +6860,7 @@ struct SessionEditSheet: View {
                         guard !title.isEmpty else { return }
                         onSave(title, editCategory.isEmpty ? nil : editCategory)
                     }
-                    .bold()
+                    .compatFontWeight(.bold)
                     .disabled(editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
@@ -7323,7 +7322,7 @@ private struct AppearanceSettingsView: View {
                             if appLanguage == lang.id {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.blue)
-                                    .fontWeight(.semibold)
+                                    .compatFontWeight(.semibold)
                             }
                         }
                     }

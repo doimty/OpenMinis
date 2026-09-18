@@ -96,7 +96,125 @@ enum CompatPresentationDetent: Hashable {
     }
 }
 
+/// A vertical editor must remain multiline on iOS 15. A lineLimit modifier
+/// cannot turn the legacy single-line TextField into a multiline editor.
+struct CompatMultilineTextField: View {
+    @Binding private var text: String
+    private let label: Text
+    private let lineLimit: ClosedRange<Int>?
+    @ScaledMetric(relativeTo: .body) private var lineHeight: CGFloat = 20
+
+    init(_ title: LocalizedStringKey, text: Binding<String>, lineLimit: ClosedRange<Int>? = nil) {
+        self._text = text
+        self.label = Text(title)
+        self.lineLimit = lineLimit
+    }
+
+    init<S: StringProtocol>(_ title: S, text: Binding<String>, lineLimit: ClosedRange<Int>? = nil) {
+        self._text = text
+        self.label = Text(verbatim: String(title))
+        self.lineLimit = lineLimit
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if #available(iOS 16.0, *) {
+            if let lineLimit {
+                TextField(text: $text, axis: .vertical) { label }
+                    .lineLimit(lineLimit)
+            } else {
+                TextField(text: $text, axis: .vertical) { label }
+            }
+        } else if let lineLimit {
+            legacyEditor
+                .frame(minHeight: lineHeight * CGFloat(lineLimit.lowerBound) + 16,
+                       maxHeight: lineHeight * CGFloat(lineLimit.upperBound) + 16)
+        } else {
+            // The transcript's existing bounded parent owns the height and
+            // scrolling. Never add an outer ScrollView around this editor.
+            legacyEditor.frame(minHeight: lineHeight + 16)
+        }
+    }
+
+    private var legacyEditor: some View {
+        TextEditor(text: $text)
+            .overlay(alignment: .topLeading) {
+                if text.isEmpty {
+                    label
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 8)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityLabel(label)
+    }
+}
+
+/// Local path erasure avoids exposing iOS-16-only AnyShape in stored types.
+struct CompatAnyShape: Shape {
+    private let makePath: (CGRect) -> Path
+    init<S: Shape>(_ shape: S) { makePath = { shape.path(in: $0) } }
+    func path(in rect: CGRect) -> Path { makePath(rect) }
+}
+
+/// Keep square joining edges on grouped rows. Rounding every corner is not an
+/// equivalent fallback. Native platforms retain their continuous corner path.
+struct CompatUnevenRoundedRectangle: Shape {
+    var topLeadingRadius: CGFloat = 0
+    var bottomLeadingRadius: CGFloat = 0
+    var bottomTrailingRadius: CGFloat = 0
+    var topTrailingRadius: CGFloat = 0
+    var style: RoundedCornerStyle = .continuous
+
+    func path(in rect: CGRect) -> Path {
+        if #available(iOS 16.0, *) {
+            return UnevenRoundedRectangle(
+                topLeadingRadius: topLeadingRadius, bottomLeadingRadius: bottomLeadingRadius,
+                bottomTrailingRadius: bottomTrailingRadius, topTrailingRadius: topTrailingRadius,
+                style: style).path(in: rect)
+        }
+        let limit = max(0, min(rect.width, rect.height) / 2)
+        let tl = min(limit, max(0, topLeadingRadius))
+        let tr = min(limit, max(0, topTrailingRadius))
+        let bl = min(limit, max(0, bottomLeadingRadius))
+        let br = min(limit, max(0, bottomTrailingRadius))
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + tl, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + tr),
+                          control: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX - br, y: rect.maxY),
+                          control: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + bl, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.maxY - bl),
+                          control: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + tl))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + tl, y: rect.minY),
+                          control: CGPoint(x: rect.minX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct LegacyFontWeight: ViewModifier {
+    @Environment(\.font) private var inheritedFont
+    let weight: Font.Weight
+    func body(content: Content) -> some View {
+        content.font((inheritedFont ?? .body).weight(weight))
+    }
+}
+
 extension View {
+    /// Unlike Text.fontWeight, the general View modifier requires iOS 16.
+    @ViewBuilder
+    func compatFontWeight(_ weight: Font.Weight) -> some View {
+        if #available(iOS 16.0, *) { fontWeight(weight) }
+        else { modifier(LegacyFontWeight(weight: weight)) }
+    }
+
     /// Older TextField/Text views can cap lines, but cannot reserve a minimum
     /// number of lines. Preserve the maximum without exposing a newer overload.
     @ViewBuilder
@@ -132,23 +250,28 @@ extension View {
     }
 
     @ViewBuilder
-    func compatToolbarVisibility(_ visibility: Visibility, for placement: ToolbarPlacement) -> some View {
-        if #available(iOS 16.0, *) { toolbar(visibility, for: placement) }
-        else { self } // Visible navbar is the iOS 15 default.
-    }
-
-    /// `TextField(_:text:axis:)` is iOS 16+. Drop the axis on legacy targets;
-    /// multiline appearance is preserved by the caller's lineLimit.
-    @ViewBuilder
-    func compatTextFieldAxis(_ title: LocalizedStringKey, text: Binding<String>, axis: Axis) -> some View {
-        if #available(iOS 16.0, *) { TextField(title, text: text, axis: axis) }
-        else { TextField(title, text: text) }
+    func compatNavigationBarHidden(_ hidden: Bool) -> some View {
+        if #available(iOS 16.0, *) { toolbar(hidden ? .hidden : .visible, for: .navigationBar) }
+        else { navigationBarHidden(hidden) }
     }
 
     @ViewBuilder
-    func compatLineLimit(_ range: ClosedRange<Int>) -> some View {
-        if #available(iOS 16.0, *) { lineLimit(range) }
-        else { lineLimit(range.upperBound) }
+    func compatPersistentSystemOverlays(_ visibility: Visibility) -> some View {
+        if #available(iOS 16.0, *) { persistentSystemOverlays(visibility) }
+        else { self } // iOS 15 keeps its system home indicator and exit gestures.
+    }
+
+    @ViewBuilder
+    func compatContextMenu<MenuItems: View, Preview: View>(
+        @ViewBuilder menuItems: @escaping () -> MenuItems,
+        @ViewBuilder preview: @escaping () -> Preview
+    ) -> some View {
+        if #available(iOS 16.0, *) {
+            contextMenu(menuItems: menuItems, preview: preview)
+        } else {
+            // Keep every menu action. Only the optional custom preview is lost.
+            contextMenu(menuItems: menuItems)
+        }
     }
 
     @ViewBuilder

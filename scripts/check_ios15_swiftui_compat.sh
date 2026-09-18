@@ -6,7 +6,15 @@ sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 work="$(mktemp -d "${TMPDIR:-/tmp}/openminis-ios15-ui.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 fixture="$root/scripts/ios15-smoke"
-compat="$root/src/ios/Shared/SwiftUICompatibility.swift"
+shared="$root/src/ios/Shared"
+production=(
+  "$shared/SwiftUICompatibility.swift"
+  "$shared/CompatNavigationPath.swift"
+  "$shared/CompatPhotoPicker.swift"
+  "$shared/CompatGeometry.swift"
+  "$shared/LegacyHostingContent.swift"
+  "$shared/LegacyFlowLayout.swift"
+)
 
 check() {
   local minimum="$1"
@@ -22,16 +30,23 @@ if check 15.0 "$fixture/NativeOnly.swift" > "$work/native-ios15.log" 2>&1; then
   echo 'FAIL: native iOS 16 controls unexpectedly type-checked at iOS 15' >&2
   exit 1
 fi
-for symbol in LabeledContent NavigationStack presentationDetents; do
-  if ! grep -F "error: '$symbol' is only available in iOS 16.0 or newer" "$work/native-ios15.log" >/dev/null; then
+for symbol in LabeledContent NavigationStack presentationDetents persistentSystemOverlays UnevenRoundedRectangle contextMenu isElementFullscreenEnabled; do
+  if ! grep -E "error: '.*${symbol}.*' is only available in iOS" "$work/native-ios15.log" >/dev/null; then
     cat "$work/native-ios15.log" >&2
     echo "FAIL: negative control did not diagnose $symbol availability" >&2
     exit 1
   fi
 done
 echo 'PASS: native API negative control fails at 15 and passes at 16'
+cat "$work/native-ios15.log"
 
+failed=0
 for minimum in 15.0 16.0; do
-  check "$minimum" "$compat" "$fixture/CompatibilityCalls.swift"
-  echo "PASS: production SwiftUI compatibility calls type-check at iOS $minimum"
+  if check "$minimum" "${production[@]}" "$fixture/CompatibilityCalls.swift"; then
+    echo "PASS: all six production compatibility modules type-check at iOS $minimum"
+  else
+    echo "FAIL: production compatibility type-check at iOS $minimum" >&2
+    failed=1
+  fi
 done
+exit "$failed"

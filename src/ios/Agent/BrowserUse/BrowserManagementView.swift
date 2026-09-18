@@ -128,10 +128,16 @@ struct BrowserManagementView: View {
                     }
                 }
             }
-            compatTextFieldAxis("Enter custom user agent...", text: $customUA, axis: .vertical)
+            CompatMultilineTextField("Enter custom user agent...", text: $customUA, lineLimit: 2...4)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .compatLineLimit(2...4)
+                .onChange(of: customUA) { value in
+                    // TextEditor inserts newlines instead of sending onSubmit.
+                    // Keep edits on the old-system path from being discarded.
+                    if #available(iOS 16.0, *) {} else {
+                        pool.customUserAgentString = value
+                    }
+                }
                 .onSubmit {
                     pool.customUserAgentString = customUA
                     pool.setUserAgentProfile(.custom)

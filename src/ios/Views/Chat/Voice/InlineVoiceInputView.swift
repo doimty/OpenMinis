@@ -746,10 +746,10 @@ struct InlineVoiceInputView: View {
             // half back into view" freeze. The text view scrolls itself here,
             // which also restores native caret-tracking that the wrapped form
             // lost.
-            TextField("", text: Binding(
+            CompatMultilineTextField("", text: Binding(
                 get: { viewModel.transcript },
                 set: { viewModel.setTranscript($0); inputText = $0 }
-            ), axis: .vertical)
+            ))
                 .focused($editFocused)
                 .font(.body)
                 .multilineTextAlignment(.center)

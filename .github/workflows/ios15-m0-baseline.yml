@@ -136,6 +136,16 @@ jobs:
           set -euo pipefail
           python3 scripts/test_ios15_build_log.py -v
 
+      - name: Compatibility structural contract tests
+        run: |
+          set -euo pipefail
+          python3 scripts/test_ios15_compat_contract.py -v
+
+      - name: Compatibility type-check smoke (15/16)
+        run: |
+          set -euo pipefail
+          bash scripts/check_ios15_swiftui_compat.sh
+
       - name: Probe iOS 15 app target
         run: |
           set -euo pipefail
