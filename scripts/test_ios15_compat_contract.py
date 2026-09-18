@@ -104,6 +104,16 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("generator.appliesPreferredTrackTransform = true", source)
         self.assertIn("generator.maximumSize = CGSize(width: 400, height: 400)", source)
 
+    def test_sidebar_drag_drop_retires_new_api_calls_without_replacing_actions(self):
+        source = (ROOT / "src/ios/Views/ContentView.swift").read_text()
+        self.assertNotIn(".draggable(session.id)", source)
+        self.assertNotIn(".dropDestination(for: String.self)", source)
+        self.assertNotIn(".navigationSplitViewColumnWidth(", source)
+        self.assertEqual(source.count(".compatDraggable(session.id)"), 2)
+        self.assertEqual(source.count(".compatDropDestination(for: String.self"), 2)
+        self.assertIn("await ChatStore.shared.setFolder(nil, forSessions: sessionIds)", source)
+        self.assertIn("await ChatStore.shared.setFolder(fid, forSessions: sessionIds)", source)
+
 
 if __name__ == "__main__":
     unittest.main()

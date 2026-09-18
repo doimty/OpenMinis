@@ -88,6 +88,21 @@ func nativeVideoFrameControl(generator: AVAssetImageGenerator) async throws {
     _ = try await generator.image(at: .zero)
 }
 
+struct NativeDragDropControl: View {
+    var body: some View {
+        Text("Sidebar")
+            .draggable("session-a")
+            .dropDestination(for: String.self,
+                action: { values in !values.isEmpty },
+                isTargeted: { _ in }
+            )
+    }
+}
+
+func nativeSplitColumnControl() -> some View {
+    Text("Sidebar").navigationSplitViewColumnWidth(min: 140, ideal: 160, max: 240)
+}
+
 func nativeImageRegexControl(_ text: String) {
     let pattern = try! Regex(#"!\[([^\]]*)\]\(([^)]+)\)"#)
     _ = text.ranges(of: pattern)

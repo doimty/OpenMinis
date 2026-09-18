@@ -514,6 +514,7 @@
 		15C015000000000000000007 /* LegacyHostingContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000008 /* LegacyHostingContent.swift */; };
 		15C015000000000000000009 /* LegacyFlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C01500000000000000000A /* LegacyFlowLayout.swift */; };
 		15C01500000000000000000B /* CompatGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C01500000000000000000C /* CompatGeometry.swift */; };
+		15C01500000000000000000D /* LegacyStringDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C01500000000000000000E /* LegacyStringDrop.swift */; };
 		RCL000010 /* Rclone.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = RCL000020 /* Rclone.xcframework */; };
 		RCL000110 /* RcloneBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = RCL000210 /* RcloneBridge.swift */; };
 		RCL000111 /* RcloneRemoteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = RCL000211 /* RcloneRemoteStore.swift */; };
@@ -1195,6 +1196,7 @@
 		15C015000000000000000008 /* LegacyHostingContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyHostingContent.swift; sourceTree = "<group>"; };
 		15C01500000000000000000A /* LegacyFlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyFlowLayout.swift; sourceTree = "<group>"; };
 		15C01500000000000000000C /* CompatGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatGeometry.swift; sourceTree = "<group>"; };
+		15C01500000000000000000E /* LegacyStringDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyStringDrop.swift; sourceTree = "<group>"; };
 		RCL000020 /* Rclone.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Rclone.xcframework; path = ../../deps/frameworks/Rclone.xcframework; sourceTree = "<group>"; };
 		RCL000210 /* RcloneBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RcloneBridge.swift; path = Remote/RcloneBridge.swift; sourceTree = "<group>"; };
 		RCL000211 /* RcloneRemoteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RcloneRemoteStore.swift; path = Remote/RcloneRemoteStore.swift; sourceTree = "<group>"; };
@@ -1768,6 +1770,7 @@
 				15C015000000000000000008 /* LegacyHostingContent.swift */,
 				15C01500000000000000000A /* LegacyFlowLayout.swift */,
 				15C01500000000000000000C /* CompatGeometry.swift */,
+				15C01500000000000000000E /* LegacyStringDrop.swift */,
 				E5Q000011 /* BPETokenizer.swift */,
 				E5MDS0013 /* MarkdownStripper.swift */,
 				E5Q000012 /* cl100k_base.tiktoken */,
@@ -3025,6 +3028,7 @@
 				15C015000000000000000007 /* LegacyHostingContent.swift in Sources */,
 				15C015000000000000000009 /* LegacyFlowLayout.swift in Sources */,
 				15C01500000000000000000B /* CompatGeometry.swift in Sources */,
+			15C01500000000000000000D /* LegacyStringDrop.swift in Sources */,
 				F1S00012 /* ChatSessionIdEnvironment.swift in Sources */,
 				E5Q000004 /* FontSettings.swift in Sources */,
 				E5R000001 /* ICloudBackupManager.swift in Sources */,

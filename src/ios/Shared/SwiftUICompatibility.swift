@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Native navigation on iOS 16+, stacked NavigationView on iOS 15.
 /// This adapter is only for stacks without a programmatic path.
@@ -215,6 +216,76 @@ extension Shape {
             fill(LinearGradient(colors: [color.opacity(0.8), color],
                                 startPoint: .top, endPoint: .bottom))
         }
+    }
+}
+
+extension View {
+    /// iOS 16+ retains native draggable; older systems use the same id payload
+    /// with the legacy onDrag API. The context-menu/long-press arbitration is
+    /// owned by the system on both paths.
+    @ViewBuilder
+    func compatDraggable(_ payload: String) -> some View {
+        if #available(iOS 16.0, *) {
+            draggable(payload)
+        } else {
+            onDrag {
+                NSItemProvider(object: payload as NSString)
+            }
+        }
+    }
+
+    /// iOS 16+ retains native dropDestination. Older systems use onDrop with a
+    /// String payload; every readable provider contributes one value, failed
+    /// providers are ignored, and a nonempty batch is delivered to the caller's
+    /// existing main-actor action. The action's Bool return cannot be reflected
+    /// synchronously on the legacy path.
+    @ViewBuilder
+    func compatDropDestination(
+        for payloadType: String.Type,
+        action: @escaping ([String]) -> Bool,
+        isTargeted: @escaping (Bool) -> Void
+    ) -> some View {
+        if #available(iOS 16.0, *) {
+            dropDestination(for: payloadType, action: action, isTargeted: isTargeted)
+        } else {
+            LegacyStringDropTarget(content: self, action: action, isTargeted: isTargeted)
+        }
+    }
+
+    /// iOS 16+ retains custom split-column width; the legacy NavigationView
+    /// uses system layout constraints.
+    @ViewBuilder
+    func compatNavigationSplitViewColumnWidth(min: CGFloat, ideal: CGFloat, max: CGFloat) -> some View {
+        if #available(iOS 16.0, *) {
+            navigationSplitViewColumnWidth(min: min, ideal: ideal, max: max)
+        } else {
+            self
+        }
+    }
+}
+
+/// onDrop's isTargeted is a Binding, not a callback. A tiny owning view
+/// provides the legacy state and forwards changes to the caller's closure.
+private struct LegacyStringDropTarget<Content: View>: View {
+    let content: Content
+    let action: ([String]) -> Bool
+    let isTargeted: (Bool) -> Void
+    @State private var targeted = false
+
+    var body: some View {
+        content
+            .onDrop(of: [UTType.text.identifier], isTargeted: $targeted) { providers in
+                guard !providers.isEmpty else { return false }
+                let accepted = LegacyStringDrop.readableProviders(from: providers)
+                guard !accepted.isEmpty else { return false }
+                Task { @MainActor in
+                    let values = await LegacyStringDrop.loadValues(from: accepted)
+                    guard !values.isEmpty, !Task.isCancelled else { return }
+                    _ = action(values)
+                }
+                return true
+            }
+            .onChange(of: targeted) { newValue in isTargeted(newValue) }
     }
 }
 

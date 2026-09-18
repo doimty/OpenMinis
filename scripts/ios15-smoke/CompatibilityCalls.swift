@@ -72,6 +72,24 @@ func thumbnailAndImageDiagnosticsCalls(generator: AVAssetImageGenerator) async t
     _ = MarkdownStripper.imageSyntaxMatches(in: "中文😀 ![图](x.png)")
 }
 
+struct DragDropCompatibilityCalls: View {
+    let sessionIds: [String]
+    @State private var isTargeted = false
+
+    var body: some View {
+        Text("Sidebar")
+            .compatDraggable(sessionIds.first ?? "")
+            .compatDropDestination(for: String.self,
+                action: { values in
+                    guard !values.isEmpty else { return false }
+                    return true
+                },
+                isTargeted: { isTargeted = $0 }
+            )
+            .compatNavigationSplitViewColumnWidth(min: 140, ideal: 160, max: 240)
+    }
+}
+
 struct SecondaryToolbarCalls: View {
     var body: some View {
         Text("Group").toolbar {

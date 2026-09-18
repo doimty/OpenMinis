@@ -14,6 +14,7 @@ production=(
   "$shared/CompatGeometry.swift"
   "$shared/LegacyHostingContent.swift"
   "$shared/LegacyFlowLayout.swift"
+  "$shared/LegacyStringDrop.swift"
   "$shared/ThumbnailCache.swift"
   "$shared/MarkdownStripper.swift"
 )
@@ -32,7 +33,7 @@ if check 15.0 "$fixture/NativeOnly.swift" > "$work/native-ios15.log" 2>&1; then
   echo 'FAIL: native iOS 16 controls unexpectedly type-checked at iOS 15' >&2
   exit 1
 fi
-for symbol in LabeledContent NavigationStack presentationDetents persistentSystemOverlays UnevenRoundedRectangle contextMenu isElementFullscreenEnabled addsPunctuation sleep milliseconds buildIf setBadgeCount removeAll secondaryAction gradient image ranges Regex; do
+for symbol in LabeledContent NavigationStack presentationDetents persistentSystemOverlays UnevenRoundedRectangle contextMenu isElementFullscreenEnabled addsPunctuation sleep milliseconds buildIf setBadgeCount removeAll secondaryAction gradient image ranges Regex draggable dropDestination navigationSplitViewColumnWidth; do
   if ! grep -E "error: '.*${symbol}.*' is only available in iOS" "$work/native-ios15.log" >/dev/null; then
     cat "$work/native-ios15.log" >&2
     echo "FAIL: negative control did not diagnose $symbol availability" >&2
@@ -61,6 +62,15 @@ if xcrun --sdk macosx swiftc -parse-as-library -swift-version 5 -enable-bare-sla
     "$shared/MarkdownStripper.swift" "$fixture/MarkdownImagePatternTests.swift" \
     -o "$work/markdown-image-tests" && "$work/markdown-image-tests"; then
   echo 'PASS: production Foundation image-diagnostic runtime tests'
+else
+  failed=1
+fi
+if xcrun --sdk macosx swiftc -parse-as-library -swift-version 5 \
+    -target "$(uname -m)-apple-macosx13.0" -sdk "$host_sdk" \
+    -module-cache-path "$work/HostModuleCache" \
+    "$shared/LegacyStringDrop.swift" "$fixture/StringDropPayloadTests.swift" \
+    -o "$work/string-drop-tests" && "$work/string-drop-tests"; then
+  echo 'PASS: production NSItemProvider String drop runtime tests'
 else
   failed=1
 fi
