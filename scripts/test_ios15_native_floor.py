@@ -212,6 +212,19 @@ class RealOutputRegressionTests(unittest.TestCase):
                                 'arm64', PLIST_OK, output=True)
         self.assertFalse(result['ok'])
 
+    def test_numeric_platform_mapping(self):
+        # Real `otool -l` prints LC_BUILD_VERSION platforms as numbers: 2 = IOS.
+        ok = audit_metadata(MODERN.replace('platform IOS', 'platform 2'),
+                            'arm64', PLIST_OK, output=True)
+        self.assertTrue(ok['ok'], ok['errors'])
+        self.assertEqual(ok['images'][0]['platform'], 'ios')
+        # 7 = IOSSIMULATOR must remain a rejection on the device probe.
+        bad = audit_metadata(MODERN.replace('platform IOS', 'platform 7'),
+                             'arm64', PLIST_OK, output=True)
+        self.assertFalse(bad['ok'])
+        self.assertTrue(any('simulator' in e.lower() or 'IOSSIMULATOR' in e
+                            for e in bad['errors']))
+
     def test_patch_minimum_cannot_be_dropped(self):
         result = audit_metadata(MODERN.replace('minos 15.0', 'minos 15.0.1'),
                                 'arm64', PLIST_OK, output=True)

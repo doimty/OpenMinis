@@ -48,6 +48,17 @@ _TRIPLE = {
 
 _KNOWN_PLATFORMS = frozenset(_TRIPLE) | {'IPHONEOS'}
 
+# `otool -l` prints LC_BUILD_VERSION platforms as raw numeric values
+# (2 = IOS, 7 = IOSSIMULATOR, ...); `-v`/plists use names. Map numbers to
+# the same canonical names so both spellings are audited identically.
+_PLATFORM_NUMBERS = {
+    '1': 'MACOS', '2': 'IOS', '3': 'TVOS', '4': 'WATCHOS',
+    '5': 'BRIDGEOS', '6': 'MACCATALYST', '7': 'IOSSIMULATOR',
+    '8': 'TVOSSIMULATOR', '9': 'WATCHOSSIMULATOR', '10': 'DRIVERKIT',
+    '11': 'VISIONOS', '12': 'VISIONOSSIMULATOR', '13': 'XROS',
+    '14': 'XROSSIMULATOR',
+}
+
 # Device-arm64 probe: simulator and every non-iOS platform are rejections.
 _ALLOWED_ARCH = {'arm64'}
 _ALLOWED_PLATFORM = {'IOS', 'IPHONEOS'}
@@ -129,6 +140,8 @@ def _audit_block(header, body, image_path, require_minimum=True):
     platform_match = _PLATFORM_PATTERN.search(block)
     # LC_VERSION_MIN_IPHONEOS carries no platform line; treat it as IOS.
     platform = None if platform_match is None else platform_match.group(1).upper()
+    if platform is not None:
+        platform = _PLATFORM_NUMBERS.get(platform, platform)
     if platform is None and has_legacy_command:
         platform = 'IOS'
 
