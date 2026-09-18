@@ -93,7 +93,7 @@ struct NativeDragDropControl: View {
         Text("Sidebar")
             .draggable("session-a")
             .dropDestination(for: String.self,
-                action: { values in !values.isEmpty },
+                action: { values, _ in !values.isEmpty },
                 isTargeted: { _ in }
             )
     }
