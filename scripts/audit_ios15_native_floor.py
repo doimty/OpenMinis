@@ -288,13 +288,15 @@ def audit_dependencies(nm_text, deps_text):
     export_names = set()
     for line in nm_text.splitlines():
         fields = line.split()
-        if len(fields) < 2:
+        if len(fields) < 3:
             continue
-        # nm -gU lines: '<address> <type> <name>'. 'U' is undefined
-        # (imported), lowercase types are local/hidden — neither is an export.
+        # nm -gU lines: '<address> <type> <name>'. A callable C entrypoint is
+        # a defined COMMON/TEXT symbol: type 'T'. 'U' is undefined (imported),
+        # 'D'/'S' are data — none are callable exports, and lowercase types
+        # are local/hidden. Only an exact 'T' counts.
         kind = fields[1]
-        name = fields[2] if len(fields) > 2 else ''
-        if kind.isupper() and name in REQUIRED_EXPORTS:
+        name = fields[2]
+        if kind == 'T' and name in REQUIRED_EXPORTS:
             exports.append(line.strip())
             export_names.add(name)
     missing = sorted(REQUIRED_EXPORTS - export_names)
@@ -305,17 +307,30 @@ def audit_dependencies(nm_text, deps_text):
     libraries = []
     deps_error = []
     for line in deps_text.splitlines():
-        if '.framework/' in line or '.dylib' in line or '/usr/lib/' in line:
-            libraries.append(line.strip())
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if not ('.framework/' in stripped or '.dylib' in stripped
+                or '/usr/lib/' in stripped):
+            continue
+        # The first line of `otool -L` output is the image path itself
+        # (".../RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary:"),
+        # which contains ".framework/" but is not a dependency. Dependency
+        # records are indented (start with tab or spaces).
+        if not line[:1].isspace() or stripped.endswith(':'):
+            continue
+        libraries.append(stripped)
+    if not libraries:
+        deps_error.append(
+            'no dependency evidence found (otool -L output absent/empty)')
     allowed_prefixes = (
-        '@rpath/RealTimeCutVADCXXLibrary.framework',
+        '@rpath/RealTimeCutVADCXXLibrary.framework/',
         '/System/Library/Frameworks/',
         '/usr/lib/',
     )
     for line in libraries:
-        stripped = line.lstrip()
-        if not any(stripped.startswith(prefix) for prefix in allowed_prefixes):
-            deps_error.append('unapproved dynamic dependency: ' + stripped)
+        if not any(line.startswith(prefix) for prefix in allowed_prefixes):
+            deps_error.append('unapproved dynamic dependency: ' + line)
 
     errors = exports_error + deps_error
     return {

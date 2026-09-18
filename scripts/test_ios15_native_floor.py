@@ -83,7 +83,8 @@ EXPORTS = """0000000000001000 T _create_vad_instance
 0000000000001050 T _set_vad_model
 0000000000001060 T _process_vad_audio
 """
-DEPENDENCIES = """/tmp/RealTimeCutVADCXXLibrary:
+# The real otool header includes .framework; it is not a dependency record.
+DEPENDENCIES = """/tmp/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary:
     @rpath/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary (compatibility version 1.0.0, current version 1.0.0)
     /usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
 """
@@ -285,6 +286,30 @@ class OutputEvidenceRegressionTests(unittest.TestCase):
         parsed = audit_dependencies(indirect, DEPENDENCIES)
         self.assertFalse(parsed['export_lines'])
         self.assertTrue(parsed['errors'])
+
+    def test_framework_image_header_is_not_a_dependency(self):
+        parsed = audit_dependencies(EXPORTS, DEPENDENCIES)
+        self.assertEqual(parsed['errors'], [])
+        self.assertEqual(len(parsed['library_lines']), 2)
+        self.assertFalse(any(line.endswith(':') for line in parsed['library_lines']))
+
+    def test_addressed_undefined_or_data_symbol_is_not_callable_export(self):
+        for kind in ('U', 'D'):
+            text = EXPORTS.replace('0000000000001020 T _set_vad_callback',
+                                   f'0000000000001020 {kind} _set_vad_callback')
+            with self.subTest(kind=kind):
+                parsed = audit_dependencies(text, DEPENDENCIES)
+                self.assertFalse(parsed['ok'])
+                self.assertFalse(any('_set_vad_callback' in line for line in parsed['export_lines']))
+
+    def test_missing_dependency_evidence_is_rejected(self):
+        self.assertFalse(audit_dependencies(EXPORTS, '')['ok'])
+
+    def test_similarly_named_external_framework_is_not_self(self):
+        deps = DEPENDENCIES.replace(
+            '@rpath/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary',
+            '@rpath/RealTimeCutVADCXXLibrary-Other.framework/Vader')
+        self.assertFalse(audit_dependencies(EXPORTS, deps)['ok'])
 
     def test_missing_required_c_entrypoint(self):
         text = '\n'.join(line for line in EXPORTS.splitlines() if 'destroy_vad_instance' not in line)
