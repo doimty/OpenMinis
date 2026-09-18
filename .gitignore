@@ -148,3 +148,6 @@ deps/lame-3.100/**/.deps/
 src/android/app/libs/rclone.aar
 __pycache__/
 *.pyc
+
+# VAD framework built by deps/build_vad_framework.sh (native deps cache)
+vendor/RealTimeCutVADLibrary/Frameworks/

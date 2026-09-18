@@ -2504,7 +2504,7 @@
 				E52000020 /* XCRemoteSwiftPackageReference "SwiftAnthropic" */,
 				E5M000020 /* XCRemoteSwiftPackageReference "swift-cmark" */,
 				E5X000020 /* XCRemoteSwiftPackageReference "SwiftMath" */,
-				B318C2F47DB3F301A17E49BE /* XCRemoteSwiftPackageReference "RealTimeCutVADLibrary" */,
+				E5A1B2C3D4E5F60718293A4B /* XCLocalSwiftPackageReference "RealTimeCutVADLibrary" */,
 			);
 			productRefGroup = E51000032 /* Products */;
 			projectDirPath = "";
@@ -3784,15 +3784,14 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		B318C2F47DB3F301A17E49BE /* XCRemoteSwiftPackageReference "RealTimeCutVADLibrary" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/helloooideeeeea/RealTimeCutVADLibrary.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		E5A1B2C3D4E5F60718293A4B /* XCLocalSwiftPackageReference "RealTimeCutVADLibrary" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../vendor/RealTimeCutVADLibrary;
 		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
 		E52000020 /* XCRemoteSwiftPackageReference "SwiftAnthropic" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/jamesrochabrun/SwiftAnthropic";
@@ -3822,7 +3821,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		C42120806C66A2C804F89620 /* RealTimeCutVADLibrary */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = B318C2F47DB3F301A17E49BE /* XCRemoteSwiftPackageReference "RealTimeCutVADLibrary" */;
+			package = E5A1B2C3D4E5F60718293A4B /* XCLocalSwiftPackageReference "RealTimeCutVADLibrary" */;
 			productName = RealTimeCutVADLibrary;
 		};
 		E52000021 /* SwiftAnthropic */ = {

@@ -354,5 +354,43 @@ class OutputEvidenceRegressionTests(unittest.TestCase):
             self.assertEqual(evidence['out_build.log'], content)
 
 
+class LocalPackageIntegrationTests(unittest.TestCase):
+    """The app must link the vendored local package, never the upstream 15.6 zip."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def test_pbxproj_uses_local_vad_package_reference(self):
+        pbx = (self.ROOT / 'src/ios/Minis.xcodeproj/project.pbxproj').read_text()
+        self.assertIn('XCLocalSwiftPackageReference "RealTimeCutVADLibrary"', pbx)
+        self.assertIn('E5A1B2C3D4E5F60718293A4B', pbx)
+        self.assertNotIn('helloooideeeeea/RealTimeCutVADLibrary.git', pbx)
+        self.assertNotIn('B318C2F47DB3F301A17E49BE', pbx)
+
+    def test_vendored_package_uses_local_binary_path(self):
+        manifest = (self.ROOT / 'vendor/RealTimeCutVADLibrary/Package.swift').read_text()
+        self.assertIn('path: "Frameworks/RealTimeCutVADCXXLibrary.xcframework"', manifest)
+        self.assertNotIn('url:', manifest)
+        self.assertNotIn('RealTimeCutVADLibraryForXCFramework', manifest)
+
+    def test_vendored_wrapper_source_and_models_present(self):
+        root = self.ROOT / 'vendor/RealTimeCutVADLibrary/RealTimeCutVADLibrary/src'
+        required = ('VADWrapper.m', 'include/VADWrapper.h', 'include/module.modulemap',
+                    'Resources/silero_vad.onnx', 'Resources/silero_vad_v5.onnx')
+        for name in required:
+            with self.subTest(name=name):
+                self.assertTrue((root / name).is_file(), f'missing {name}')
+        self.assertGreater((root / 'Resources/silero_vad_v5.onnx').stat().st_size, 1_000_000)
+
+    def test_build_vad_script_overrides_floor_and_checks_inputs(self):
+        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text()
+        self.assertIn('IPHONEOS_DEPLOYMENT_TARGET=15.0', script)
+        self.assertIn('ONNX_SHA256', script)
+        # The source SHA is pinned in the workflow env, not hardcoded in the
+        # script; verify the script consumes it and the workflow pins it.
+        self.assertIn('NATIVE_CXX_SHA', script)
+        workflow = (self.ROOT / '.github/workflows/ios15-m0-baseline.yml').read_text()
+        self.assertIn('1648fc13a04a90521a2ef3887885ef2506208605', workflow)
+
+
 if __name__ == '__main__':
     unittest.main()

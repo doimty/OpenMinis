@@ -18,6 +18,15 @@ env:
   EXPECTED_XCODE_BUILD: "Build version 17C52"
   EXPECTED_IOS_SDK: "26.2"
   EXPECTED_ISH: "3f6384c70eefd1a370f121d3492a5f21f7767df9"
+  # Pins for the vendored local VAD package's binary (built from C++ source
+  # at IPHONEOS_DEPLOYMENT_TARGET=15.0, see deps/build_vad_framework.sh).
+  # Checksums are the published values from the wrapper Package.swift tag
+  # 1.0.3; the probe workflow independently audits the resulting binary.
+  NATIVE_CXX_SHA: 1648fc13a04a90521a2ef3887885ef2506208605
+  ONNX_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/onnxruntime.xcframework.zip
+  ONNX_SHA256: 498ba860229e0ce45e6983ce44478a836b0c0763451ed37a8b1f8e74a8a0dc1f
+  APM_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/webrtc_audio_processing.xcframework.zip
+  APM_SHA256: 3ee3d36e9207a09fa3133c405f08a49a0d023f173ee5b4a47c047362aba56856
 
 jobs:
   baseline:
@@ -62,7 +71,8 @@ jobs:
             deps/frameworks
             deps/resources
             deps/lame-build
-          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/rclone-mobile/go.sum') }}
+            vendor/RealTimeCutVADLibrary/Frameworks
+          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/build_vad_framework.sh','deps/rclone-mobile/go.sum') }}
 
       - name: Install native build tools
         if: steps.native-cache.outputs.cache-hit != 'true'
@@ -100,7 +110,8 @@ jobs:
           ./deps/build_ish.sh
           ./deps/prepare_alpine_rootfs.sh
           ./deps/build_rclone_ios.sh
-          ls -ld deps/libs deps/frameworks deps/resources
+          ./deps/build_vad_framework.sh
+          ls -ld deps/libs deps/frameworks deps/resources vendor/RealTimeCutVADLibrary/Frameworks
 
       - name: Save native iOS deps cache
         if: steps.native-cache.outputs.cache-hit != 'true'
@@ -112,7 +123,8 @@ jobs:
             deps/frameworks
             deps/resources
             deps/lame-build
-          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/rclone-mobile/go.sum') }}
+            vendor/RealTimeCutVADLibrary/Frameworks
+          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/build_vad_framework.sh','deps/rclone-mobile/go.sum') }}
 
       - name: Compile unchanged baseline
         if: github.event_name == 'workflow_dispatch'
