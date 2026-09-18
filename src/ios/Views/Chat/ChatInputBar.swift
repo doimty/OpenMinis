@@ -1465,6 +1465,10 @@ struct PastableTextView: UIViewRepresentable {
         return tv
     }
 
+    /// iOS 16+ sizing hook; older systems size the representable through the
+    /// text view's own intrinsicContentSize (pinned height, max-height cap,
+    /// content height), which PastableUITextView already implements.
+    @available(iOS 16.0, *)
     func sizeThatFits(_ proposal: ProposedViewSize, uiView tv: PastableUITextView, context: Context) -> CGSize? {
         let width = proposal.width ?? UIScreen.main.bounds.width
         // [T-share-url-input-height] UITextView.sizeThatFits returns the
