@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 import WebKit
 import Speech
+import FileProvider
+import UserNotifications
 
 // Exercise production adapters and real call shapes, not copied backports.
 // This proves type/availability contracts only, not on-device rendering.
@@ -104,6 +106,26 @@ func cancellableTimerCalls() async {
     let settleMillis = 1200
     try? await Task.sleep(nanoseconds: UInt64(settleMillis) * 1_000_000)
     guard !Task.isCancelled else { return }
+}
+
+struct FileProviderAvailabilityCalls {
+    @available(iOS 16.0, *)
+    static let domain = NSFileProviderDomain(identifier: NSFileProviderDomainIdentifier("smoke"), displayName: "Smoke")
+
+    static func signalAndRemove() {
+        guard #available(iOS 16.0, *) else { return }
+        NSFileProviderManager(for: domain)?.signalEnumerator(for: .rootContainer) { _ in }
+        NSFileProviderManager.remove(domain, mode: .removeAll) { _, _ in }
+    }
+}
+
+@MainActor
+func badgeAvailabilityCalls(enabled: Bool, count: Int) {
+    guard #available(iOS 16.0, *) else {
+        UIApplication.shared.applicationIconBadgeNumber = enabled ? count : 0
+        return
+    }
+    UNUserNotificationCenter.current().setBadgeCount(enabled ? count : 0) { _ in }
 }
 
 struct ConditionalToolbarCalls: View {

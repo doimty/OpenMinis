@@ -60,6 +60,41 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("recognitionRequest.taskHint = .dictation", source)
         self.assertIn("recognizer.recognitionTask(with: recognitionRequest)", source)
 
+    def test_file_provider_guard_preserves_core_initialization(self):
+        source = (ROOT / "src/ios/MinisApp.swift").read_text()
+        body = source.split("private static func registerFileProviderDomain() {", 1)[1]
+        body = body.split("private static func signalFileProvider()", 1)[0]
+        guard = "guard #available(iOS 16.0, *) else { return }"
+        self.assertTrue(guard in body, "legacy startup must stop before replicated-domain work")
+        boundary = body.index(guard)
+        for setup in ("fm.createDirectory", "SoulStore.ensureExists()", "SoulStore.refreshCache()"):
+            self.assertLess(body.index(setup), boundary)
+        self.assertLess(boundary, body.index("let staleDir"))
+        self.assertLess(boundary, body.index("NSFileProviderManager.getDomainsWithCompletionHandler"))
+        self.assertNotIn("#if #available", source)
+        self.assertTrue(re.search(r"@available\(iOS 16\.0, \*\)\s*private static let fileProviderDomain", source) is not None)
+        signal = source.split("private static func signalFileProvider() {", 1)[1]
+        self.assertTrue(signal.lstrip().startswith(guard))
+
+    def test_file_provider_watcher_does_not_start_below_ios16(self):
+        source = (ROOT / "src/ios/FileProvider/AppGroupChangeWatcher.swift").read_text()
+        body = source.split("func start() {", 1)[1]
+        guard = "guard #available(iOS 16.0, *) else { return }"
+        self.assertTrue(body.lstrip().startswith(guard))
+        self.assertLess(body.index(guard), body.index("started = true"))
+
+    def test_badge_fallback_preserves_enabled_policy_and_main_actor(self):
+        source = (ROOT / "src/ios/Agent/Background/BackgroundKeepAliveManager.swift").read_text()
+        self.assertTrue(re.search(r"@MainActor\s*final class BackgroundKeepAliveManager", source) is not None)
+        body = source.split("private func refreshActiveTaskBadge(sessions: Set<String>, enabled: Bool) {", 1)[1]
+        body = body.split("// MARK: - Background Task Notifications", 1)[0]
+        self.assertTrue(body.lstrip().startswith("guard #available(iOS 16.0, *) else {"))
+        self.assertIn("UIApplication.shared.applicationIconBadgeNumber = enabled ? sessions.count : 0", body)
+        self.assertIn("center.setBadgeCount(sessions.count)", body)
+        app = (ROOT / "src/ios/MinisApp.swift").read_text()
+        self.assertEqual(app.count("UNUserNotificationCenter.current().setBadgeCount(0)"), 1)
+        self.assertIn("UIApplication.shared.applicationIconBadgeNumber = 0", app)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -521,7 +521,11 @@ struct MinisApp: App {
                 debugServer.restartIfDead(port: 8321)
                 #endif
 
-                try? await UNUserNotificationCenter.current().setBadgeCount(0)
+                if #available(iOS 16.0, *) {
+                    try? await UNUserNotificationCenter.current().setBadgeCount(0)
+                } else {
+                    await MainActor.run { UIApplication.shared.applicationIconBadgeNumber = 0 }
+                }
                 BackgroundInterruptionTracker.shared.checkOnForeground()
                 // [T-shortcuts-diag-and-pending] Scan for AppIntent runs that
                 // were marked pending but never cleared (i.e. the process was
@@ -655,6 +659,7 @@ struct MinisApp: App {
 
     // MARK: - FileProvider
 
+    @available(iOS 16.0, *)
     private static let fileProviderDomain = NSFileProviderDomain(
         identifier: NSFileProviderDomainIdentifier("com.openminis.app.files"),
         displayName: "Minis"
@@ -739,6 +744,10 @@ struct MinisApp: App {
         // sidebar title render stale first. App.init() already pre-loads it; this
         // keeps the cache fresh after ensureExists() seeds a first-launch SOUL.md.
         SoulStore.refreshCache()
+
+        // Core App Group/Soul setup above also belongs to the iOS 15 edition.
+        // Only the replicated Files-app integration below requires iOS 16.
+        guard #available(iOS 16.0, *) else { return }
 
         // Clean up stale directory created by a bug where workingSet identifier
         // was passed through as a subdirectory name.
@@ -888,6 +897,7 @@ struct MinisApp: App {
     }
 
     private static func signalFileProvider() {
+        guard #available(iOS 16.0, *) else { return }
         NSFileProviderManager(for: fileProviderDomain)?.signalEnumerator(for: .rootContainer) { error in
             if let error {
                 lifecycleLog.warning("[FileProvider] signal failed: \(error.localizedDescription)")

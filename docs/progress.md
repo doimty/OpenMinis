@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-09-18 — f27b5a7 app-startup integration boundary
+
+- Fresh local/fork baseline is f27b5a7; run35332863701 failed at18:08:10 with four diagnostics in MinisApp (domain initializer, badge API, replicated-domain removeAll). Expanded smoke passed15/16. The pre-existing local badge branch is retained; no new push occurred through18:46.
+- Correct Swift mechanism: `@available` for the lazy static domain, runtime `guard #available` for execution. `#if #available` is NOT valid Swift and will not be written. Do not replace the replicated domain with an invented legacy storage path.
+- Preserve the unconditional registerFileProviderDomain call: its directory/Soul initialization must run on15. Return only AFTER that setup and BEFORE FileProvider cleanup/reset/registration. Signal and watcher start independently no-op below16. Domain reset generation, callbacks, backup/restore and modern behavior remain unchanged.
+- BackgroundKeepAliveManager is explicitly @MainActor. Its legacy badge path can assign applicationIconBadgeNumber directly, respecting the existing enabled/count policy without an extra asynchronous hop. Preserve native setBadgeCount and logging on16+; foreground clears0 on both branches.
+- Add structural red/green checks for initialization order, guarded domain/signaling/watcher and badge policy; extend Apple negative/positive fixtures for FileProvider and badge API shapes. Full-app compile remains required. No filesystem data or reset logic is deleted/reimplemented.
+- Implemented the boundary in three production files. Before the fix all three new checks failed; afterwards structural tests9/9, parser8/8, toolbar audit tests7/7 and zero toolbar findings. Shell syntax/diff checks pass, five changed Swift files have no added parser errors. Reviewed the production diff: no changes to reset generation/snapshot/restore callbacks or core initialization order. Cloud compile pending.
+
 ## 2026-09-18 — c3eacb9 full-build follow-up: conditional toolbar builders
 
 - Baseline local/fork `c3eacb9a9315e9e3d59a30fd447d8cba83acc567`, clean before this batch. Run `35330747608` failed at 17:43:04 in the full app, while expanded iOS15/16 smoke passed. Artifact `reports/openminis-ios15/run-35330747608-M8WlyJ/` has 800024-byte log, exit65, matching versions; actions.log lines519/556 confirm smoke PASS. The nine speech/timer diagnostics no longer appear.

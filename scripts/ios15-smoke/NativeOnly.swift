@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 import WebKit
 import Speech
+import FileProvider
+import UserNotifications
 
 // Negative controls use the actual rejected API shapes. This entire file must
 // type-check at 16, and diagnose availability (not bad syntax) at 15.
@@ -65,6 +67,12 @@ func nativeSpeechControl(url: URL) {
 
 func nativeTimerControl() async throws {
     try await Task.sleep(for: .milliseconds(200))
+}
+
+func nativeFileProviderControl() {
+    let domain = NSFileProviderDomain(identifier: NSFileProviderDomainIdentifier("smoke"), displayName: "Smoke")
+    NSFileProviderManager.remove(domain, mode: .removeAll) { _, _ in }
+    UNUserNotificationCenter.current().setBadgeCount(0) { _ in }
 }
 
 struct NativeOptionalToolbarControl: View {

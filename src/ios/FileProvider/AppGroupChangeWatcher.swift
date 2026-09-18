@@ -44,6 +44,7 @@ final class AppGroupChangeWatcher {
 
     /// Start watching the three exposed roots. Idempotent — calling twice is a no-op.
     func start() {
+        guard #available(iOS 16.0, *) else { return }
         guard !started else { return }
         started = true
 

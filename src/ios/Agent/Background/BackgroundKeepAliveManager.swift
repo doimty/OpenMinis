@@ -817,6 +817,10 @@ final class BackgroundKeepAliveManager: NSObject, ObservableObject, CLLocationMa
     }
 
     private func refreshActiveTaskBadge(sessions: Set<String>, enabled: Bool) {
+        guard #available(iOS 16.0, *) else {
+            UIApplication.shared.applicationIconBadgeNumber = enabled ? sessions.count : 0
+            return
+        }
         let center = UNUserNotificationCenter.current()
         guard enabled else {
             center.setBadgeCount(0) { _ in }
