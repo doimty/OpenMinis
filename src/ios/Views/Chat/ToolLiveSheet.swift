@@ -474,7 +474,7 @@ struct ToolLiveSheet: View {
         .onReceive(block.objectWillChange) { _ in
             blockUpdateTick += 1
         }
-        .presentationDragIndicator(.hidden)
+        .compatPresentationDragIndicator(.hidden)
         // Tapping a URL in shell output (underlined via attributedShellLine)
         // routes through `activeSheet` so it shares one `.sheet(item:)`
         // modifier with the browser takeover below.
@@ -654,7 +654,7 @@ struct ToolLiveSheet: View {
         .padding(.vertical, 10)
         .background(Color(UIColor.systemBackground))
         .fullScreenCover(isPresented: $showTerminal) {
-            NavigationStack {
+            CompatNavigationStack {
                 // Pre-fill the shell command the tool is currently running,
                 // WITHOUT a trailing newline — the user can review/edit and
                 // press Enter themselves (intentional, not auto-run).

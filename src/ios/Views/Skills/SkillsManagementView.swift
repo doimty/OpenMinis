@@ -229,7 +229,7 @@ private struct ImportSkillSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 Picker("Import Method", selection: $importMode) {
                     ForEach(ImportMode.allCases, id: \.self) { mode in
@@ -507,14 +507,14 @@ private struct SkillDetailView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    LabeledContent("Version", value: skill.version)
+                    CompatLabeledContent("Version", value: skill.version)
                     if let modDate = latestFileModDate {
-                        LabeledContent("Last Modified") {
+                        CompatLabeledContent("Last Modified") {
                             Text(Self.relativeTime(modDate))
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    LabeledContent("Source") {
+                    CompatLabeledContent("Source") {
                         switch skill.importSource {
                         case .url(let url):
                             Text(url)
@@ -529,7 +529,7 @@ private struct SkillDetailView: View {
                             Text(AppLocalized("Session created")).foregroundStyle(.secondary)
                         }
                     }
-                    LabeledContent(AppLocalized("Usage")) {
+                    CompatLabeledContent(AppLocalized("Usage")) {
                         let freq = store.usageFrequency(for: skill.id)
                         Text(usageFrequencyLabel(freq))
                             .foregroundStyle(usageFrequencyColor(freq))
@@ -912,7 +912,7 @@ struct MinisSkillsBrowserView: View {
     @StateObject private var coordinator = SkillBrowserCoordinator()
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             ZStack {
                 SkillBrowserWebView(coordinator: coordinator)
                     .ignoresSafeArea(edges: .bottom)

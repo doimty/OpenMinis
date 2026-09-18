@@ -68,6 +68,7 @@ struct SwipeToSendHint: View {
 // MARK: - Flow Layout
 
 /// A custom Layout that arranges subviews in a wrapping horizontal flow.
+@available(iOS 16.0, *)
 private struct FlowLayout: Layout {
     var hSpacing: CGFloat = 8
     var vSpacing: CGFloat = 8
@@ -172,28 +173,37 @@ struct InputAttachmentGridView: View {
     @State private var draggingID: UUID?
 
     var body: some View {
-        FlowLayout(hSpacing: 8, vSpacing: 8) {
-            ForEach(attachments) { attachment in
-                AttachmentChip(attachment: attachment) {
-                    onRemove(attachment)
+        Group {
+            if #available(iOS 16.0, *) {
+                FlowLayout(hSpacing: 8, vSpacing: 8) {
+                    ForEach(attachments) { attachment in chip(attachment) }
+                    ForEach(0..<loadingVideoCount, id: \.self) { _ in VideoLoadingChip() }
                 }
-                .opacity(draggingID == attachment.id ? 0.4 : 1)
-                .onDrag {
-                    draggingID = attachment.id
-                    return NSItemProvider(object: attachment.id.uuidString as NSString)
-                }
-                .onDrop(of: [.text], delegate: AttachmentDropDelegate(
-                    targetID: attachment.id,
-                    draggingID: $draggingID,
-                    onMove: onMove
-                ))
-            }
-            ForEach(0..<loadingVideoCount, id: \.self) { _ in
-                VideoLoadingChip()
+            } else {
+                LegacyFlowLayout(items: legacyItems, hSpacing: 8, vSpacing: 8)
             }
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)  // room for × button overhang (offset y: -4)
+    }
+
+    private var legacyItems: [LegacyFlowItem] {
+        attachments.map { attachment in
+            LegacyFlowItem(id: attachment.id) { chip(attachment) }
+        } + (0..<loadingVideoCount).map { index in
+            LegacyFlowItem(id: "loading-video-\(index)") { VideoLoadingChip() }
+        }
+    }
+
+    private func chip(_ attachment: InputAttachment) -> some View {
+        AttachmentChip(attachment: attachment) { onRemove(attachment) }
+            .opacity(draggingID == attachment.id ? 0.4 : 1)
+            .onDrag {
+                draggingID = attachment.id
+                return NSItemProvider(object: attachment.id.uuidString as NSString)
+            }
+            .onDrop(of: [.text], delegate: AttachmentDropDelegate(
+                targetID: attachment.id, draggingID: $draggingID, onMove: onMove))
     }
 }
 
@@ -274,7 +284,7 @@ private struct AttachmentChip: View {
         .onAppear { loadThumbnailIfNeeded() }
         .onTapGesture { showPreview = true }
         .sheet(isPresented: $showPreview) {
-            NavigationStack {
+            CompatNavigationStack {
                 AttachmentPreviewView(url: attachment.cacheURL)
                     .navigationTitle(attachment.fileName)
                     .navigationBarTitleDisplayMode(.inline)
@@ -500,24 +510,6 @@ private struct AttachmentPreviewView: UIViewControllerRepresentable {
     }
 }
 
-// MARK: - Video File Transferable (for PhotosPicker video export)
-
-struct VideoFileTransferable: Transferable {
-    let url: URL
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(contentType: .movie) { video in
-            SentTransferredFile(video.url)
-        } importing: { received in
-            // Copy to a temp location so the file outlives the picker callback
-            let tmp = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString.prefix(8) + "_" + received.file.lastPathComponent)
-            try FileManager.default.copyItem(at: received.file, to: tmp)
-            return Self(url: tmp)
-        }
-    }
-}
-
 // MARK: - Camera Picker (UIImagePickerController wrapper)
 
 struct CameraPicker: UIViewControllerRepresentable {
@@ -632,18 +624,26 @@ struct UserAttachmentList: View {
     }
 
     var body: some View {
-        FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
-            ForEach(attachments) { meta in
-                if meta.isImage {
-                    AsyncImageTile(meta: meta, tileSize: tileSize) {
-                        openGallery(startingAt: meta)
-                    }
-                } else if meta.isVideo {
-                    AsyncVideoTile(meta: meta, tileSize: tileSize)
-                } else {
-                    fileTile(meta)
-                }
+        if #available(iOS 16.0, *) {
+            FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
+                ForEach(attachments) { meta in tile(meta) }
             }
+        } else {
+            LegacyFlowLayout(items: attachments.map { meta in
+                LegacyFlowItem(id: meta.id) { tile(meta) }
+            }, hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap,
+               alignment: .trailing)
+        }
+    }
+
+    @ViewBuilder
+    private func tile(_ meta: AttachmentMeta) -> some View {
+        if meta.isImage {
+            AsyncImageTile(meta: meta, tileSize: tileSize) { openGallery(startingAt: meta) }
+        } else if meta.isVideo {
+            AsyncVideoTile(meta: meta, tileSize: tileSize)
+        } else {
+            fileTile(meta)
         }
     }
 
@@ -775,18 +775,28 @@ struct QueuedAttachmentPreview: View {
     private let tileSize: CGFloat = UserAttachmentTileMetrics.tile
 
     var body: some View {
-        FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
-            ForEach(attachments) { attachment in
-                switch attachment.kind {
-                case .image:
-                    AsyncCacheURLImageTile(cacheURL: attachment.cacheURL, tileSize: tileSize)
-                        .opacity(0.7)
-                case .video:
-                    placeholderTile(icon: "film", fileName: attachment.fileName)
-                case .document:
-                    placeholderTile(icon: "doc.fill", fileName: attachment.fileName)
-                }
+        if #available(iOS 16.0, *) {
+            FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
+                ForEach(attachments) { attachment in tile(attachment) }
             }
+        } else {
+            LegacyFlowLayout(items: attachments.map { attachment in
+                LegacyFlowItem(id: attachment.id) { tile(attachment) }
+            }, hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap,
+               alignment: .trailing)
+        }
+    }
+
+    @ViewBuilder
+    private func tile(_ attachment: InputAttachment) -> some View {
+        switch attachment.kind {
+        case .image:
+            AsyncCacheURLImageTile(cacheURL: attachment.cacheURL, tileSize: tileSize)
+                .opacity(0.7)
+        case .video:
+            placeholderTile(icon: "film", fileName: attachment.fileName)
+        case .document:
+            placeholderTile(icon: "doc.fill", fileName: attachment.fileName)
         }
     }
 

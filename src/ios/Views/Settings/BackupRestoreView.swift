@@ -302,32 +302,32 @@ struct BackupRestoreView: View {
                 }
             }
 
-            LabeledContent("Created",
-                           value: m.createdAt.formatted(date: .abbreviated, time: .shortened))
+            CompatLabeledContent("Created",
+                                 value: m.createdAt.formatted(date: .abbreviated, time: .shortened))
             // The data cut-off, when the package records one. Distinct from
             // "Created": anything changed after this instant is deliberately
             // not in the package, and the user should see that before
             // deciding this is the backup they want.
             if let snapshotAt = m.snapshotAt, snapshotAt != m.createdAt {
-                LabeledContent("Data as of",
-                               value: snapshotAt.formatted(date: .abbreviated, time: .shortened))
+                CompatLabeledContent("Data as of",
+                                     value: snapshotAt.formatted(date: .abbreviated, time: .shortened))
             }
-            LabeledContent("From", value: "\(m.deviceName) · \(m.app.platform) \(m.app.version)")
+            CompatLabeledContent("From", value: "\(m.deviceName) · \(m.app.platform) \(m.app.version)")
             if m.encryption != nil {
-                LabeledContent("Encrypted", value: AppLocalized("Yes"))
+                CompatLabeledContent("Encrypted", value: AppLocalized("Yes"))
             }
             if let limits = m.limits.maxFileBytes, limits == 0 {
                 // The package was made with file contents switched off, so it
                 // can restore conversations but none of their attachments.
                 // Saying "size limit" here would be misleading — nothing was
                 // too big, the user chose to leave files out.
-                LabeledContent("File contents",
-                               value: "Not included (\(m.limits.skippedFiles) file(s) listed)")
+                CompatLabeledContent("File contents",
+                                     value: "Not included (\(m.limits.skippedFiles) file(s) listed)")
             } else if let limits = m.limits.maxFileBytes, limits > 0 {
                 // §3.4 — the package is known-incomplete, and the user should
                 // learn that here rather than after restoring.
-                LabeledContent("Excluded (size limit)",
-                               value: "\(m.limits.skippedFiles) file(s)")
+                CompatLabeledContent("Excluded (size limit)",
+                                     value: "\(m.limits.skippedFiles) file(s)")
             }
 
             // Escape hatch, kept with the thing it replaces rather than in the
@@ -500,17 +500,17 @@ struct BackupRestoreView: View {
 
     private func reportSection(_ r: BackupImporter.Report) -> some View {
         Section {
-            LabeledContent("Restored", value: "\(r.totalImported)")
-            if r.totalUpdated > 0 { LabeledContent("Updated", value: "\(r.totalUpdated)") }
+            CompatLabeledContent("Restored", value: "\(r.totalImported)")
+            if r.totalUpdated > 0 { CompatLabeledContent("Updated", value: "\(r.totalUpdated)") }
             // "Skipped" is the expected outcome for anything already present,
             // so it is labelled as such rather than looking like a failure.
-            LabeledContent("Already up to date", value: "\(r.totalSkipped)")
+            CompatLabeledContent("Already up to date", value: "\(r.totalSkipped)")
             if r.totalUnreadable > 0 {
-                LabeledContent("Unreadable", value: "\(r.totalUnreadable)")
+                CompatLabeledContent("Unreadable", value: "\(r.totalUnreadable)")
             }
             let credsRestored = r.categories.reduce(0) { $0 + $1.credentialsRestored }
             if credsRestored > 0 {
-                LabeledContent("API keys restored", value: "\(credsRestored)")
+                CompatLabeledContent("API keys restored", value: "\(credsRestored)")
             }
             ForEach(r.categories, id: \.category) { c in
                 if let failed = c.failed {
@@ -921,7 +921,7 @@ struct ServerRestorePickerSheet: View {
     @State private var showAddServer = false
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 if !remotes.isEmpty {
                     Section {
@@ -1312,7 +1312,7 @@ struct ServerPackageListView: View {
             .disabled(cancelFlag.value)
         }
         .padding(24)
-        .presentationDetents([.height(240)])
+        .compatPresentationDetentHeight(240)
         // No swipe-to-dismiss: leaving the sheet would hide a transfer that is
         // still running, which is how the concurrency problem started.
         .interactiveDismissDisabled(true)

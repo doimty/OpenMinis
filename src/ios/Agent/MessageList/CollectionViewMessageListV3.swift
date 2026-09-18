@@ -1176,7 +1176,7 @@ extension CollectionViewMessageListV3 {
                 let message = messages[msgIdx]
                 let bridge = getOrCreateBridge(for: message, in: messages)
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedWholeMessageV3(
                         message: message,
                         bridge: bridge,
@@ -1186,35 +1186,23 @@ extension CollectionViewMessageListV3 {
                     // to prevent use-after-free in ViewGraphGeometryObservers
                     // when UICollectionView recycles the cell.
                     .transaction { $0.disablesAnimations = true }
-                    // UIHostingConfiguration creates an independent SwiftUI
-                    // environment — it does NOT inherit EnvironmentObjects
-                    // from the outer AIChatView. Descendant views inside the
-                    // cell (notably ToolCapsuleView, which reads
-                    // `@EnvironmentObject vm: AIChatViewModel` for its long-
-                    // press menu's `vm.isProcessing` check) would trigger
-                    // SwiftUI's "No ObservableObject of type AIChatViewModel
-                    // found" fatal (EXC_BREAKPOINT) the moment the body
-                    // evaluates — symptom: app crashes when waking from
-                    // lock + tapping a session-complete notification, since
-                    // the deep-link forces an immediate cell rebuild before
-                    // any other view layer can re-inject the vm. Re-inject
-                    // explicitly on every hosting config.
+                    // Both hosting backends create an independent SwiftUI
+                    // environment. Re-inject the VM on every configuration,
+                    // including cold-start deep links and notification opens.
                     // [T-ios-tool-capsule-vm-envobject-crash]
                     .environmentObject(vm)
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
 
             case .assistantHeader(let msgId):
                 guard let msgIdx = messageIndex[msgId], msgIdx < messages.count else { return }
                 let message = messages[msgIdx]
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedAssistantHeaderV3(message: message, maxWidth: width,
                                             onOpenSoulSettings: onOpenSoulSettings)
                         .transaction { $0.disablesAnimations = true }
                         .environmentObject(vm)
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
 
             case .assistantBlock(let msgId, let blockId):
                 guard let msgIdx = messageIndex[msgId], msgIdx < messages.count else {
@@ -1228,7 +1216,7 @@ extension CollectionViewMessageListV3 {
                 }
                 let bridge = getOrCreateBridge(for: message, in: messages)
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedAssistantBlockV3(
                         block: block,
                         message: message,
@@ -1237,15 +1225,14 @@ extension CollectionViewMessageListV3 {
                     )
                     .transaction { $0.disablesAnimations = true }
                     .environmentObject(vm)
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
 
             case .assistantFooter(let msgId):
                 guard let msgIdx = messageIndex[msgId], msgIdx < messages.count else { return }
                 let message = messages[msgIdx]
                 let bridge = getOrCreateBridge(for: message, in: messages)
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedAssistantFooterV3(
                         message: message,
                         bridge: bridge,
@@ -1253,8 +1240,7 @@ extension CollectionViewMessageListV3 {
                     )
                     .transaction { $0.disablesAnimations = true }
                     .environmentObject(vm)
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
             }
 
             // [T-ios-scroll-decel-height-drift] Seed this cell with the real

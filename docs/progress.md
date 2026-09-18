@@ -1,5 +1,55 @@
 # Progress
 
+## 2026-09-18 13:50 — batch compatibility complete, pushing for compile gate
+
+- 兼容层落地（6 个 Shared 文件，pbxproj 已全部注册：BuildFile/FileReference/Group/Sources 各 4 处引用齐全，含 LegacyFlowLayoutTests 的同步目录豁免确认）：
+  - `SwiftUICompatibility.swift`：CompatNavigationStack / CompatLabeledContent（泛型+value 变体）/ CompatPresentationDetent / sheet·scroll·toolbar 适配器。
+  - `CompatNavigationPath.swift`：CompatPathNavigationStack（[Element] 绑定）/ CompatValueNavigationLink / CompatSplitNavigationView（iOS15 = NavigationView 双栏）。
+  - `CompatPhotoPicker.swift`：CompatPhotoPickerItem（iOS16 PhotosPickerItem / iOS15 PHPickerResult 双后端，视频自拷贝临时 URL）/ compatPhotosPicker。
+  - `CompatGeometry.swift`：compatOnGeometryChange（iOS15 PreferenceKey 模拟）。
+  - `LegacyHostingContent.swift`：iOS15 UIContentConfiguration + UIHostingController 承载；`SelfSizingCell.applyHostedContent(parent:content:)` 统一双路径。
+  - `LegacyFlowLayout.swift` + `MinisTests/LegacyFlowLayoutTests.swift`（4 用例）。
+- 调用点：40+ 文件批改（Backup/AIChatView/ContentView/Settings/Sync/Provider/MCP/Rootfs/语音）；ContentView 路由已改 [String] + CompatPathNavigationStack；SettingsSheet 深链已迁移 destination 闭包。
+- 工具：`scripts/ios15_build_log.py`（去注释误报的诊断提取器，8/8 回归）+ `scripts/plan_ios15_adapters.py`（tree-sitter 编辑 planner，批次 JSON 在 reports/openminis-ios15/batch-adapter-plan/）。
+- 工作流升级：诊断改用脚本、加 cache/save（红 probe 不再丢原生缓存）、加单测步骤。
+- 本次 commit 推 compat/ios15 触发云端编译=唯一编译门禁。预期第一次仍可能红（导航递归 link 方案、承载层编译细节未经验证），按真实错误收敛；BUILD SUCCEEDED 才算过。M3 真机验收仍未进行。
+
+## 2026-09-18 10:22 — Batch compatibility before the next push (current instruction)
+
+- User: “嗯，基本做好兼容再去推”. Do not push a tiny page fix just to discover the next compiler error. Supersedes the previous one-layer-per-push approach.
+- Keep work local until the major iOS 15 paths are implemented and inspected together: navigation (including route state), message hosting/lifecycle, media picking/layout, simple form/sheet APIs, and system-integration availability. Preserve native paths on supported versions.
+- Next remote build is an integrated verification gate, not proof that unchecked local code already compiles. No local Xcode/Swift is installed. Do not promise one-pass success or an installable IPA before cloud and device validation.
+- Local changes remain based on `1410ef0`, no new commit/push/run. BackupRestoreView's 13 diagnosed calls have now been switched. Log-parser regression tests passed 8/8, with four failures demonstrated against the old extractor first. Swift smoke has only passed shell syntax locally; Apple type-checks are pending.
+- Independent review was not available: the exposed spawn payload includes ACP-only `streamTo`, rejected for subagents. No child started. Stop retrying this tool combination; do not change the gateway or claim independent review.
+
+## 2026-09-18 — Resume M1: backup/restore availability layer (in progress)
+
+### Locked baseline and red evidence
+
+- Local and fork `compat/ios15` both point to `1410ef040c78ca03be7000f88ccfd0ad5928daa0`; preserve the pre-existing uncommitted 23:50 progress entry below.
+- Latest completed CI: `35243806282`, failed at 2026-09-18 00:06 Asia/Shanghai. Downloaded the nonempty 888,385-byte compiler log and `versions.json`; provenance confirms Xcode 26.2 / 17C52, SDK 26.2, Swift 6.2.3, pinned iSH `3f6384c`.
+- There are **24 real compiler diagnostics**, all in `BackupRestoreView.swift`: 11 `LabeledContent` sites each emit a type and initializer error, plus `NavigationStack` at 924 and `presentationDetents` at 1315. The old summary's 42 includes 18 source-comment echoes containing `error:`.
+- The real red-capable feedback loop is the pinned macOS compile in `.github/workflows/ios15-m0-baseline.yml`. This host has no Xcode; local source checks are not a substitute. The diagnostics directly identify unavailable APIs, so speculative bisection is not useful here.
+
+### Plan, hypotheses and ownership
+
+1. Keep compatibility views in a small, independently type-checkable SwiftUI file. Mechanically move the existing navigation / sheet / scroll adapters out of `AppLocalization.swift` without changing their behavior; register the new file in the app target. Add `CompatLabeledContent(LocalizedStringKey, value: String)` and a height-only sheet adapter accepting `CGFloat`, never an unavailable `PresentationDetent` in a legacy-visible signature.
+2. Change only the 13 diagnosed backup/restore call sites. iOS 16+ retains native controls. iOS 15 uses a localized label/value row, the existing stacked `NavigationView`, and a standard sheet. Preserve cancel, interactive-dismiss protection, import/download state and backup formats.
+3. Before production edits, add a small Apple-compiler smoke fixture for the actual compatibility module. A native-API negative control must fail for iOS 15 and pass for iOS 16; adapted calls must type-check at both targets. Obtain independent plan/diff review.
+4. Tighten the existing compile loop: unit-test a diagnostic parser against source-comment false positives, and save successfully built native dependencies before the intentionally red app probe rather than only on whole-job success. This is CI-only; retain pinned toolchain/submodule and failed xcodebuild exit status.
+
+Success for this checkpoint: compatibility smoke passes at 15/16; all 24 old backup diagnostics disappear from a fresh full compile; native cache survives a later Swift failure; diagnostic summary counts actual compiler errors. A later file's availability failure is a new layer, not global M1 success.
+
+Independent failure signals: missing Xcode target membership; localized labels become verbatim or dynamic values become localization keys; iOS 16 loses native navigation/form semantics; cancellation/dismiss guards change; native cache saves partial output; parser hides an unlocated compiler/linker failure or turns a red build green.
+
+Ablations: raw iOS-16-only controls must fail the iOS-15 smoke and compile at 16; guarded controls must compile at both; feed the observed comment into the log parser and require zero diagnostics from that line. Full app compile remains authoritative, and runtime / iOS 15 device acceptance is still outstanding.
+
+## 2026-09-17 23:50 — M1 layer: LocalizedStringResource / NavigationStack
+
+- Last probe `35237699911`: 54 errors in the app (FileProvider isolated). Dominant: LocalizedStringResource, NavigationStack, buildIf, Regex, presentationDetents, scrollContentBackground, View.bold/fontWeight.
+- Fixes in this checkpoint: `AppLocalized` takes `String` (iOS 15 bundle lookup); `LocalizedStringResource` overload gated to 16+; idle option labels are `String`; `CompatNavigationStack` for the four failing stacks; env-var key check without Regex; sheet detents / hidden scroll background / toolbar `if` availability wrappers.
+- Expect the next CI run to fail on the *next* availability layer, not these 54.
+
 ## 2026-09-17 22:42 — M1 method after first probe
 
 - Run `35232182546` failed as intended. 17 errors, all FileProvider `NSFileProviderRequest` / ItemVersion / ItemFields (iOS 16). Main app never compiled.

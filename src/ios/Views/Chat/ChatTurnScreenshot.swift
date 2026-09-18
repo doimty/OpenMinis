@@ -19,7 +19,7 @@ struct ChatScreenshotPreviewSheet: View {
     private let logger = AppLogger(category: "ScreenshotPreview")
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             ScrollView(.vertical, showsIndicators: true) {
                 Image(uiImage: image)
                     .resizable()
@@ -59,7 +59,7 @@ struct ChatScreenshotPreviewSheet: View {
                     }
                 }
             }
-            .toolbarBackground(.visible, for: .navigationBar)
+            .compatVisibleNavigationBarBackground()
             .overlay(alignment: .bottom) {
                 if let toast {
                     Text(toast)

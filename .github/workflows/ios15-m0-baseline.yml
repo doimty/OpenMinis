@@ -102,6 +102,18 @@ jobs:
           ./deps/build_rclone_ios.sh
           ls -ld deps/libs deps/frameworks deps/resources
 
+      - name: Save native iOS deps cache
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            deps/libs
+            deps/include
+            deps/frameworks
+            deps/resources
+            deps/lame-build
+          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/rclone-mobile/go.sum') }}
+
       - name: Compile unchanged baseline
         if: github.event_name == 'workflow_dispatch'
         run: |
@@ -118,6 +130,11 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             build \
             | tee "$RUNNER_TEMP/m0/xcodebuild.log"
+
+      - name: Diagnostic parser regression tests
+        run: |
+          set -euo pipefail
+          python3 scripts/test_ios15_build_log.py -v
 
       - name: Probe iOS 15 app target
         run: |
@@ -140,24 +157,10 @@ jobs:
           status=$?
           set -e
           printf 'xcodebuild_exit=%s\n' "$status" | tee "$RUNNER_TEMP/m1/exit.txt"
-          python3 - <<'PY'
-          from pathlib import Path
-          import json, os, re
-          log=Path(os.environ['RUNNER_TEMP'])/'m1'/'xcodebuild.log'
-          text=log.read_text(errors='replace')
-          errors=[ln for ln in text.splitlines() if ' error:' in ln or ln.startswith('error:')]
-          Path(os.environ['RUNNER_TEMP']+'/m1/errors.txt').write_text('\n'.join(errors)+('\n' if errors else ''))
-          summary={
-            'log_bytes': log.stat().st_size,
-            'error_lines': len(errors),
-            'build_succeeded': '** BUILD SUCCEEDED **' in text,
-            'build_failed': '** BUILD FAILED **' in text,
-            'first_errors': errors[:80],
-          }
-          Path(os.environ['RUNNER_TEMP']+'/m1/summary.json').write_text(json.dumps(summary, indent=2)+'\n')
-          print(json.dumps({k:summary[k] for k in summary if k!='first_errors'}, indent=2))
-          print('\n'.join(errors[:40]))
-          PY
+          # Summarize with the tested extractor so source-comment echoes (lines
+          # containing `error:` in /// docs or string literals) are not counted
+          # as compiler diagnostics. The xcodebuild exit status stays the gate.
+          python3 scripts/ios15_build_log.py "$RUNNER_TEMP/m1/xcodebuild.log" --output-dir "$RUNNER_TEMP/m1"
           test -s "$RUNNER_TEMP/m1/xcodebuild.log"
           # First probe is expected to fail. Keep the job red if xcodebuild failed
           # so the availability list is not mistaken for a passing iOS 15 build.

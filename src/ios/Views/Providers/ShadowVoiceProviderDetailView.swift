@@ -21,7 +21,7 @@ struct ShadowVoiceProviderDetailView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent {
+                CompatLabeledContent {
                     Text(instance?.label ?? "—")
                         .foregroundStyle(.secondary)
                 } label: {
@@ -32,7 +32,7 @@ struct ShadowVoiceProviderDetailView: View {
                     }
                 }
                 if let base = instance?.effectiveCustomBaseURL {
-                    LabeledContent {
+                    CompatLabeledContent {
                         Text(base)
                             .font(.system(.caption, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -87,7 +87,7 @@ struct ShadowVoiceProviderDetailView: View {
             // sheet identity and its stale TestSession.
             ModelQuickTestSheet(entry: entry)
                 .id(entry.id)
-                .presentationDetents([.medium, .large])
+                .compatPresentationDetents([.medium, .large])
         }
     }
 

@@ -561,7 +561,7 @@ private struct FolderPickerSheet: View {
     private var sessionCount: Int { sessionIds.count }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 Section {
                     HStack {
@@ -1076,7 +1076,6 @@ struct ContentView: View {
     /// Whether the initial session load has completed (prevents showing the list before we decide to auto-navigate).
     @State private var didInitialLoad = false
     /// Controls sidebar visibility on iPad (automatic handles iPhone collapse).
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
 
     /// Launch screen preference: 0=Auto, 1=Last Session, 2=New Chat.
     @AppStorage("launchScreen") private var launchScreen: Int = 0
@@ -1149,7 +1148,7 @@ struct ContentView: View {
     /// Whether the current window is wide enough for two-column layout.
     @State private var isWideLayout = false
     /// Navigation path for stack (compact) layout.
-    @State private var navigationPath = NavigationPath()
+    @State private var navigationPath: [String] = []
     /// Tracks the session ID currently visible on the compact navigation stack.
     @State private var currentStackSessionId: String?
     /// [T-ios-stacknav-transition-attributegraph-race] Compact-layout analogue
@@ -1230,7 +1229,7 @@ struct ContentView: View {
     ///
     /// Carries the deferral instant so a stale request can be dropped rather
     /// than flushed — see `pendingBackgroundNavigationTTL`.
-    @State private var pendingBackgroundNavigation: (path: NavigationPath, deferredAt: Date)?
+    @State private var pendingBackgroundNavigation: (path: [String], deferredAt: Date)?
 
     /// [T-ios-bg-nav-push-watchdog] How long a deferred push stays valid.
     ///
@@ -1436,7 +1435,7 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(isPresented: $showTerminal) {
-            NavigationStack {
+            CompatNavigationStack {
                 ISHTerminalView(showCloseButton: true)
             }
         }
@@ -1448,7 +1447,7 @@ struct ContentView: View {
             case .settings:
                 SettingsSheet(showTerminal: $showTerminal)
             case .rootfsManagement:
-                NavigationStack {
+                CompatNavigationStack {
                     RootfsManagementView()
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
@@ -1459,11 +1458,11 @@ struct ContentView: View {
             case .browser:
                 BrowserSheetView(pool: browserPool)
             case .browserManagement:
-                NavigationStack {
+                CompatNavigationStack {
                     BrowserManagementView(pool: browserPool)
                 }
             case .syncMigrationDetail:
-                NavigationStack {
+                CompatNavigationStack {
                     SyncMigrationDetailView()
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
@@ -1492,7 +1491,7 @@ struct ContentView: View {
             .onAppear {
                 print("[DELETE] Sheet appeared. singleDeleteInfo is \(singleDeleteInfo == nil ? "nil" : "non-nil, sessionCount=\(singleDeleteInfo!.sessionCount)")")
             }
-            .presentationDetents([.medium])
+            .compatPresentationDetents([.medium])
         }
         .sheet(item: $sessionToEdit) { session in
             SessionEditSheet(session: session) { newTitle, newCategory in
@@ -1504,7 +1503,7 @@ struct ContentView: View {
                 }
                 sessionToEdit = nil
             }
-            .presentationDetents([.medium])
+            .compatPresentationDetents([.medium])
         }
         .sheet(isPresented: $showDeleteConfirm, onDismiss: {
             if deleteInfo == nil {
@@ -1521,7 +1520,7 @@ struct ContentView: View {
                 deleteSelectedSessions()
                 showDeleteConfirm = false
             }
-            .presentationDetents([.medium])
+            .compatPresentationDetents([.medium])
         }
         .sheet(isPresented: $showExportPreview) {
             ExportPreviewSheet(fileURL: exportFileURL, previewURL: exportPreviewURL, summary: exportSummary)
@@ -1556,7 +1555,7 @@ struct ContentView: View {
                 if req.fromMultiSelect { folderMoveApplied = true }
                 folderPickerRequest = nil
             }
-            .presentationDetents([.medium, .large])
+            .compatPresentationDetents([.medium, .large])
         }
         .modifier(FolderAlertsModifier(
             folderToRename: $folderToRename,
@@ -2071,7 +2070,7 @@ struct ContentView: View {
         // session-switch / tap lag is a separate issue (ChatSession Array `==`
         // in SwiftUI's transaction flush; an A/B test confirmed the font
         // injection is not its cause), so per-column injection is safe here.
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        CompatSplitNavigationView {
             sessionList(useNavigationLinks: false)
                 .appFontScale()
         } detail: {
@@ -2083,9 +2082,9 @@ struct ContentView: View {
     // MARK: - Stack Layout (iPhone / narrow window)
 
     private var stackLayout: some View {
-        NavigationStack(path: $navigationPath) {
+        CompatPathNavigationStack(path: $navigationPath) {
             sessionList(useNavigationLinks: true)
-                .navigationDestination(for: String.self) { id in
+        } destination: { id in
                     // `.id(id)` mirrors detailView (iPad): navigationDestination
                     // views are identified by stack depth, not path value, so
                     // replacing the top element in place (menu "New Chat" swaps
@@ -2126,7 +2125,6 @@ struct ContentView: View {
                             }
                             .onDisappear { shareLog.info("🔄SESSION stackNav DISAPPEAR id=\(id)") }
                     }
-                }
         }
     }
 
@@ -2833,7 +2831,7 @@ struct ContentView: View {
                                     }
                                 }
                                 .background(
-                                    NavigationLink(value: session.id) { EmptyView() }
+                                    CompatValueNavigationLink(value: session.id, path: $navigationPath) { EmptyView() }
                                         .opacity(0)
                                 )
                             .listRowInsets(EdgeInsets())
@@ -3491,7 +3489,7 @@ struct ContentView: View {
         if isWideLayout {
             openSession(newId)
         } else {
-            commitNavigationPath(NavigationPath([newId]))
+            commitNavigationPath([newId])
             currentStackSessionId = newId
         }
     }
@@ -3525,7 +3523,7 @@ struct ContentView: View {
             if isWideLayout {
                 selectedSessionId = nil
             } else {
-                navigationPath = NavigationPath()
+                navigationPath = []
                 currentStackSessionId = nil
             }
         }
@@ -3544,7 +3542,7 @@ struct ContentView: View {
         if isWideLayout {
             openSession(newId)
         } else {
-            commitNavigationPath(NavigationPath([newId]))
+            commitNavigationPath([newId])
             currentStackSessionId = newId
         }
         QuickActionWorkflow.shared.attachTargetSession(newId)
@@ -3577,7 +3575,7 @@ struct ContentView: View {
     /// `previousStackSessionId` stays in lockstep because it is maintained by
     /// the `onChange(of: navigationPath)` observer, which simply runs later —
     /// when the deferred path is actually committed.
-    private func commitNavigationPath(_ newPath: NavigationPath) {
+    private func commitNavigationPath(_ newPath: [String]) {
         // [T-share-first-tap-no-response] `.inactive` is NOT the state this
         // gate was built for. The watchdog kills it prevents come from a push
         // running AIChatView's whole first layout while the app is genuinely
@@ -3646,7 +3644,7 @@ struct ContentView: View {
             return
         }
         searchFocused = false
-        commitNavigationPath(NavigationPath([id]))
+        commitNavigationPath([id])
         currentStackSessionId = id
     }
 
@@ -3814,7 +3812,7 @@ struct ContentView: View {
             Section {
                 ForEach(entry.ids, id: \.self) { sessionId in
                     if let session = byId["\(entry.deviceId):\(sessionId)"] {
-                        NavigationLink(value: "remote:\(entry.deviceId):\(session.id)") {
+                        CompatValueNavigationLink(value: "remote:\(entry.deviceId):\(session.id)", path: $navigationPath) {
                             RemoteSessionRow(session: session)
                         }
                         .listRowInsets(EdgeInsets())
@@ -3987,12 +3985,12 @@ struct ContentView: View {
         .frame(maxHeight: .infinity)
         .padding(.horizontal, 32)
         .sheet(isPresented: $showAddProvider) {
-            NavigationStack {
+            CompatNavigationStack {
                 AddProviderView()
             }
         }
         .sheet(isPresented: $showSelectModels) {
-            NavigationStack {
+            CompatNavigationStack {
                 OnboardingModelSelectionView()
             }
         }
@@ -5620,7 +5618,7 @@ private struct DeleteConfirmSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(spacing: 0) {
                 if isLoading || info == nil {
                     Spacer()
@@ -5742,7 +5740,7 @@ private struct ExportPreviewSheet: View {
     private let previewLimit = 10000
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(spacing: 0) {
                 // Preview — summary for multi-select, full content for single.
                 if let summary {
@@ -6801,7 +6799,7 @@ struct SessionEditSheet: View {
     ]
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 Section("Title") {
                     TextField("Session title", text: $editTitle)
@@ -7416,11 +7414,11 @@ private struct SettingsSheet: View {
     @AppStorage("appearanceMode") private var appearanceMode: Int = 0
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
-    @State private var navPath = NavigationPath()
+    @State private var navPath: [SettingsDestination] = []
     @State private var showFeedbackDialog = false
 
     var body: some View {
-        NavigationStack(path: $navPath) {
+        CompatPathNavigationStack(path: $navPath, root: {
             List {
                 Section {
                     NavigationLink {
@@ -7721,56 +7719,6 @@ private struct SettingsSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .navigationDestination(for: SettingsDestination.self) { dest in
-                switch dest {
-                case .providers:
-                    ProviderInstancesView()
-                case .providerDetail(let id):
-                    ProviderInstanceDetailView(instanceId: id)
-                case .modelGroups:
-                    ModelGroupsView()
-                case .modelGroupDetail(let id):
-                    ModelGroupDetailView(groupId: id)
-                case .usage:
-                    UsageStatsView()
-                case .skills:
-                    SkillsManagementView()
-                case .soul:
-                    SoulSettingsView()
-                case .memory:
-                    MemoryManagementView()
-                case .storage:
-                    StorageManagementView()
-                case .mountedFolders:
-                    MountedFoldersSettingsView()
-                case .sharedFolders:
-                    SharedFoldersSettingsView()
-                case .logs:
-                    // Pull a one-shot tab hint from the deep link router
-                    // (e.g. `?tab=config-audit`). LogManagementView clears
-                    // its local state independently; the published value
-                    // here is consumed once and reset to nil.
-                    LogManagementView(initialTab: deepLink.pendingLogsTab ?? "logs")
-                        .onAppear { deepLink.pendingLogsTab = nil }
-                case .appearance:
-                    AppearanceSettingsView()
-                case .background:
-                    EnhancedBackgroundSettingsView()
-                case .about:
-                    AboutView()
-                case .environments:
-                    EnvironmentVariablesView()
-                case .permissions:
-                    OffloadPermissionSettingsView()
-                // [T-mcp-oauth-deeplink] Detail = the list view told to open
-                // the server's edit sheet on appear; a deleted/unknown server
-                // just lands on the list (no crash, sensible fallback).
-                case .mcpIntegrations:
-                    MCPIntegrationsView()
-                case .mcpServerDetail(let serverId):
-                    MCPIntegrationsView(initialEditServerId: serverId)
-                }
-            }
             .onAppear {
                 applyPendingDeepLink()
                 // Legacy flags — kept so older call sites keep working.
@@ -7802,9 +7750,55 @@ private struct SettingsSheet: View {
             .onChange(of: deepLink.pendingSettingsTarget) { _ in
                 applyPendingDeepLink()
             }
-        }
+        }, destination: { settingsDestination($0) })
         .preferredColorScheme(appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : nil)
         .appFontScale()
+    }
+
+    @ViewBuilder
+    private func settingsDestination(_ dest: SettingsDestination) -> some View {
+        switch dest {
+        case .providers:
+            ProviderInstancesView()
+        case .providerDetail(let id):
+            ProviderInstanceDetailView(instanceId: id)
+        case .modelGroups:
+            ModelGroupsView()
+        case .modelGroupDetail(let id):
+            ModelGroupDetailView(groupId: id)
+        case .usage:
+            UsageStatsView()
+        case .skills:
+            SkillsManagementView()
+        case .soul:
+            SoulSettingsView()
+        case .memory:
+            MemoryManagementView()
+        case .storage:
+            StorageManagementView()
+        case .mountedFolders:
+            MountedFoldersSettingsView()
+        case .sharedFolders:
+            SharedFoldersSettingsView()
+        case .logs:
+            // Preserve the one-shot log-tab hint from the deep-link router.
+            LogManagementView(initialTab: deepLink.pendingLogsTab ?? "logs")
+                .onAppear { deepLink.pendingLogsTab = nil }
+        case .appearance:
+            AppearanceSettingsView()
+        case .background:
+            EnhancedBackgroundSettingsView()
+        case .about:
+            AboutView()
+        case .environments:
+            EnvironmentVariablesView()
+        case .permissions:
+            OffloadPermissionSettingsView()
+        case .mcpIntegrations:
+            MCPIntegrationsView()
+        case .mcpServerDetail(let serverId):
+            MCPIntegrationsView(initialEditServerId: serverId)
+        }
     }
 
     /// Translate `DeepLinkCoordinator.pendingSettingsTarget` into a
@@ -7820,7 +7814,7 @@ private struct SettingsSheet: View {
         // Reset path so deep links are predictable: a deep link always
         // lands on the requested destination as the only stack entry,
         // not on top of whatever the user was browsing earlier.
-        navPath = NavigationPath()
+        navPath = []
         switch target {
         case .home:
             break // already at Settings root
