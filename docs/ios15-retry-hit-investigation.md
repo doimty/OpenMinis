@@ -45,3 +45,15 @@ This delivery does not claim an effort-policy fix. Device visual acceptance of t
 ## Checkpoint
 
 Working tree was clean at `b363866`; branch `fix/ios15-retry-hit` created; fix + probe + tests + workflow are this change set. The pinned probe and full package build passed before delivery. Do not treat the earlier successful retry() log as proof the visible button was reachable; device acceptance remains pending.
+## Full-hierarchy probe (run `35453402726`, source `9761f4814150d902314e817e800740c026c4fa72`)
+
+Added `scripts/ios15-retry-probe/HierarchyProbeApp.swift` and extended the runner to build/run two probes on the pinned iOS26.2 simulator:
+1. unit probe (content view in isolation): 20pt estimate → Retry center hits inside the hosting tree; 64pt control also hits.
+2. full-hierarchy probe: footer cell (legacy hosting) + bottom-anchored 180pt composer overlay above it in z-order, mirroring AIChatView.
+
+Full-hierarchy results (all asserted):
+- Phase A control (no overlay): Retry point hits inside the cell hosting tree — `true`.
+- Phase B short-inset (cell under overlay, i.e. floating-preview geometry stall): Retry point hits the OVERLAY and not the cell — `true` — the user's exact symptom reproduced.
+- Phase C fixed-inset (cell above the same overlay, the `effectiveFloatingHeight` floor): Retry point hits inside the cell again and not the overlay — `true`.
+
+Run `35453402726` completed/success. The inset-floor fix is now validated at the full hierarchy level, not just the content view in isolation. Device acceptance still pending.
