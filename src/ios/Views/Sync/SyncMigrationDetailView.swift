@@ -856,7 +856,7 @@ struct SyncMigrationDetailView: View {
         titleColor: Color? = nil
     ) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: systemImage)
+            Image(systemName: CompatSystemSymbol.name(systemImage))
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 20, height: 20)

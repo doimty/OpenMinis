@@ -128,7 +128,7 @@ struct BackupHistoryDetailView: View {
                 // "Completed", with the row separator drawn across the middle
                 // of it. Measured on device (iPhone 11) before and after.
                 HStack(spacing: 4) {
-                    Image(systemName: BackupHistoryRow.statusIcon(record.status))
+                    Image(systemName: CompatSystemSymbol.name(BackupHistoryRow.statusIcon(record.status)))
                     Text(BackupHistoryRow.statusText(record.status))
                 }
                 .foregroundStyle(BackupHistoryRow.statusColour(record.status))
@@ -460,7 +460,7 @@ struct BackupHistoryRow: View {
             if record.status == .running {
                 BackupRunningIndicator()
             } else {
-                Image(systemName: Self.statusIcon(record.status))
+                Image(systemName: CompatSystemSymbol.name(Self.statusIcon(record.status)))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)

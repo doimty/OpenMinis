@@ -522,7 +522,7 @@ struct ModelGroupDetailView: View {
     // MARK: - Settings Icon
 
     private func settingsIcon(_ systemName: String, color: Color) -> some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 9))
             .foregroundStyle(.white)
             .frame(width: 21, height: 21)

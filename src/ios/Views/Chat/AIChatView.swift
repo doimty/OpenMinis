@@ -2762,7 +2762,7 @@ struct AIChatView: View {
     /// Shared label style for the floating scroll buttons (up / down), matching
     /// the original scroll-to-bottom button look.
     private func scrollFloatingButtonLabel(_ systemName: String) -> some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(.secondary)
             .frame(width: 36, height: 36)
@@ -4319,7 +4319,7 @@ struct AIChatView: View {
 
         var body: some View {
             HStack(spacing: 10) {
-                Image(systemName: iconName)
+                Image(systemName: CompatSystemSymbol.name(iconName))
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(isSelected ? Color.white : ChatColors.secondaryText)
                     .frame(width: 20)
@@ -4410,7 +4410,7 @@ struct AIChatView: View {
                                 .resizable()
                                 .frame(width: 16, height: 16)
                         } else {
-                            Image(systemName: cmd.icon)
+                            Image(systemName: CompatSystemSymbol.name(cmd.icon))
                                 .font(.system(size: 14, weight: .medium))
                         }
                     }
@@ -6138,7 +6138,7 @@ private struct StatRow: View {
                         .frame(width: 14, height: 14)
                 }
             } else {
-                Label(label, systemImage: icon)
+                Label(label, systemImage: CompatSystemSymbol.name(icon))
             }
             Spacer()
             Text(value)

@@ -183,7 +183,7 @@ private struct SessionSkillDetailView: View {
                                 Text(relativePath)
                                     .font(.system(.subheadline, design: .monospaced))
                             } icon: {
-                                Image(systemName: iconName(for: relativePath))
+                                Image(systemName: CompatSystemSymbol.name(iconName(for: relativePath)))
                                     .foregroundStyle(.secondary)
                             }
                         }

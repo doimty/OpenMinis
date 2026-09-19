@@ -367,7 +367,7 @@ private struct MinisFileChipView: View {
             showShareSheet = true
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: minisFileIcon(for: ext))
+                Image(systemName: CompatSystemSymbol.name(minisFileIcon(for: ext)))
                     .font(.system(size: 13))
                     .foregroundColor(ChatColors.accent)
                 Text(filename)
@@ -516,7 +516,7 @@ struct AsyncVideoTile: View {
 /// Shared placeholder tile for image/video attachments.
 private func attachmentPlaceholderTile(icon: String, size: CGFloat) -> some View {
     VStack(spacing: 4) {
-        Image(systemName: icon)
+        Image(systemName: CompatSystemSymbol.name(icon))
             .font(.system(size: 22))
             .foregroundStyle(.tertiary)
     }

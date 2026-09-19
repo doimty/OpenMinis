@@ -4394,10 +4394,10 @@ struct ContentView: View {
                     fallbackFill: Self.newChatBrandColor,
                     fallbackShadowOpacity: 0.2
                 ) {
-                    Image(systemName: {
+                    Image(systemName: CompatSystemSymbol.name({
                         if #available(iOS 17.0, *) { return "bubble.left.and.text.bubble.right" }
                         return "plus.message.fill"
-                    }())
+                    }()))
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Self.newChatIconColor)
                 }
@@ -5954,7 +5954,7 @@ private struct ExportPreviewSheet: View {
     private func actionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.system(size: 20))
                 Text(label)
                     .font(.caption2)
@@ -6546,7 +6546,7 @@ private struct SessionRow: View, Equatable {
     }
 
     private func badgeCircle(icon: String, color: Color, iconSize: CGFloat = 9, size: CGFloat = 16) -> some View {
-        Image(systemName: icon)
+        Image(systemName: CompatSystemSymbol.name(icon))
             .font(.system(size: iconSize, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
@@ -6636,7 +6636,7 @@ private struct SessionRow: View, Equatable {
     private var providerIcon: some View {
         let icon = categoryIcon
         let size: CGFloat = (icon.systemName == "bubble.left.fill" || icon.systemName == "terminal.fill") ? 18 : 20
-        Image(systemName: icon.systemName)
+        Image(systemName: CompatSystemSymbol.name(icon.systemName))
             .font(.system(size: size))
             .foregroundStyle(icon.color)
     }
@@ -6767,7 +6767,7 @@ private struct RemoteSessionRow: View {
     private var providerIcon: some View {
         let icon = categoryIcon
         let size: CGFloat = (icon.systemName == "bubble.left.fill" || icon.systemName == "terminal.fill") ? 18 : 20
-        Image(systemName: icon.systemName)
+        Image(systemName: CompatSystemSymbol.name(icon.systemName))
             .font(.system(size: size))
             .foregroundStyle(icon.color)
     }
@@ -6827,7 +6827,7 @@ struct SessionEditSheet: View {
                                 editCategory = cat.key
                             } label: {
                                 VStack(spacing: 6) {
-                                    Image(systemName: cat.icon)
+                                    Image(systemName: CompatSystemSymbol.name(cat.icon))
                                         .font(.system(size: 20))
                                         .foregroundStyle(editCategory == cat.key ? .white : cat.color)
                                         .frame(width: 44, height: 44)
@@ -7440,7 +7440,7 @@ private struct SettingsSheet: View {
                         ProviderInstancesView()
                     } label: {
                         if #available(iOS 26, *) {
-                            Label("Manage Providers", systemImage: "key.circle.fill")
+                            Label("Manage Providers", systemImage: CompatSystemSymbol.name("key.circle.fill"))
                         } else {
                             Label("Manage Providers", systemImage: "lock.circle.fill")
                         }
@@ -7647,7 +7647,7 @@ private struct SettingsSheet: View {
                             } icon: {
                                 // Match SF Symbol to the device's actual sensor — Touch ID
                                 // devices showed a Face ID glyph here before.
-                                Image(systemName: BiometricAuth.biometryIconName)
+                                Image(systemName: CompatSystemSymbol.name(BiometricAuth.biometryIconName))
                                     .font(.system(size: 11))
                                     .foregroundStyle(.white)
                                     .frame(width: 21, height: 21)

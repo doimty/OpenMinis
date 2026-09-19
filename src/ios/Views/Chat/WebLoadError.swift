@@ -109,7 +109,7 @@ struct WebLoadErrorOverlay: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: error.systemImage)
+            Image(systemName: CompatSystemSymbol.name(error.systemImage))
                 .font(.system(size: 44, weight: .regular))
                 .foregroundStyle(.secondary)
             Text(error.title)

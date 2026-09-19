@@ -302,7 +302,7 @@ struct CloudSyncSettingsView: View {
     // MARK: - Helpers
 
     private func settingsIcon(_ systemName: String, color: Color) -> some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 9))
             .foregroundStyle(.white)
             .frame(width: 21, height: 21)
@@ -390,7 +390,7 @@ private struct DeviceSyncSection: View {
     }
 
     private func settingsIcon(_ systemName: String, color: Color) -> some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 9))
             .foregroundStyle(.white)
             .frame(width: 21, height: 21)
@@ -405,7 +405,7 @@ private struct DeviceSyncSection: View {
                 set: { engine.setDeviceSyncEnabled(device.id, enabled: $0) }
             )) {
                 HStack {
-                    Image(systemName: deviceIcon)
+                    Image(systemName: CompatSystemSymbol.name(deviceIcon))
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(device.deviceName)

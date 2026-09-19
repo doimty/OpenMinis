@@ -42,7 +42,7 @@ struct ICloudBackupView: View {
                             performBackup(category: category)
                         } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: category.systemImage)
+                                Image(systemName: CompatSystemSymbol.name(category.systemImage))
                                     .font(.system(size: 15, weight: .medium))
                                     .foregroundColor(.white)
                                     .frame(width: 30, height: 30)
@@ -153,7 +153,7 @@ struct ICloudBackupView: View {
 
     private func backupRow(_ entry: ICloudBackupManager.BackupEntry) -> some View {
         HStack {
-            Image(systemName: entry.category.systemImage)
+            Image(systemName: CompatSystemSymbol.name(entry.category.systemImage))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(.white)
                 .frame(width: 30, height: 30)

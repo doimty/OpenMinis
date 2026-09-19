@@ -492,7 +492,7 @@ struct AddProviderView: View {
                     applyVoiceTemplate(template)
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: template.symbol)
+                        Image(systemName: CompatSystemSymbol.name(template.symbol))
                             .font(.body)
                             .foregroundStyle(template.tint)
                             .frame(width: 32, height: 32)
@@ -554,7 +554,7 @@ struct AddProviderView: View {
                             selectedCredential = cred
                         } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: cred == .apiKey ? "key" : "person.badge.shield.checkmark")
+                                Image(systemName: CompatSystemSymbol.name(cred == .apiKey ? "key" : "person.badge.shield.checkmark"))
                                     .font(.body)
                                     .frame(width: 28)
                                     .foregroundStyle(Color(UIColor.label))
@@ -1175,7 +1175,7 @@ struct AddProviderView: View {
             Image(systemName: "arrow.triangle.branch")
                 .foregroundStyle(.cyan)
         case .openAIResponses:
-            Image(systemName: "arrow.trianglehead.2.counterclockwise")
+            Image(systemName: CompatSystemSymbol.name("arrow.trianglehead.2.counterclockwise"))
                 .foregroundStyle(.mint)
         case .xAI:
             Image(systemName: "x.circle")

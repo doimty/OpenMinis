@@ -327,7 +327,7 @@ struct ChatMessageRow: View {
                         .scaleEffect(0.6)
                         .frame(width: 12, height: 12)
                 } else if let icon {
-                    Image(systemName: icon)
+                    Image(systemName: CompatSystemSymbol.name(icon))
                         .font(.system(size: 10))
                 }
                 Text(message.content)

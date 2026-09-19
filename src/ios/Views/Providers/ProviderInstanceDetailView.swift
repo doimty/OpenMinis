@@ -842,7 +842,7 @@ struct ProviderInstanceDetailView: View {
             }
             // Output modalities (tinted, generate-style glyphs).
             if modality.contains(.imageOutput) {
-                Image(systemName: "photo.badge.plus")
+                Image(systemName: CompatSystemSymbol.name("photo.badge.plus"))
                     .font(.caption2)
                     .foregroundStyle(.tint)
                     .accessibilityLabel(AppLocalized("Image output"))
@@ -1458,7 +1458,7 @@ struct ModelEntryDetailSheet: View {
                         AppLogger(category: "QuickTest").info("[QuickTest] button tapped model=\(entry.model.id)")
                         showQuickTest = true
                     } label: {
-                        Label(AppLocalized("Quick Test"), systemImage: "bolt.badge.checkmark")
+                        Label(AppLocalized("Quick Test"), systemImage: CompatSystemSymbol.name("bolt.badge.checkmark"))
                     }
                     .buttonStyle(.borderless)
                 } footer: {

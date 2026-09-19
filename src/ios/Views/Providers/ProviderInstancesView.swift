@@ -100,7 +100,7 @@ struct ProviderInstancesView: View {
             if store.instances.isEmpty {
                 Section {
                     VStack(spacing: 8) {
-                        Image(systemName: "key.slash")
+                        Image(systemName: CompatSystemSymbol.name("key.slash"))
                             .font(.system(size: 32))
                             .foregroundStyle(.quaternary)
                         Text("No providers configured")
@@ -141,7 +141,7 @@ struct ProviderInstancesView: View {
                             Task { await forceSyncProviders() }
                         } label: {
                             Label(AppLocalized("Force iCloud Sync"),
-                                  systemImage: "arrow.triangle.2.circlepath.icloud")
+                                  systemImage: CompatSystemSymbol.name("arrow.triangle.2.circlepath.icloud"))
                         }
                     }
                 } label: {

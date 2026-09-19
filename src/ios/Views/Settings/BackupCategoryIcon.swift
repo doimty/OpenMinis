@@ -31,7 +31,7 @@ struct BackupActionIcon: View {
     let tint: Color
 
     var body: some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 9))
             .foregroundStyle(.white)
             .frame(width: 21, height: 21)
@@ -43,7 +43,7 @@ struct BackupCategoryIcon: View {
     let category: BackupCategory
 
     var body: some View {
-        Image(systemName: Self.symbol(for: category))
+        Image(systemName: CompatSystemSymbol.name(Self.symbol(for: category)))
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: 28, height: 28)

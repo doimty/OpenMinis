@@ -152,7 +152,7 @@ struct WebAppAddToHomeSheet: View {
                                 Circle()
                                     .fill(c.color.opacity(0.22))
                                     .frame(width: 44, height: 44)
-                                Image(systemName: c.symbol)
+                                Image(systemName: CompatSystemSymbol.name(c.symbol))
                                     .font(.system(size: 20, weight: .semibold))
                                     .foregroundStyle(c.color)
                                 if category == c {
@@ -400,7 +400,7 @@ private struct LauncherTilePreview: View {
                 Circle()
                     .fill(category.color.opacity(0.22))
                     .frame(width: chip, height: chip)
-                Image(systemName: category.symbol)
+                Image(systemName: CompatSystemSymbol.name(category.symbol))
                     .font(.system(size: 30, weight: .semibold))
                     .foregroundStyle(category.color)
             }

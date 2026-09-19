@@ -155,7 +155,7 @@ struct BrowserSheetView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: 5) {
-                        Image(systemName: pool.userAgentProfile.icon)
+                        Image(systemName: CompatSystemSymbol.name(pool.userAgentProfile.icon))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Text(navigationTitle)

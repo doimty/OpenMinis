@@ -204,7 +204,7 @@ struct SkillsManagementView: View {
                 .font(.caption2)
                 .foregroundStyle(.green)
         case .session:
-            Image(systemName: "bubble.left.and.text.bubble.right")
+            Image(systemName: CompatSystemSymbol.name("bubble.left.and.text.bubble.right"))
                 .font(.caption2)
                 .foregroundStyle(.purple)
         }
@@ -399,7 +399,7 @@ private struct SettingsActionIcon: View {
     let color: Color
 
     var body: some View {
-        Image(systemName: systemImage)
+        Image(systemName: CompatSystemSymbol.name(systemImage))
             .font(.system(size: 9))
             .foregroundStyle(.white)
             .frame(width: 21, height: 21)
@@ -627,7 +627,7 @@ private struct SkillDetailView: View {
                                 Text(relativePath)
                                     .font(.system(.subheadline, design: .monospaced))
                             } icon: {
-                                Image(systemName: fileIcon(for: relativePath))
+                                Image(systemName: CompatSystemSymbol.name(fileIcon(for: relativePath)))
                                     .foregroundStyle(.secondary)
                             }
                         }

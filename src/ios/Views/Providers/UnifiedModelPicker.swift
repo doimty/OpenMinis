@@ -543,7 +543,7 @@ struct UnifiedModelPicker: View {
         Button {
             quickTestEntry = entry
         } label: {
-            Image(systemName: "bolt.badge.checkmark")
+            Image(systemName: CompatSystemSymbol.name("bolt.badge.checkmark"))
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(.tint)
                 .frame(width: 32, height: 32)
@@ -1085,7 +1085,7 @@ struct UnifiedModelPicker: View {
                     .font(.system(size: 20))
                     .foregroundStyle(isSelected ? Color.accentColor : Color(UIColor.tertiaryLabel))
 
-                Image(systemName: traits.iconSymbol)
+                Image(systemName: CompatSystemSymbol.name(traits.iconSymbol))
                     .font(.system(size: 11))
                     .foregroundStyle(traits.tint)
                     .frame(width: 14)

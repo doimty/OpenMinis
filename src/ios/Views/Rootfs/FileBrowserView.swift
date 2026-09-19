@@ -701,7 +701,7 @@ private struct FileInfoView: View {
         List {
             Section {
                 VStack(spacing: 12) {
-                    Image(systemName: item.iconName)
+                    Image(systemName: CompatSystemSymbol.name(item.iconName))
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                     Text("Preview not available")
@@ -762,7 +762,7 @@ private struct FileBrowserRow: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     onCopiedPath()
                 } label: {
-                    Label(AppLocalized("Copy Absolute Path"), systemImage: "document.on.clipboard")
+                    Label(AppLocalized("Copy Absolute Path"), systemImage: CompatSystemSymbol.name("document.on.clipboard"))
                 }
                 Button { onCopy() } label: {
                     Label("Copy to…", systemImage: "doc.on.doc")
@@ -819,7 +819,7 @@ struct FileItemRow: View {
         HStack(spacing: 12) {
             // Icon
             ZStack(alignment: .bottomLeading) {
-                Image(systemName: item.iconName)
+                Image(systemName: CompatSystemSymbol.name(item.iconName))
                     .font(.title2)
                     .foregroundColor(item.isDirectory ? .blue : .secondary)
                 if item.isSymlink {

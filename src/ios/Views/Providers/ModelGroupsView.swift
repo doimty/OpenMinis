@@ -162,7 +162,7 @@ struct ModelGroupsView: View {
                             Task { await forceSyncGroups() }
                         } label: {
                             Label(AppLocalized("Force iCloud Sync"),
-                                  systemImage: "arrow.triangle.2.circlepath.icloud")
+                                  systemImage: CompatSystemSymbol.name("arrow.triangle.2.circlepath.icloud"))
                         }
                     }
                 } label: {
@@ -330,7 +330,7 @@ private struct GroupRow: View {
                 .font(.caption).foregroundStyle(.tint)
                 .accessibilityLabel(AppLocalized("Video generation"))
         case .imageOutput:
-            Image(systemName: "photo.badge.plus")
+            Image(systemName: CompatSystemSymbol.name("photo.badge.plus"))
                 .font(.caption).foregroundStyle(.tint)
                 .accessibilityLabel(AppLocalized("Image generation"))
         case .audioOutput:
@@ -338,7 +338,7 @@ private struct GroupRow: View {
                 .font(.caption).foregroundStyle(.tint)
                 .accessibilityLabel(AppLocalized("Speech output"))
         case .audioInput:
-            Image(systemName: "waveform.badge.mic")
+            Image(systemName: CompatSystemSymbol.name("waveform.badge.mic"))
                 .font(.caption).foregroundStyle(.secondary)
                 .accessibilityLabel(AppLocalized("Speech transcription"))
         case .videoInput:

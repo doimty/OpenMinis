@@ -86,7 +86,7 @@ struct CloudSyncSettingsV2View: View {
                             }
                         )) {
                             HStack(spacing: 12) {
-                                Image(systemName: iconName(for: cat))
+                                Image(systemName: CompatSystemSymbol.name(iconName(for: cat)))
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(.white)
                                     .frame(width: 28, height: 28)

@@ -271,3 +271,16 @@ No Swift compatibility code has been changed yet. No targets lowered, no depende
 - Production fix `a862439fb812b111e2858c5a5d0bf0e99d1d8ac1` on branch `fix/ios15-markdown-intrinsic-width`: `SelectableMarkdownView.swift` overrides `intrinsicContentSize` to report `noIntrinsicMetric` for width and measure height at the current live `bounds.width`. Plain UIKit, so it works on the iOS 15 runtime; the iOS16-only representable `sizeThatFits` override is left unchanged. Local structural suite 17/17.
 - CI `ios15-m0-baseline` run `35428883271` is queued on the fix branch to compile and package the IPA. Do not treat a started run as success; verify Xcode/SDK from the log and re-download the IPA from the artifact.
 - Still not device-verified. The probe is a minimal API-path matrix on iOS 26.2, not an iOS 15 runtime. Ship the IPA only after CI passes, then require the same screenshot + log loop as before.
+
+---
+
+## 2026-09-19 — SF Symbols follow-up
+
+- Previous IPA provenance: final source is `f56d0ff4641f4c5e3efa844d936f4d679d1f6afe`, run `35429647024` completed successfully. The two earlier builds failed on the erroneous `QSize` return type; fixing only the working tree/test did not fix the committed production source. Final IPA: 84,166,188 bytes, SHA256 `666ecbe6c56c1fed65eb42f32ec645e84607a07d441f3d78d5c19ff0054619c2`, delivered by Weixin. That package is an **iphoneos device build**, not a simulator IPA. No new device geometry acceptance is inferred from the Add Provider screenshot.
+- User clarified that many SF Symbols do not exist on iOS 15. Confirmed example: four voice templates use `mic.and.signal.meter` (introduced in iOS 16). Plan/limitations: `docs/ios15-sf-symbols.md`.
+- Baseline compared with fork; branch `fix/ios15-sf-symbols` created from `f56d0ff`. Coverage gate went red on 78 late/dynamic render calls in 43 files (this counts boundaries, not 78 proven blank icons).
+- Implementation: `CompatSystemSymbol` resolves requested names using actual UIKit availability, preserves supported names, uses 20 semantic fallbacks and a visible generic fallback for unknown names. Only rendering arguments changed; data, labels, actions and markdown geometry are unchanged. Native Image/Label/UIImage initializers/configurations remain in use.
+- Local verification: parser/coverage regression tests green (the pre-fix test failed only at real-source coverage), prior compatibility contracts 17/17, packager 10/10, shell syntax, YAML parse, project-registration references, all fallback floors and exact-edit comparison passed. Every one of the 43 existing Swift-file diffs equals the reviewed plan. No Swift compiler is available locally.
+- Native gate is now early in the pinned Xcode 26.2 workflow: iOS 15/16 API type-check plus execution of the production resolver against six explicit availability catalogs, then the existing full app build/IPA pipeline. The catalog test is not an iOS 15 runtime test.
+- Independent review did not run: subagent launches were rejected due to an ACP-only streamTo parameter. Main agent owns the review/evidence; do not report a nonexistent child review.
+- Checkpoint: local patch and tests complete, cloud compilation and package delivery still pending. One push-triggered build on the new branch is sufficient; do not duplicate it with workflow_dispatch.

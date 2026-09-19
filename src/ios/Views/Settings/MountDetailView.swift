@@ -178,7 +178,7 @@ struct MountDetailView: View {
     private var headerSection: some View {
         Section {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: context.iconName)
+                Image(systemName: CompatSystemSymbol.name(context.iconName))
                     .font(.system(size: 13))
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)

@@ -7,7 +7,7 @@ name: ios15-m0-baseline
 on:
   workflow_dispatch:
   push:
-    branches: [compat/ios15]
+    branches: [compat/ios15, fix/ios15-sf-symbols]
 
 permissions:
   contents: read
@@ -52,6 +52,17 @@ jobs:
           sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
           printf 'iphoneos SDK %s\n' "$sdk"
           test "$sdk" = "$EXPECTED_IOS_SDK"
+
+      - name: SF Symbols compatibility gates
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sf-symbols"
+          python3 -m venv "$RUNNER_TEMP/sf-symbol-venv"
+          "$RUNNER_TEMP/sf-symbol-venv/bin/pip" install --disable-pip-version-check \
+            tree-sitter==0.25.2 tree-sitter-swift==0.7.3
+          "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_ios15_sf_symbols.py -v \
+            2>&1 | tee "$RUNNER_TEMP/sf-symbols/audit.log"
+          bash scripts/check_ios15_symbols.sh 2>&1 | tee "$RUNNER_TEMP/sf-symbols/native.log"
 
       - name: Init pinned iSH submodule only
         run: |
@@ -262,5 +273,6 @@ jobs:
             ${{ runner.temp }}/m1/summary.json
             ${{ runner.temp }}/m1/versions.json
             ${{ runner.temp }}/m1/exit.txt
+            ${{ runner.temp }}/sf-symbols/*.log
           if-no-files-found: warn
           retention-days: 14

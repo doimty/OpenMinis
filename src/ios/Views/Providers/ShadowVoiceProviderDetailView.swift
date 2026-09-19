@@ -92,7 +92,7 @@ struct ShadowVoiceProviderDetailView: View {
     }
 
     private func styledIcon(_ systemName: String, color: Color) -> some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 9))
             .foregroundStyle(.white)
             .frame(width: 21, height: 21)

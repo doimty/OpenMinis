@@ -440,7 +440,7 @@ private struct AttachmentChip: View {
     private var fileChip: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 2) {
-                Image(systemName: fileIconName)
+                Image(systemName: CompatSystemSymbol.name(fileIconName))
                     .font(.system(size: 20))
                     .foregroundStyle(ChatColors.secondaryText)
                     .frame(maxHeight: .infinity, alignment: .bottom)
@@ -688,7 +688,7 @@ struct UserAttachmentList: View {
             if let url = URL(string: meta.minisURL) { openURL(url) }
         } label: {
             VStack(spacing: 2) {
-                Image(systemName: fileIconName(for: meta.fileName))
+                Image(systemName: CompatSystemSymbol.name(fileIconName(for: meta.fileName)))
                     .font(.system(size: 20))
                     .foregroundStyle(ChatColors.secondaryText)
                     .frame(maxHeight: .infinity, alignment: .bottom)
@@ -802,7 +802,7 @@ struct QueuedAttachmentPreview: View {
 
     private func placeholderTile(icon: String, fileName: String) -> some View {
         VStack(spacing: 4) {
-            Image(systemName: icon)
+            Image(systemName: CompatSystemSymbol.name(icon))
                 .font(.title3)
                 .foregroundStyle(.secondary)
             Text(fileName)

@@ -76,7 +76,7 @@ struct ModelQuickTestSheet: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "bolt.badge.checkmark")
+            Image(systemName: CompatSystemSymbol.name("bolt.badge.checkmark"))
                 .font(.title3)
                 .foregroundStyle(.tint)
                 .frame(width: 34, height: 34)
@@ -360,7 +360,7 @@ private struct TestCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: run.kind.icon).foregroundStyle(.tint)
+                Image(systemName: CompatSystemSymbol.name(run.kind.icon)).foregroundStyle(.tint)
                 Text(run.kind.title).font(.subheadline.weight(.semibold))
                 Spacer()
                 statusBadge

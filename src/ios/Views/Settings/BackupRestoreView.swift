@@ -842,7 +842,7 @@ struct FolderPackageListView: View {
                 // Hand-rolled rather than ContentUnavailableView: the
                 // deployment target is iOS 16 and that is iOS 17+.
                 VStack(spacing: 10) {
-                    Image(systemName: "externaldrive.badge.questionmark")
+                    Image(systemName: CompatSystemSymbol.name("externaldrive.badge.questionmark"))
                         .font(.system(size: 40))
                         .foregroundStyle(.secondary)
                     Text("No .minisbak files in this folder.")

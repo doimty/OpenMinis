@@ -807,8 +807,8 @@ struct BackupSettingsView: View {
                 // hidden link driven by state, so the label area pushes the
                 // detail view and the switch keeps its own hit area.
                 HStack(spacing: 12) {
-                    Image(systemName: RcloneBackendCatalog.backend(for: r.backend)?.icon
-                          ?? "externaldrive.connected.to.line.below")
+                    Image(systemName: CompatSystemSymbol.name(RcloneBackendCatalog.backend(for: r.backend)?.icon
+                          ?? "externaldrive.connected.to.line.below"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 28, height: 28)

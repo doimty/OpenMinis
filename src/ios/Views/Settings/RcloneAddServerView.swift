@@ -171,7 +171,7 @@ struct RcloneAddServerView: View {
                     if displayName.isEmpty { displayName = defaultName(for: b) }
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: b.icon)
+                        Image(systemName: CompatSystemSymbol.name(b.icon))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(width: 28, height: 28)

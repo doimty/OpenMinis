@@ -485,7 +485,7 @@ struct QuickCommandButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.caption)
                 Text(label)
                     .font(.caption)

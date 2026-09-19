@@ -210,7 +210,7 @@ struct MessageImageGallery: View {
 
     @ViewBuilder
     private func chromeIcon(_ name: String, tint: Color? = nil) -> some View {
-        Image(systemName: name)
+        Image(systemName: CompatSystemSymbol.name(name))
             .font(.body.weight(.semibold))
             .foregroundStyle(tint ?? ChatColors.primaryText)
             .frame(width: 44, height: 44)

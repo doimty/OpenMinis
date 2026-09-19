@@ -202,7 +202,7 @@ struct BackupDestinationPicker: View {
     // MARK: - Helpers
 
     private func icon(_ name: String, _ colour: Color) -> some View {
-        Image(systemName: name)
+        Image(systemName: CompatSystemSymbol.name(name))
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: 28, height: 28)
