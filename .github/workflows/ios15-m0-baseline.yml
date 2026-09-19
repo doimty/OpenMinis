@@ -153,6 +153,11 @@ jobs:
           set -euo pipefail
           python3 scripts/test_ios15_compat_contract.py -v
 
+      - name: TrollStore IPA packager tests
+        run: |
+          set -euo pipefail
+          python3 scripts/test_package_ios15_ipa.py -v
+
       - name: Compatibility type-check smoke (15/16)
         run: |
           set -euo pipefail
@@ -187,6 +192,31 @@ jobs:
           # First probe is expected to fail. Keep the job red if xcodebuild failed
           # so the availability list is not mistaken for a passing iOS 15 build.
           exit "$status"
+
+      - name: Package TrollStore IPA
+        run: |
+          set -euo pipefail
+          python3 scripts/package_ios15_ipa.py \
+            --derived-data "$RUNNER_TEMP/m1/DerivedData" \
+            --configuration Debug \
+            --output-dir "$RUNNER_TEMP/ipa" \
+            --entitlements scripts/ios15-trollstore.entitlements
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          manifest = json.loads((Path(os.environ['RUNNER_TEMP'])/'ipa'/'manifest.json').read_text())
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Upload TrollStore IPA
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: minis-ios15-trollstore-ipa
+          path: |
+            ${{ runner.temp }}/ipa/*.ipa
+            ${{ runner.temp }}/ipa/manifest.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Record evidence
         if: always()

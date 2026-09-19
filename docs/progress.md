@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-09-19 — TrollStore IPA packaging wired to the compile probe
+
+- User is on TrollStore ("巨魔环境"), so the next deliverable is an unsigned/ad-hoc IPA, not a Developer-ID signed build.
+- Added `scripts/package_ios15_ipa.py`, fixture tests `scripts/test_package_ios15_ipa.py` (10/10 local), and `scripts/ios15-trollstore.entitlements`. The packager copies the probe `Debug-iphoneos/Minis.app`, rejects an app floor newer than 15.0, strips FileProvider 16.0 and Agent Widget 16.2, keeps Share at 15.0, and zips `Payload/Minis.app`. Source bundle is not mutated. Linux tests use `--skip-sign`; Darwin CI ad-hoc signs.
+- `ios15-m0-baseline.yml` now runs the packager tests before smoke, packages after a green probe, and uploads artifact `minis-ios15-trollstore-ipa`. No IPA exists until that job succeeds; do not treat this commit as a built package.
+- Install notes: `docs/ios15-trollstore-ipa.md`. Remaining after a real artifact: send/install on the TrollStore device, then M3 acceptance (launch, provider, Linux command, persistence, attachments, streaming, VAD, 16+ regression).
+
 ## 2026-09-19 — 1cbcdfa: VAD 15.0 local package linked, app compile gate CLOSED
 
 - Baseline `1cbcdfa27d6ef58dc8f000ff52ed7b50dff59c6f`. Run35382826109 succeeded; app xcodebuild exit0, zero errors, `build_succeeded=true`, log 2,274,514 bytes. The app now links a **local vendored Swift package** (`vendor/RealTimeCutVADLibrary`) whose binaryTarget is an xcframework rebuilt from pinned C++ source at `IPHONEOS_DEPLOYMENT_TARGET=15.0` by `deps/build_vad_framework.sh` (native-deps step, cached).
