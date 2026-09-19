@@ -7,7 +7,7 @@ name: ios15-m0-baseline
 on:
   workflow_dispatch:
   push:
-    branches: [compat/ios15, fix/ios15-sf-symbols, fix/ios15-input-prompts]
+    branches: [compat/ios15, fix/ios15-sf-symbols, fix/ios15-input-prompts, fix/ios15-retry-hit]
 
 permissions:
   contents: read
@@ -81,6 +81,15 @@ jobs:
           bash scripts/check_ios15_input_prompts.sh 2>&1 | tee "$RUNNER_TEMP/input-prompts/native.log"
           bash scripts/run_ios15_input_prompt_probe.sh "$RUNNER_TEMP/input-prompts/native-ui" \
             2>&1 | tee "$RUNNER_TEMP/input-prompts/probe.log"
+
+      - name: Retry hit-test probe
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/retry-probe"
+          bash scripts/run_ios15_retry_probe.sh "$RUNNER_TEMP/retry-probe" \
+            2>&1 | tee "$RUNNER_TEMP/retry-probe/probe.log"
+          "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_ios15_retry_hit.py -v \
+            2>&1 | tee "$RUNNER_TEMP/retry-probe/contract.log"
 
       - name: Cache native iOS deps
         id: native-cache
@@ -285,5 +294,6 @@ jobs:
             ${{ runner.temp }}/m1/exit.txt
             ${{ runner.temp }}/sf-symbols/*.log
             ${{ runner.temp }}/input-prompts/**
+            ${{ runner.temp }}/retry-probe/**
           if-no-files-found: warn
           retention-days: 14

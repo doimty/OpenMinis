@@ -106,7 +106,21 @@ struct CollectionViewMessageListV3: UIViewControllerRepresentable {
         // heights now accurate the +16 breathing room becomes pure
         // dead space — observed as ~100pt gap between the last bubble
         // and the composer top. Restored to the historical +8.
-        let bottomPad: CGFloat = inputBarHeight + floatingBarHeight + 8
+        // [T-ios-retry-hit] The floating tool preview's height is reported by
+        // a geometry observer. Until that observer fires (and at stall moments
+        // it can stay 0 while the preview is visibly mounted), the bottom inset
+        // would be short by the whole preview height and the last message
+        // would sit under the preview + composer — visually "under the input
+        // bar" and untappable because the overlay intercepts. Clamp the
+        // contribution to a floor when the VM has tool blocks at all.
+        let hasToolBlocks = vm.messages.contains(where: {
+            $0.role == .assistant && !$0.isCompactedHistory
+                && $0.blocks.contains { $0.toolStatus != nil }
+        })
+        let effectiveFloating: CGFloat = floatingBarHeight > 1
+            ? floatingBarHeight
+            : (hasToolBlocks ? 68 : 0)
+        let bottomPad: CGFloat = inputBarHeight + effectiveFloating + 8
         let baseChanged = abs(coord.baseBottomInset - bottomPad) > 0.5
         if baseChanged {
             let cv = vc.collectionView!

@@ -126,6 +126,24 @@ private final class LegacyHostingContentView: UIView, UIContentView {
         }
     }
 
+    /// A short cell estimate leaves the hosting view taller than this content
+    /// view's bounds (the bottom edge is intentionally unpinned so intrinsic
+    /// height drives the async size report). UIKit hit-testing stops at the
+    /// RECEIVER's edge before descending into subviews, so everything in the
+    /// overflow tail becomes touch-dead until the layout settles — the chat
+    /// footer's Retry capsule is exactly that tail. Keep the whole hosting
+    /// view reachable: use the default path first, then forward touches that
+    /// land inside host.view's frame even though they fall below our bounds.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        if hit != nil { return hit }
+        let hostPoint = convert(point, to: host.view)
+        if host.view.bounds.contains(hostPoint) {
+            return host.view.hitTest(hostPoint, with: event)
+        }
+        return nil
+    }
+
     override var intrinsicContentSize: CGSize {
         guard bounds.width > 1 else {
             return CGSize(width: UIView.noIntrinsicMetric, height: UIView.noIntrinsicMetric)
