@@ -86,7 +86,10 @@ class ResolveAndValidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             derived = Path(tmp) / "DerivedData"
             app = make_app(derived / "Build" / "Products" / "Debug-iphoneos")
-            self.assertEqual(resolve_app(None, derived, "Debug"), app)
+            found = resolve_app(None, derived, "Debug")
+            # macOS temp dirs live under /var -> /private/var; compare inodes.
+            self.assertTrue(found.samefile(app))
+            self.assertEqual(found, found.resolve())
 
     def test_rejects_app_newer_than_15(self):
         with tempfile.TemporaryDirectory() as tmp:
