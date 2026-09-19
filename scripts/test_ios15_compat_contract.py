@@ -174,7 +174,7 @@ class CompatibilityContractTests(unittest.TestCase):
         # plain UIKit so it also works on the iOS 15 runtime.
         source = (ROOT / "src/ios/Views/Chat/SelectableMarkdownView.swift").read_text()
         self.assertIn("T-ios15-fallback-intrinsic-width", source)
-        self.assertIn("override var intrinsicContentSize: QSize", source)
+        self.assertIn("override var intrinsicContentSize: CGSize", source)
         self.assertIn("noIntrinsicMetric", source)
         self.assertIn("bounds.width.isFinite", source)
         self.assertIn("sizeThatFits(CGSize(width: bounds.width", source)
