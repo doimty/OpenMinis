@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-09-19 — device rejects the latest layout fix; screenshot attribution corrected
+
+- User explicitly confirms the previously supplied chat screenshot is from the **latest `161a1c8` IPA**, not an earlier build. Treat it as failed device acceptance. Do not ask for another identical screenshot or a reinstall to establish its version.
+- Fresh baseline check: local HEAD and `git ls-remote fork refs/heads/compat/ios15` both resolve to `161a1c84fc861e43107c30896d16ac2a68992d09`; preserved IPA SHA256 is `e265e4df530163ad45df558355b04d51bd4f04d128a0cf33d5c50be0bcb49fa2`. No production code changed during this follow-up.
+- `python3 scripts/test_ios15_compat_contract.py -v` still passes 14/14. These are structural checks, **not a rendering regression test**; they cannot overrule the device failure. Local `bash scripts/check_ios15_swiftui_compat.sh` stops at line 5 (`xcrun: command not found`). The current cloud workflow performs an unsigned generic-iOS build, not an iOS 15 render/test run.
+- Earlier claims that screenshot whitespace proves a cell-height bug, a bottom-inset bug, or a need to bottom-align short conversations were not measured. Likewise, the exact missing text and horizontal root cause are unverified. Do not change scroll alignment or ship another speculative frame patch merely to fill the screenshot's whitespace.
+- Feedback-loop gate remains open: existing `MinisUITests/MessageListV3UITests.swift` launches `--uitest-message-list`, but was not run on an Apple runtime here. `MessageListSnapshotCollector` records actual geometry only when enabled; it is DEBUG-only and off by default. No captured geometry trace exists for this report yet.
+- Lowest-friction next artifact: Settings → Logs → the relevant daily `minis-YYYY-MM-DD.log` → share from the detail page (iOS 15 sharing is implemented in `LogManagementView.swift`). Request the file, not manual keyword filtering, and inspect privately. If it lacks geometry, use the existing debug snapshot seam to create a bounded diagnostic capture rather than inventing another cause.
+
+
 ## 2026-09-19 — iOS 15 usability: session-row tap + legacy chat height fix
 
 - User feedback after the SwiftUI-crash fix: chatting works, but layout is off, and the session list only opens once at launch — tapping rows never navigates.

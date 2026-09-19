@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Narrow structural guards, not a substitute for the Apple-compiler smoke."""
 import re
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -145,6 +148,44 @@ class CompatibilityContractTests(unittest.TestCase):
         source = (ROOT / "src/ios/Views/ContentView.swift").read_text()
         self.assertIn(".compatLegacyNavigationTap {", source)
         self.assertIn("navigationPath.append(session.id)", source)
+
+    def test_ios15_markdown_measure_width_is_guarded(self):
+        # The legacy iOS 15 path measured at NSTextContainer's default
+        # 10_000_000pt sentinel when bounds.width <= 1, poisoning the height
+        # cache and handing CoreAnimation an undrawable layer (device log
+        # 2026-09-19: measureW=10000000, 146x "Ignoring bogus layer size").
+        source = (ROOT / "src/ios/Views/Chat/SelectableMarkdownView.swift").read_text()
+        self.assertIn("T-ios15-measure-width-guard", source)
+        self.assertIn("let maxSaneW = max(fallbackW, UIScreen.main.bounds.width)", source)
+        self.assertIn("no real width yet; deferring to GeometryReader/next pass", source)
+
+    def test_ios15_chat_geometry_detector_red_and_green(self):
+        detector = ROOT / "scripts/check_ios15_chat_geometry.py"
+        self.assertTrue(detector.exists(), "geometry replay detector must exist")
+        red = """\
+[13:42:23] [WatchdogProbe] [cv-bounds] WH old=0x0 new=428x801 visibleCells=0
+[13:42:23] [TextContainerGuard] [WARN] short-circuited setSize: size=10000000.0x10000000.0 tick=8738
+[13:42:23] [CellSize] [INFO] [invalidateCell] FIRST-MEASURE CORRECTION cellH=1167.0 newH=1020.0
+[13:42:23] -[<CALayer> display]: Ignoring bogus layer size (10000000.000000, 1020.000000), contentsScale 3.0
+[13:42:23] [CellSize] [INFO] [invalidateCell][SKIP-DEDUPE] storageLen=738 measureW=10000000 tcW=10000000 lastH=1020.0 tableGen=0
+"""
+        green = """\
+[13:42:34] [WatchdogProbe] [cv-bounds] WH old=0x0 new=428x801 visibleCells=0
+[13:42:34] [CellSize] [INFO] [invalidateCell][SKIP-DEDUPE] storageLen=2 measureW=396 tcW=396 lastH=28.0 tableGen=0
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            red_path = Path(tmp) / "red.log"
+            green_path = Path(tmp) / "green.log"
+            red_path.write_text(red)
+            green_path.write_text(green)
+            red_run = subprocess.run([sys.executable, str(detector), str(red_path)],
+                                     capture_output=True, text=True)
+            green_run = subprocess.run([sys.executable, str(detector), str(green_path)],
+                                       capture_output=True, text=True)
+        self.assertEqual(red_run.returncode, 1,
+                         "red fixture must fail: " + red_run.stdout[-400:])
+        self.assertEqual(green_run.returncode, 0,
+                         "green fixture must pass: " + green_run.stdout[-400:])
 
 
 if __name__ == "__main__":

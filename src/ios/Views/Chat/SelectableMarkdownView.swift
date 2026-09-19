@@ -7013,7 +7013,28 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
         // outer-cell probe width (~402) by SwiftUI's preferredLayoutAttributes
         // pass — measuring at that wrong width would write a 23pt-too-small
         // height into lastComputedHeight, producing the streaming spike.
-        let measureWidth: CGFloat = bounds.width > 1 ? bounds.width : textContainer.size.width
+        //
+        // [T-ios15-measure-width-guard 2026-09-19] The legacy iOS 15 hosting
+        // path can reach this before the text view has a real frame
+        // (bounds.width <= 1); the fallback then reads NSTextContainer's
+        // default 10_000_000pt "unbounded" sentinel. Measuring at that width
+        // produced a bogus height (1020pt), poisoned lastComputedHeight and
+        // the dedup fingerprint, and handed CoreAnimation a 10M-wide layer it
+        // refuses to draw — 146× "Ignoring bogus layer size (10000000, 1020)"
+        // in the 2026-09-19 iOS 15 device log, matching the clipped/flooded
+        // chat layout. Clamp to a real width; when no sane width exists yet,
+        // skip the measure entirely and let the GeometryReader report (or the
+        // next layout pass) supply one.
+        let rawMeasureWidth: CGFloat = bounds.width > 1 ? bounds.width : textContainer.size.width
+        let fallbackW: CGFloat = findCollectionView()?.bounds.width ?? UIScreen.main.bounds.width
+        let maxSaneW = max(fallbackW, UIScreen.main.bounds.width)
+        let measureWidth: CGFloat
+        if rawMeasureWidth > 1 && rawMeasureWidth <= maxSaneW {
+            measureWidth = rawMeasureWidth
+        } else {
+            cellSizeLogger.info("[invalidateCell][WIDTH-GUARD] rawW=\(String(format: "%.0f", rawMeasureWidth)) tcW=\(String(format: "%.0f", textContainer.size.width)) bW=\(String(format: "%.0f", bounds.width)) screenW=\(String(format: "%.0f", UIScreen.main.bounds.width)) — no real width yet; deferring to GeometryReader/next pass")
+            return
+        }
         // [TableGenDedup] Compute the sum of every TableAttachment's generation
         // counter. Streaming tables mutate rows in place without changing
         // textStorage.length, so the (storageLen, width) fingerprint alone
