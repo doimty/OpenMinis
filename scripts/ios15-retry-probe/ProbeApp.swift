@@ -128,15 +128,19 @@ final class RetryProbeApp: UIResponder, UIApplicationDelegate {
             try? await Task.sleep(nanoseconds: 200_000_000)
             contentView.layoutIfNeeded()
 
-            // The hosting view is the only subview of the content view.
+            // The hosting view is the only subview of the content view (the
+            // production layout pins it top/leading/trailing).
             let hostView: UIView? = contentView.subviews.first
             let overflow = (hostView?.frame.maxY ?? 0) - contentView.bounds.maxY
 
-            // Retry capsule sits near the trailing edge at the content's
-            // bottom. Probe the WINDOW hit-test at that point and also at a
-            // control point well inside the bounds (error icon area).
+            // Retry capsule sits at the trailing edge, vertically centered in
+            // the CONTENT (host view), which is pinned to the top of the
+            // content view. Its true center is therefore
+            //   x = bounds.maxX - 36, y = hostView.frame.midY
+            // (hostView.frame is in contentView coordinates).
+            let hostCenterY = hostView.map { $0.frame.midY } ?? 25
             let retryPointInContent = CGPoint(x: contentView.bounds.maxX - 36,
-                                              y: contentView.bounds.maxY - 2)
+                                              y: hostCenterY)
             let iconPointInContent = CGPoint(x: 18, y: 8)
             let retryInWindow = window?.convert(retryPointInContent, from: contentView)
             let iconInWindow = window?.convert(iconPointInContent, from: contentView)
@@ -158,28 +162,27 @@ final class RetryProbeApp: UIResponder, UIApplicationDelegate {
         }
 
         do {
-            // Phase A: cell estimate SHORTER than the rendered footer (the
-            // "first layout pass after error appears" case).
-            let short = await makeProbe(estimateHeight: 40)
-            // Phase B: cell estimate at the content's natural height.
-            let natural = await makeProbe(estimateHeight: 96)
+            // Phase A: cell estimate (20pt) SHORTER than the rendered footer
+            // (≈50pt) so the Retry button's true center (y≈25) falls BELOW the
+            // content view's bounds — the pre-fix dead zone.
+            let short = await makeProbe(estimateHeight: 20)
+            // Phase B: estimate (64pt) at/above the content's natural height.
+            let natural = await makeProbe(estimateHeight: 64)
 
-            // Red condition (pre-fix): short estimate leaves the retry area
-            // touch-dead. Green condition (post-fix): both short and natural
-            // estimates keep the retry area reachable inside the hosting tree.
-            let shortOverflow = (short["host_overflow_below_contentView_pt"] as? Double) ?? 0
+            // Green condition (post-fix): the Retry point stays reachable
+            // inside the hosting tree at BOTH estimates.
             let shortHit = (short["retry_point_hit_is_inside_hosting"] as? Bool) ?? false
             let naturalHit = (natural["retry_point_hit_is_inside_hosting"] as? Bool) ?? false
-            let naturalOverflow = (natural["host_overflow_below_contentView_pt"] as? Double) ?? 0
 
             let passed = shortHit && naturalHit
+            let shortHitLabel = shortHit ? "hittable" : "dead"
             let report: [String: Any] = [
                 "os": UIDevice.current.systemVersion,
                 "passed": passed,
                 "short_estimate": short,
                 "natural_estimate": natural,
                 "conclusion": passed
-                    ? "PASS: even with a short cell estimate (overflow=\(shortOverflow)pt) the retry area stays hittable inside the hosting tree; natural estimate also hittable."
+                    ? "PASS: with a 20pt estimate the retry center stays \(shortHitLabel) inside hosting; control estimate also hittable."
                     : "FAIL: short_estimate=\(short) natural_estimate=\(natural)",
                 "limits": "Production LegacyHostingConfiguration on pinned iOS26.2; not an iOS15 runtime or full-app XCUITest.",
             ]
