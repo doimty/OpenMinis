@@ -113,7 +113,7 @@ struct MessageMenuCalls: View {
 func hostingAndWebKitCalls() {
     let parent = UIViewController()
     let configuration = LegacyHostingConfiguration(content: AnyView(MessageMenuCalls()),
-                                                    parent: WeakHostingParent(parent), onSizeChange: {})
+                                                    parent: WeakHostingParent(parent), onSizeChange: { _ in })
     _ = configuration.makeContentView()
     _ = LegacyFlowLayout(items: [LegacyFlowItem(id: "image") { Text("Attachment") }])
     _ = LegacyFlowArrangement.pack(sizes: [CGSize(width: 20, height: 10)], width: 100,
