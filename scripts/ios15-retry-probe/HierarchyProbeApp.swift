@@ -83,7 +83,7 @@ final class ProbeCell: UICollectionViewCell {
     func install(error: String, onRetry: @escaping () -> Void) {
         let config = LegacyHostingConfiguration(
             content: AnyView(RetryFooterContent(error: error, onRetry: onRetry)),
-            parent: nil,
+            parent: WeakHostingParent(nil),
             onSizeChange: { _ in }
         )
         let hosted = config.makeContentView()
@@ -199,7 +199,7 @@ final class HierarchyRetryProbeApp: UIResponder, UIApplicationDelegate {
         // Green: control reachable, short-inset tap lands on the overlay (bug
         // reproduced), fixed-inset tap reaches the cell again.
         let passed = aInsideCell && bHitsOverlay && !bInsideCell && cInsideCell && !cHitsOverlay
-        let full = ["os": UIDevice.current.systemVersion, "passed": passed, "details": report]
+        let full: [String: Any] = ["os": UIDevice.current.systemVersion, "passed": passed, "details": report]
         if let data = try? JSONSerialization.data(withJSONObject: full, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: directory.appendingPathComponent("report.json"))
         }
