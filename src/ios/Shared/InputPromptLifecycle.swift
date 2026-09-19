@@ -1,6 +1,6 @@
-/// The legacy input sheet has its own presentation state. Do not bind it
-/// directly to the caller: an optional-subject binding can discard the item
-/// before the confirm callback gets a chance to read it.
+/// Completion state for the legacy input sheet. Presentation is derived
+/// directly from the caller, never mirrored through an onChange observer:
+/// a quick close/reopen can coalesce false -> true and lose that observer edge.
 struct InputPromptLifecycle: Equatable {
     enum Completion: Equatable {
         case confirm
@@ -8,32 +8,31 @@ struct InputPromptLifecycle: Equatable {
         case external
     }
 
-    private(set) var isPresented = false
+    private(set) var isActive = false
     private(set) var pending: Completion?
 
     init() {}
 
-    mutating func synchronize(requested: Bool) {
-        if requested {
-            // The owner stays true until completion. Re-rendering while the
-            // sheet dismisses must not immediately reopen that same sheet.
-            if pending == nil { isPresented = true }
-        } else if isPresented || pending != nil {
-            isPresented = false
-            pending = .external
-        }
+    func presentationRequested(byOwner requested: Bool) -> Bool {
+        requested && pending == nil
+    }
+
+    mutating func didPresent() {
+        if pending == nil { isActive = true }
     }
 
     mutating func requestClose(_ completion: Completion) {
-        guard isPresented else { return }
+        guard isActive, pending == nil else { return }
         pending = completion
-        isPresented = false
     }
 
-    mutating func didDismiss() -> Completion? {
-        let completion = pending ?? (isPresented ? .cancel : nil)
-        isPresented = false
+    mutating func didDismiss(ownerRequested: Bool) -> Completion? {
+        let completion = pending ?? (isActive ? .cancel : nil)
+        isActive = false
         pending = nil
+        // Recheck the actual owner at completion, not a delayed observation.
+        // Revocation during dismissal must veto a previously requested save.
+        if !ownerRequested, completion != nil { return .external }
         return completion
     }
 }

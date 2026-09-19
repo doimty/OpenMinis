@@ -83,6 +83,13 @@ view.alert(item: $item) { _ in Alert(title: Text("Info")) }
     def test_all_original_callers_use_the_adapter(self):
         self.assertEqual(production_violations(), [])
 
+    def test_legacy_does_not_mirror_owner_through_an_observer(self):
+        source = (ROOT / "src/ios/Shared/CompatTextInputAlert.swift").read_text()
+        self.assertIn("presentationRequested(byOwner: isPresented)", source)
+        self.assertIn("didDismiss(ownerRequested: isPresented)", source)
+        self.assertNotIn(".onChange", source, "a coalesced close/reopen must not lose presentation")
+        self.assertNotIn(".synchronize", source)
+
     def test_native_alert_branch_is_gated_and_legacy_has_no_parent_dismiss(self):
         source = (ROOT / "src/ios/Shared/CompatTextInputAlert.swift").read_text()
         self.assertIn("if #available(iOS 16.0, *)", source)

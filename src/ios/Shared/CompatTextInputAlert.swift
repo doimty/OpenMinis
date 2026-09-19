@@ -76,7 +76,7 @@ struct LegacyTextInputAlert<Fields: View, Message: View>: ViewModifier {
 
     private var sheetBinding: Binding<Bool> {
         Binding(
-            get: { lifecycle.isPresented },
+            get: { lifecycle.presentationRequested(byOwner: isPresented) },
             set: { visible in
                 if !visible { lifecycle.requestClose(.cancel) }
             })
@@ -107,15 +107,12 @@ struct LegacyTextInputAlert<Fields: View, Message: View>: ViewModifier {
                     }
                 }
                 .navigationViewStyle(StackNavigationViewStyle())
-            }
-            .onAppear { lifecycle.synchronize(requested: isPresented) }
-            .onChange(of: isPresented) { requested in
-                lifecycle.synchronize(requested: requested)
+                .onAppear { lifecycle.didPresent() }
             }
     }
 
     private func completeDismissal() {
-        guard let completion = lifecycle.didDismiss() else { return }
+        guard let completion = lifecycle.didDismiss(ownerRequested: isPresented) else { return }
         // UIKit has finished dismissing the sheet now. Commit editing and
         // run the existing action before clearing an optional-subject binding.
         // A follow-up collision alert can safely be presented by that action.

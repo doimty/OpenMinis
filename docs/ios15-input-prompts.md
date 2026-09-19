@@ -23,7 +23,7 @@ An existing visible child session performed a read-only source audit, saved outs
 
 - One `compatTextInputAlert` adapter. iOS 16+ retains native SwiftUI alert; iOS 15 uses NavigationView + Form + explicit Cancel/confirm controls in its own sheet.
 - Pass title/confirm labels as SwiftUI Text and retain the original field/message builders. This preserves in-app localization, interpolated messages, field bindings and keyboard modifiers; do not flatten them through String localization.
-- A small pure `InputPromptLifecycle` owns opening, requested completion, external cancellation and one-shot dismissal consumption. The caller presentation binding remains true until after submit/cancel callback. This prevents `folderToRename` from being cleared before submit and runs duplicate-name follow-up only after sheet dismissal.
+- A small pure `InputPromptLifecycle` owns active/closing/completion state. The sheet's requested visibility is derived directly from the caller binding, not mirrored through an onChange observer. The caller presentation binding remains true until after submit/cancel callback; its actual value is rechecked at dismissal to veto a revoked save. This preserves `folderToRename` for submit and runs collision follow-up after sheet dismissal.
 - No universal empty-input rule, new folder-name policy, parent environment dismiss, configuration/storage/schema changes, or capability-gate removal. Device Name can remain empty to reset its default. Rclone Cancel/validation/path logic stays at its current owner.
 - Migrate all seven input builders to the adapter; Device Name is preventive source consistency, not a claim of a seventh currently exposed iOS 15 failure. Button/message-only alerts remain native.
 
@@ -39,8 +39,16 @@ An existing visible child session performed a read-only source audit, saved outs
 
 The raw-alert source gate was executed before implementation and failed on all 7 input builders. After migrating them it passes (6 parser/contract tests); the existing symbol suite 10/10 and compatibility suite 17/17 also pass. Shell/embedded Python/YAML syntax and new Swift syntax-tree parsing were checked; these are not Apple type checks.
 
-Implementation follows the independent source audit's legacy Form-sheet recommendation. Original fields/messages, validation and persistence handlers are retained. A second read-only implementation review has been requested from the same visible child session; it is not yet a completed review.
+Implementation follows the independent source audit's legacy Form-sheet recommendation. Original fields/messages, validation and persistence handlers are retained. The second read-only implementation review identified two P2 gaps: checking the current owner at completion rather than trusting observer timing, and testing immediate collision-action reopening plus modern multi-field extraction. Both are incorporated into the revision described below.
 
 Request changes are diagnostics only: Responses builder logs requested level; the final outgoing-body logger prints bounded `reasoning.effort` and `reasoning_effort` metadata before the truncated body preview, now explicitly labelled a preview. The request serialization and policy are unchanged. Synthetic tests cover truncation, missing/null/nonstandard values, no body mutation, and no prompt/unknown-value leakage.
 
 Device screenshot remains the original failing runtime evidence. No iOS 15 simulator/device is attached here. Apple type checks and the eight-stage forced-legacy/native-modern component probe are mandatory cloud gates before packaging. Thinking wire mismatch remains unproven pending a complete request, not declared repaired.
+
+### First native probe and corrective revision
+
+Run `35435115684`, source `6f0841f32ceb1e9d9d91911f2635575d0326ca3a`, passed iOS15/16 type checks, 38 lifecycle checks, and request-metadata tests. The actual legacy component displayed an editable CJK field and passed first confirm/cancel, but then failed to reopen (`timeout: external-cancel field`). The failure screenshot showed only the underlying view; **no package was built or delivered**. Evidence: workspace `reports/openminis-ios15/input-prompts/run-35435115684-wYILZw/`.
+
+The first adapter mirrored the owner flag through onChange into another presentation boolean. A rapid false/true owner cycle can be coalesced, leaving that mirror false. The corrective design removes the mirror/observer entirely: derive sheet visibility directly from the owner while pending completion suppresses reopening during dismissal. Native appearance records activity, and dismissal rechecks the current owner even if no observer ran. New pure cases cover reopening without an observer edge and revocation without prior synchronization. The next native run must validate the correction; source reasoning alone is not acceptance.
+
+The probe now invokes the same Change Name state action while the collision alert is still up (no artificial dismissal wait), checks a modern two-field builder with modifiers, and records owner/activity/pending/field counts on failure. Close/action seams remain programmatic, not XCUITest taps.

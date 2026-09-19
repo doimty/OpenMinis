@@ -17,6 +17,12 @@ final class ProbeState: ObservableObject {
     var subjectBinding: Binding<Bool> {
         Binding(get: { self.subject != nil }, set: { if !$0 { self.subject = nil } })
     }
+
+    func changeName() {
+        // Same state ordering as FolderAlertsModifier's real alert action.
+        subject = "folder-A"
+        followup = false
+    }
 }
 
 struct LegacyOneField: View {
@@ -52,7 +58,7 @@ struct LegacyTwoFields: View {
                     TextField("Description", text: $state.detail)
                 }, message: EmptyView()))
             .alert("Group Already Exists", isPresented: $state.followup) {
-                Button("Change Name") {}
+                Button("Change Name", action: state.changeName)
                 Button("Cancel", role: .cancel) {}
             }
     }
@@ -73,6 +79,9 @@ struct ModernPrompt: View {
             .compatTextInputAlert(Text("Modern Prompt"), isPresented: $state.requested,
                                   confirmLabel: Text("Create"), onConfirm: {}) {
                 TextField("Group name", text: $state.name)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                TextField("Description", text: $state.detail)
             } message: { Text("Keep modern native alert fields.") }
     }
 }
@@ -81,6 +90,7 @@ struct ModernPrompt: View {
 @MainActor
 final class ProbeApp: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
+    var observedState: ProbeState?
     var phases: [String] = []
     let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("input-probe", isDirectory: true)
@@ -96,7 +106,8 @@ final class ProbeApp: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    func host<V: View>(_ view: V) {
+    func host<V: View>(_ view: V, state: ProbeState) {
+        observedState = state
         window?.rootViewController = UIHostingController(rootView: view)
     }
 
@@ -147,9 +158,9 @@ final class ProbeApp: UIResponder, UIApplicationDelegate {
     func run() async {
         do {
             let one = ProbeState()
-            host(LegacyOneField(state: one))
+            host(LegacyOneField(state: one), state: one)
             one.requested = true
-            try await wait("legacy one field") { self.fields().count == 1 }
+            try await wait("legacy one field") { one.lifecycle.isActive && self.fields().count == 1 }
             try enter("Group name", "家庭模型组 🐱")
             try await wait("CJK binding update") { one.name == "家庭模型组 🐱" }
             snapshot("legacy-editable-name")
@@ -162,14 +173,14 @@ final class ProbeApp: UIResponder, UIApplicationDelegate {
             phases.append("confirm-once-owner-held-until-dismissal")
 
             one.requested = true
-            try await wait("reopened legacy field") { self.fields().count == 1 }
+            try await wait("reopened legacy field") { one.lifecycle.isActive && self.fields().count == 1 }
             one.lifecycle.requestClose(.cancel)
             try await wait("cancel callback") { one.cancelled == 1 && !one.requested }
             try require(one.saved.count == 1, "cancel saved")
             phases.append("cancel-without-save")
 
             one.requested = true
-            try await wait("external-cancel field") { self.fields().count == 1 }
+            try await wait("external-cancel field") { one.lifecycle.isActive && self.fields().count == 1 }
             one.requested = false
             try await wait("external cancellation dismissed") { self.window?.rootViewController?.presentedViewController == nil }
             try require(one.saved.count == 1 && one.cancelled == 1, "external cancellation dispatched user action")
@@ -178,9 +189,9 @@ final class ProbeApp: UIResponder, UIApplicationDelegate {
             let two = ProbeState()
             two.name = "Original"
             two.detail = "Old description"
-            host(LegacyTwoFields(state: two))
+            host(LegacyTwoFields(state: two), state: two)
             two.subject = "folder-A"
-            try await wait("legacy two fields") { self.fields().count == 2 }
+            try await wait("legacy two fields") { two.lifecycle.isActive && self.fields().count == 2 }
             try enter("Group name", "重复分组")
             try enter("Description", "描述仍然保留")
             try await wait("two bindings") { two.name == "重复分组" && two.detail == "描述仍然保留" }
@@ -190,21 +201,21 @@ final class ProbeApp: UIResponder, UIApplicationDelegate {
             try require(two.ownerAliveAtSubmit && two.subject == nil && two.saved.count == 1, "optional subject/callback broken")
             try require(two.saved[0].0 == "重复分组" && two.saved[0].1 == "描述仍然保留", "description/name lost")
             phases.append("two-fields-optional-subject-and-followup")
-            two.followup = false
-            try await wait("followup closed") { self.window?.rootViewController?.presentedViewController == nil }
-            two.subject = "folder-A"
-            try await wait("rename reopened") { self.fields().count == 2 }
+            // Invoke the same action used by Change Name while the alert is
+            // still presented. Do not insert an artificial dismissal wait.
+            two.changeName()
+            try await wait("rename reopened") { two.lifecycle.isActive && self.fields().count == 2 }
             try require(two.name == "重复分组" && two.detail == "描述仍然保留", "reopen lost drafts")
             two.subject = nil
             try await wait("rename closed") { self.window?.rootViewController?.presentedViewController == nil }
             phases.append("rename-reopen-preserves-drafts")
 
             let nested = ProbeState()
-            host(NestedPrompt(state: nested))
+            host(NestedPrompt(state: nested), state: nested)
             nested.outer = true
             try await wait("outer sheet") { self.window?.rootViewController?.presentedViewController != nil }
             nested.requested = true
-            try await wait("nested input field") { self.fields().count == 1 }
+            try await wait("nested input field") { nested.lifecycle.isActive && self.fields().count == 1 }
             try enter("Group name", "备份目录")
             try await wait("nested edit") { nested.name == "备份目录" }
             nested.lifecycle.requestClose(.confirm)
@@ -215,14 +226,15 @@ final class ProbeApp: UIResponder, UIApplicationDelegate {
             phases.append("nested-prompt-preserves-parent-flow")
 
             let modern = ProbeState()
-            host(ModernPrompt(state: modern))
+            host(ModernPrompt(state: modern), state: modern)
             modern.requested = true
-            try await wait("modern native alert text field") { self.alert()?.textFields?.count == 1 }
+            try await wait("modern native alert text fields") { self.alert()?.textFields?.count == 2 }
             try enter("Group name", "现代系统仍可输入")
-            try await wait("modern binding") { modern.name == "现代系统仍可输入" }
+            try enter("Description", "多字段和修饰符")
+            try await wait("modern bindings") { modern.name == "现代系统仍可输入" && modern.detail == "多字段和修饰符" }
             modern.requested = false
             try await wait("modern dismissed") { self.window?.rootViewController?.presentedViewController == nil }
-            phases.append("modern-native-alert-keeps-field")
+            phases.append("modern-native-alert-keeps-fields")
             finish(error: nil)
         } catch {
             snapshot("failure")
@@ -238,6 +250,12 @@ final class ProbeApp: UIResponder, UIApplicationDelegate {
             "limits": "Production legacy component forced on iOS26.2; editing is native UIKit, close uses production lifecycle seam; not iOS15 runtime or full-app XCUITest."
         ]
         if let error { report["error"] = error }
+        if let state = observedState {
+            report["state"] = ["requested": state.requested, "subject_present": state.subject != nil,
+                               "active": state.lifecycle.isActive, "pending": String(describing: state.lifecycle.pending),
+                               "field_count": fields().count, "saved_count": state.saved.count,
+                               "cancelled_count": state.cancelled] as [String: Any]
+        }
         if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: directory.appendingPathComponent("report.json"))
         }
