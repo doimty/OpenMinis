@@ -5220,13 +5220,13 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
     // text), so this repairs the root contract rather than adding another
     // downstream clamp. A width change still re-measures via the layout
     // width-delta branch and the correction chain.
-    override var intrinsicContentSize: QSize {
+    override var intrinsicContentSize: CGSize {
         let original = super.intrinsicContentSize
         guard bounds.width > 1, bounds.width.isFinite else {
             return original
         }
         let height = sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height
-        return QSize(width: UIView.noIntrinsicMetric, height: height)
+        return CGSize(width: UIView.noIntrinsicMetric, height: height)
     }
 
     // [T-ios-table-cell-image-menu] iOS 16 ONLY: UITextView attaches a built-in
