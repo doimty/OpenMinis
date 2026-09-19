@@ -5199,6 +5199,36 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
         selectionDragTracker = tracker
     }
 
+    // [T-ios15-fallback-intrinsic-width 2026-09-19]
+    // The legacy iOS 15 bridging path has no representable sizeThatFits, so
+    // SwiftUI asks the view's intrinsicContentSize with an unbounded width
+    // proposal. A non-scrolling NSTextContainer/UITTextView reports its ideal
+    // width (653pt for long text, 1e7pt once a width-filling attachment such
+    // as a thematic break is present), and with the default horizontal
+    // compression resistance that demand wins over the host's 396pt proposal
+    // — the live bounds grow to 653 -> 1e7, CoreAnimation refuses the
+    // 10M-wide layer, and the chat layout clips and floods (device log
+    // 2026-09-19: 144 bogus layers at measureW=10000000; reproduced in the
+    // pinned iOS 26.2 simulator matrix in docs/ios15-markdown-width-investigation.md).
+    //
+    // Report no width demand and measure the height at the CURRENT live width.
+    // This is plain UIKit, so it works on the iOS 15 runtime, unlike the
+    // iOS16-only sizeThatFits override. The existing height-correction chain
+    // (invalidateCellSizeIfNeeded / FIRST-MEASURE CORRECTION / GeometryReader
+    // report) already measures at bounds.width and produces correct heights
+    // once the width is sane (device log: measureW=396 lastH=28.0 for short
+    // text), so this repairs the root contract rather than adding another
+    // downstream clamp. A width change still re-measures via the layout
+    // width-delta branch and the correction chain.
+    override var intrinsicContentSize: QSize {
+        let original = super.intrinsicContentSize
+        guard bounds.width > 1, bounds.width.isFinite else {
+            return original
+        }
+        let height = sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height
+        return QSize(width: UIView.noIntrinsicMetric, height: height)
+    }
+
     // [T-ios-table-cell-image-menu] iOS 16 ONLY: UITextView attaches a built-in
     // UIContextMenuInteraction that, when an inline NSTextAttachment carries an
     // image (our TableAttachment / CodeBlockAttachment / MathAttachment all use a

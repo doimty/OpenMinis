@@ -159,6 +159,26 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("let maxSaneW = max(fallbackW, UIScreen.main.bounds.width)", source)
         self.assertIn("no real width yet; deferring to GeometryReader/next pass", source)
 
+    def test_ios15_fallback_intrinsic_width_does_not_demand_unbounded_width(self):
+        # The legacy iOS 15 bridge has no representable sizeThatFits, so
+        # SwiftUI asks the view's intrinsicContentSize with an unbounded
+        # width proposal. Without this override a non-scrolling
+        # NSTextContainer/UITTextView reports its ideal width (653pt for long
+        # text, 1e7pt once a width-filling attachment is present) and the
+        # default horizontal compression resistance lets that demand win over
+        # the host's 396pt proposal — the live bounds grow to 1e7, CoreAnimation
+        # refuses the 10M-wide layer, and the chat layout clips and floods
+        # (device log 2026-09-19: 144 bogus layers at measureW=10000000;
+        # reproduced in the pinned iOS 26.2 simulator matrix in
+        # docs/ios15-markdown-width-investigation.md). The override must be
+        # plain UIKit so it also works on the iOS 15 runtime.
+        source = (ROOT / "src/ios/Views/Chat/SelectableMarkdownView.swift").read_text()
+        self.assertIn("T-ios15-fallback-intrinsic-width", source)
+        self.assertIn("override var intrinsicContentSize: QSize", source)
+        self.assertIn("noIntrinsicMetric", source)
+        self.assertIn("bounds.width.isFinite", source)
+        self.assertIn("sizeThatFits(CGSize(width: bounds.width", source)
+
     def test_ios15_chat_geometry_detector_red_and_green(self):
         detector = ROOT / "scripts/check_ios15_chat_geometry.py"
         self.assertTrue(detector.exists(), "geometry replay detector must exist")
