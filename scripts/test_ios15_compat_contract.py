@@ -116,7 +116,7 @@ class CompatibilityContractTests(unittest.TestCase):
 
     def test_os_unfair_lock_is_not_a_swift_stored_var(self):
         # iPhone14,3 / iOS 15.1.1 crash 2026-09-19 10:37: PAC in swift_beginAccess
-        # from CrashReporter.appendLog. `&storedLock` is exclusive on self.
+        # from CrashReporter.appendLog. `&storedLock` is exclusive access on self.
         stored = re.compile(r"\bvar\s+\w+\s*=\s*os_unfair_lock(?:_s)?\s*\(")
         hits = []
         for path in (ROOT / "src/ios").rglob("*.swift"):
@@ -126,6 +126,18 @@ class CompatibilityContractTests(unittest.TestCase):
                 if stored.search(line):
                     hits.append(f"{path.relative_to(ROOT)}:{number}:{line.strip()}")
         self.assertEqual(hits, [], "use NSLock or a pointer-backed lock, not a stored os_unfair_lock")
+
+    def test_ios15_legacy_hosting_skips_sync_swiftui_measure(self):
+        source = (ROOT / "src/ios/Agent/MessageList/MessageListInfrastructure.swift").read_text()
+        branch = source.index("if contentConfiguration is LegacyHostingConfiguration")
+        super_measure = source.index("var superAttrs", branch)
+        self.assertLess(branch, super_measure)
+        self.assertIn("legacyMeasuredSize", source[branch:super_measure])
+        self.assertIn("return layoutAttributes", source[branch:super_measure])
+
+        legacy = (ROOT / "src/ios/Shared/LegacyHostingContent.swift").read_text()
+        self.assertIn("let onSizeChange: (CGSize) -> Void", legacy)
+        self.assertIn("self.current.onSizeChange(size)", legacy)
 
 
 if __name__ == "__main__":

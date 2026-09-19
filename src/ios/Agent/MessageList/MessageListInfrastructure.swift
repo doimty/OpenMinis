@@ -67,6 +67,12 @@ class SelfSizingCell: UICollectionViewCell {
     /// SwiftUI's view graph and triggering a geometry observer race.
     private var lastComputedHeight: CGFloat?
 
+    /// iOS 15's legacy hosting path reports this from GeometryReader after the
+    /// host has rendered. It is the only synchronous-free size source on that
+    /// OS; calling UIHostingController.systemLayoutSizeFitting from UIKit's
+    /// preferred-layout callback re-enters AttributeGraph and can PAC-crash.
+    private var legacyMeasuredSize: CGSize?
+
     /// The width at which `lastComputedHeight` was measured. A width change
     /// still re-measures; an unchanged width reuses the cached height without
     /// calling `super.preferredLayoutAttributesFitting` or
@@ -133,6 +139,7 @@ class SelfSizingCell: UICollectionViewCell {
         lastComputedHeight = nil
         lastComputedWidth = nil
         lastMeasureMediaTime = nil
+        legacyMeasuredSize = nil
         // [T-ios-scroll-decel-height-drift] Drop any prior seed — content just
         // changed, so a seed from the old content would be wrong. configureCell
         // re-seeds (from the memo, keyed by the NEW content) right after this.
@@ -152,10 +159,11 @@ class SelfSizingCell: UICollectionViewCell {
             let generation = configGeneration &+ 1
             let config = LegacyHostingConfiguration(
                 content: AnyView(content()), parent: WeakHostingParent(parent),
-                onSizeChange: { [weak self] in
+                onSizeChange: { [weak self] size in
                     guard let self, self.configGeneration == generation,
                           self.window != nil else { return }
                     self.clearCachedHeight()
+                    self.legacyMeasuredSize = size
                     self.seededHeight = nil
                     self.seededWidth = nil
                     var ancestor = self.superview
@@ -345,6 +353,29 @@ class SelfSizingCell: UICollectionViewCell {
             lastMeasureMediaTime = CACurrentMediaTime()
             let copy = layoutAttributes.copy() as! UICollectionViewLayoutAttributes
             copy.size.height = sh
+            return copy
+        }
+
+        // iOS 15 compatibility path. GeometryReader in LegacyHostedRoot reports
+        // the rendered size asynchronously. Do not synchronously call either
+        // UICollectionView's super sizing path or UIHostingController's
+        // systemLayoutSizeFitting here: on iOS 15 that re-enters SwiftUI's
+        // AttributeGraph during a diffable update and crashes in
+        // LayoutComputer.EngineDelegate.explicitAlignment. Until the first
+        // report, keep the layout's estimate; after it arrives, return the
+        // measured height and let the normal invalidation path settle the row.
+        if contentConfiguration is LegacyHostingConfiguration {
+            guard let measured = legacyMeasuredSize,
+                  measured.width > 1,
+                  measured.height.isFinite,
+                  abs(measured.width - layoutAttributes.size.width) < 2 else {
+                return layoutAttributes
+            }
+            let copy = layoutAttributes.copy() as! UICollectionViewLayoutAttributes
+            copy.size.height = max(0, ceil(measured.height))
+            lastComputedHeight = copy.size.height
+            lastComputedWidth = layoutAttributes.size.width
+            lastMeasureMediaTime = CACurrentMediaTime()
             return copy
         }
 
@@ -660,6 +691,7 @@ class SelfSizingCell: UICollectionViewCell {
         lastComputedHeight = nil
         lastComputedWidth = nil
         lastMeasureMediaTime = nil
+        legacyMeasuredSize = nil
     }
 
     override func prepareForReuse() {
@@ -667,6 +699,7 @@ class SelfSizingCell: UICollectionViewCell {
         lastComputedHeight = nil
         lastComputedWidth = nil
         lastMeasureMediaTime = nil
+        legacyMeasuredSize = nil
         // [T-ios-contextmenu-liquidmorph-reuse] Cancel any context-menu
         // presentation still in flight for THIS cell before UIKit hands it to a
         // different message.

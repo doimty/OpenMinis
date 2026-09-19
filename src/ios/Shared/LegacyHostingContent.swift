@@ -7,7 +7,7 @@ import UIKit
 struct LegacyHostingConfiguration: UIContentConfiguration {
     let content: AnyView
     let parent: WeakHostingParent
-    let onSizeChange: () -> Void
+    let onSizeChange: (CGSize) -> Void
 
     func makeContentView() -> UIView & UIContentView {
         LegacyHostingContentView(configuration: self)
@@ -159,7 +159,7 @@ private final class LegacyHostingContentView: UIView, UIContentView {
             guard let self else { return }
             self.sizeNotificationPending = false
             self.invalidateIntrinsicContentSize()
-            self.current.onSizeChange()
+            self.current.onSizeChange(size)
         }
     }
 

@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-09-19 — iOS 15.1.1 SwiftUI legacy-hosting crash diagnosed and patched
+
+- New raw system `.ips` from iPhone14,3 / iOS15.1.1, incident `29F10B9B-BD7D-4509-8019-4C4BF6937016`, is a different/new-build crash. `Minis.debug.dylib` UUID `ff55af62-e986-3005-a22f-c2a83d8ee1f7` confirms it is not the old IPA.
+- Stack: `swift_beginAccess` → `LayoutComputer.EngineDelegate.explicitAlignment` → `AttributeGraph` → `LegacyHostingContentView.measuredSize` → `systemLayoutSizeFitting` → `SelfSizingCell.preferredLayoutAttributesFitting` during diffable update. This is iOS15 SwiftUI graph re-entry, not the repaired `CrashReporter.appendLog` lock.
+- Patch: iOS15 `SelfSizingCell` now bypasses both `super.preferredLayoutAttributesFitting` and synchronous `UIHostingController.systemLayoutSizeFitting` for `LegacyHostingConfiguration`. It uses the layout estimate until `LegacyHostedRoot`'s `GeometryReader` asynchronously reports a size, then returns that measured height and invalidates the layout. iOS16+ path unchanged.
+- Local structural suite 13/13, IPA packager 10/10, parser 8/8, diff check pass. This is not yet device-verified; next cloud run is the compile gate and next IPA must be tested on the same phone. Local host cannot run Apple smoke (`xcrun` absent); toolbar audit dependency (`tree_sitter`) is absent.
+
 ## 2026-09-19 — iOS 15.1.1 PAC crash in CrashReporter.appendLog
 
 - User installed the TrollStore IPA on iPhone14,3 / iOS 15.1.1 (19B81). App launched then died: EXC_BAD_ACCESS SIGSEGV, `possible pointer authentication failure`, queue `com.apple.uikit.datasource.diffing`.
