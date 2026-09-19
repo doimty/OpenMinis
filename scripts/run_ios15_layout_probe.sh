@@ -105,7 +105,7 @@ if result.returncode or not (results/'report.json').exists():
     raise SystemExit('FAIL: probe crashed or did not produce its geometry report')
 report = json.loads((results/'report.json').read_text())
 assert report['os'] == '26.2', report['os']
-assert len(report['samples']) == 35, len(report['samples'])
+assert len(report['samples']) == 42, len(report['samples'])
 print('MATRIX_COMPLETE:', len(report['samples']), 'samples')
 print('BASELINE_LIVE_OVERFLOW:', report['baseline_reproduces_live_width_overflow'])
 print('PASSING_ABLATIONS:', report['passing_modes'])

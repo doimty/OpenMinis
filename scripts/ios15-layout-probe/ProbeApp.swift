@@ -11,7 +11,7 @@ struct SelectableMarkdownTheme {
 }
 
 enum ProbeMode: String, CaseIterable {
-    case baseline, lowHorizontalResistance, noIntrinsicWidth, explicitFrame, directHost
+    case baseline, intrinsicAtBoundsWidth, lowHorizontalResistance, noIntrinsicWidth, explicitFrame, directHost
 }
 
 @MainActor
@@ -48,6 +48,21 @@ final class ProbeTextView: UITextView {
     override var intrinsicContentSize: CGSize {
         let original = super.intrinsicContentSize
         if mode == .noIntrinsicWidth {
+            return CGSize(width: UIView.noIntrinsicMetric, height: original.height)
+        }
+        // Candidate fix shape: the fallback bridge measures the ideal height
+        // at an UNBOUNDED width (the iOS15 path has no representable
+        // sizeThatFits), so the intrinsic height comes out as if the text
+        // were laid out at 1e7pt. Report no width demand and measure the
+        // height at the CURRENT live width instead. This is plain UIKit and
+        // therefore works on the iOS 15 runtime, unlike the iOS16-only
+        // UIViewRepresentable.sizeThatFits override.
+        if mode == .intrinsicAtBoundsWidth {
+            let width = bounds.width
+            if width > 1 && width.isFinite {
+                let height = sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+                return CGSize(width: UIView.noIntrinsicMetric, height: height)
+            }
             return CGSize(width: UIView.noIntrinsicMetric, height: original.height)
         }
         return original
