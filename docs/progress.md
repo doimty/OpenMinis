@@ -1,11 +1,19 @@
 # Progress
 
-## 2026-09-19 — TrollStore IPA packaging wired to the compile probe
+## 2026-09-19 — iOS 15.1.1 PAC crash in CrashReporter.appendLog
 
-- User is on TrollStore ("巨魔环境"), so the next deliverable is an unsigned/ad-hoc IPA, not a Developer-ID signed build.
-- Added `scripts/package_ios15_ipa.py`, fixture tests `scripts/test_package_ios15_ipa.py` (10/10 local), and `scripts/ios15-trollstore.entitlements`. The packager copies the probe `Debug-iphoneos/Minis.app`, rejects an app floor newer than 15.0, strips FileProvider 16.0 and Agent Widget 16.2, keeps Share at 15.0, and zips `Payload/Minis.app`. Source bundle is not mutated. Linux tests use `--skip-sign`; Darwin CI ad-hoc signs.
-- `ios15-m0-baseline.yml` now runs the packager tests before smoke, packages after a green probe, and uploads artifact `minis-ios15-trollstore-ipa`. No IPA exists until that job succeeds; do not treat this commit as a built package.
-- Install notes: `docs/ios15-trollstore-ipa.md`. Remaining after a real artifact: send/install on the TrollStore device, then M3 acceptance (launch, provider, Linux command, persistence, attachments, streaming, VAD, 16+ regression).
+- User installed the TrollStore IPA on iPhone14,3 / iOS 15.1.1 (19B81). App launched then died: EXC_BAD_ACCESS SIGSEGV, `possible pointer authentication failure`, queue `com.apple.uikit.datasource.diffing`.
+- Stack: `SelfSizingCell.preferredLayoutAttributesFitting` → `AppLogger.info` → `CrashReporter.appendLog` → `swift_beginAccess`. Evidence `reports/openminis-ios15/crash-2026-09-19/` (workspace, not this repo). Binary is arm64 not arm64e; dyld loaded Minis.debug.dylib; this is not the chained-fixups launch abort.
+- Cause: `os_unfair_lock` stored as a Swift `var` on the same object that mutates other properties. `&logRingLock` starts exclusive access on self; mutating `logRing` then traps on iOS 15's exclusivity runtime. Same pattern in MessageListLayout streaming lock and BrowserTabPool.GateBox.
+- Fix: those locks are `NSLock` `let`s. Structural test `test_os_unfair_lock_is_not_a_swift_stored_var` failed on the four stored vars first (12/12 after). No new files, no pbxproj. Remaining after the next IPA: M3 device acceptance on this same phone.
+
+## 2026-09-19 — TrollStore IPA delivered (e8b5c22 / 35412629983)
+
+- User is on TrollStore. Unsigned/ad-hoc Debug IPA, not Developer-ID.
+- Baseline `e8b5c22d0630bb6edf1ba0b0694199d6cec13638`. Run 35412629983 success in 8m36s. IPA `Minis-1.13-ios15-trollstore.ipa` 84163359 bytes, SHA256 `fe64fde471ed608f7830e33b2f242fc11d732d127d791146980245b42dd4321b`, MinimumOS 15.0, ad-hoc signed, Share kept, FileProvider 16.0 and Widget 16.2 stripped.
+- Prerelease: https://github.com/doimty/OpenMinis/releases/download/ios15-trollstore-1.13-e8b5c22/Minis-1.13-ios15-trollstore.ipa
+- First packager CI 35412567522 failed only the `/var` vs `/private/var` path equality test; production packager was unused that run.
+- Remaining: M3 device acceptance after install (launch, provider, Linux command, persistence, attachments, streaming, VAD, 16+ regression).
 
 ## 2026-09-19 — 1cbcdfa: VAD 15.0 local package linked, app compile gate CLOSED
 

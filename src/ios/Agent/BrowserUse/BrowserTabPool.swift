@@ -575,7 +575,7 @@ final class BrowserTabPool: ObservableObject {
         nextSerialToken &+= 1
 
         final class GateBox: @unchecked Sendable {
-            private var lock = os_unfair_lock()
+            private let lock = NSLock()
             private var resume: (() -> Void)?
             private var preFired = false
 
@@ -583,27 +583,27 @@ final class BrowserTabPool: ObservableObject {
             /// its continuation, fire it; otherwise mark pre-fired so the
             /// installer fires immediately on arrival.
             func signal() {
-                os_unfair_lock_lock(&lock)
+                lock.lock()
                 if let r = resume {
                     resume = nil
-                    os_unfair_lock_unlock(&lock)
+                    lock.unlock()
                     r()
                 } else {
                     preFired = true
-                    os_unfair_lock_unlock(&lock)
+                    lock.unlock()
                 }
             }
 
             /// Called from the gate Task once `withCheckedContinuation` hands
             /// it the resume closure. If release already fired, drain it now.
             func install(_ r: @escaping () -> Void) {
-                os_unfair_lock_lock(&lock)
+                lock.lock()
                 if preFired {
-                    os_unfair_lock_unlock(&lock)
+                    lock.unlock()
                     r()
                 } else {
                     resume = r
-                    os_unfair_lock_unlock(&lock)
+                    lock.unlock()
                 }
             }
         }

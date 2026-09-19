@@ -114,6 +114,19 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("await ChatStore.shared.setFolder(nil, forSessions: sessionIds)", source)
         self.assertIn("await ChatStore.shared.setFolder(fid, forSessions: sessionIds)", source)
 
+    def test_os_unfair_lock_is_not_a_swift_stored_var(self):
+        # iPhone14,3 / iOS 15.1.1 crash 2026-09-19 10:37: PAC in swift_beginAccess
+        # from CrashReporter.appendLog. `&storedLock` is exclusive on self.
+        stored = re.compile(r"\bvar\s+\w+\s*=\s*os_unfair_lock(?:_s)?\s*\(")
+        hits = []
+        for path in (ROOT / "src/ios").rglob("*.swift"):
+            if "MinisTests" in path.parts:
+                continue
+            for number, line in enumerate(path.read_text().splitlines(), 1):
+                if stored.search(line):
+                    hits.append(f"{path.relative_to(ROOT)}:{number}:{line.strip()}")
+        self.assertEqual(hits, [], "use NSLock or a pointer-backed lock, not a stored os_unfair_lock")
+
 
 if __name__ == "__main__":
     unittest.main()

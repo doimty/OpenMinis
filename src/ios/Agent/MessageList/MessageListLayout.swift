@@ -1,5 +1,4 @@
 import UIKit
-import os
 
 /// A custom UICollectionViewLayout for the chat message list that maintains
 /// cached cell heights across layout invalidation cycles.
@@ -82,18 +81,18 @@ final class MessageListLayout: UICollectionViewLayout {
     /// stale Int). Guard every access with an unfair lock so reads copy a
     /// consistent snapshot and the write is atomic w.r.t. those reads.
     private var _streamingCellRanges: [Range<Int>] = []
-    private var _streamingLock = os_unfair_lock_s()
+    private let _streamingLock = NSLock()
 
     var streamingCellRanges: [Range<Int>] {
         get {
-            os_unfair_lock_lock(&_streamingLock)
-            defer { os_unfair_lock_unlock(&_streamingLock) }
+            _streamingLock.lock()
+            defer { _streamingLock.unlock() }
             return _streamingCellRanges
         }
         set {
-            os_unfair_lock_lock(&_streamingLock)
+            _streamingLock.lock()
             _streamingCellRanges = newValue
-            os_unfair_lock_unlock(&_streamingLock)
+            _streamingLock.unlock()
         }
     }
 
@@ -101,8 +100,8 @@ final class MessageListLayout: UICollectionViewLayout {
     /// gate in MessageListInfrastructure). Reads as the tail streaming
     /// message's first item, matching the old single-index meaning.
     var streamingCellIndex: Int? {
-        os_unfair_lock_lock(&_streamingLock)
-        defer { os_unfair_lock_unlock(&_streamingLock) }
+        _streamingLock.lock()
+        defer { _streamingLock.unlock() }
         return _streamingCellRanges.last?.lowerBound
     }
 

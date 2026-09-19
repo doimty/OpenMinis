@@ -2,7 +2,6 @@ import Foundation
 import MachO
 import MetricKit
 import UIKit
-import os
 
 private let logger = AppLogger(category: "CrashReporter")
 
@@ -151,43 +150,44 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
 
     private var logRing: [String] = []
     private let logRingCapacity = 20
-    private var logRingLock = os_unfair_lock()
+    // NSLock, not os_unfair_lock as a Swift stored var: `&logRingLock` starts
+    // exclusive access on self, then mutating logRing traps in swift_beginAccess
+    // (PAC EXC_BAD_ACCESS). iPhone14,3 / iOS 15.1.1 crash 2026-09-19 10:37,
+    // incident 6A15A209-85FE-45E1-A43F-1D9BF5E177C9, queue UIKit datasource.diffing.
+    private let logRingLock = NSLock()
 
     func appendLog(_ line: String) {
-        os_unfair_lock_lock(&logRingLock)
+        logRingLock.lock()
+        defer { logRingLock.unlock() }
         if logRing.count >= logRingCapacity {
             logRing.removeFirst()
         }
         logRing.append(line)
-        os_unfair_lock_unlock(&logRingLock)
     }
 
     func logRingSnapshot() -> [String] {
-        os_unfair_lock_lock(&logRingLock)
-        let snapshot = logRing
-        os_unfair_lock_unlock(&logRingLock)
-        return snapshot
+        logRingLock.lock()
+        defer { logRingLock.unlock() }
+        return logRing
     }
 
     // MARK: - Last API Tracking
 
-    private var lastAPILock = os_unfair_lock()
+    private let lastAPILock = NSLock()
     private var _lastAPIProvider: String?
     private var _lastAPIModel: String?
 
     func setLastAPI(provider: String, model: String) {
-        os_unfair_lock_lock(&lastAPILock)
+        lastAPILock.lock()
+        defer { lastAPILock.unlock() }
         _lastAPIProvider = provider
         _lastAPIModel = model
-        os_unfair_lock_unlock(&lastAPILock)
     }
 
     private func lastAPI() -> (provider: String?, model: String?) {
-        os_unfair_lock_lock(&lastAPILock)
-        let p = _lastAPIProvider
-        let m = _lastAPIModel
-        os_unfair_lock_unlock(&lastAPILock)
-        return (p, m)
+        lastAPILock.lock()
+        defer { lastAPILock.unlock() }
+        return (_lastAPIProvider, _lastAPIModel)
     }
 
     private override init() {
