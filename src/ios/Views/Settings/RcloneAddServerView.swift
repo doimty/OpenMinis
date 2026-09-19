@@ -114,46 +114,31 @@ struct RcloneAddServerView: View {
                     }
                 }
             }
-            .alert("New Folder", isPresented: $showNewFolder) {
+            // [T-backup-newfolder-create-missing] Keep Create visible. The
+            // native alert path can omit a disabled action entirely (the
+            // earlier "只有取消" report). createFolder() owns blank-name
+            // validation, just as the sibling destination browser does.
+            .compatTextInputAlert(Text("New Folder"), isPresented: $showNewFolder,
+                                  confirmLabel: Text("Create"),
+                                  onConfirm: { Task { await createFolder() } },
+                                  onCancel: { newFolderName = "" }) {
                 TextField("Folder name", text: $newFolderName)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                Button("Cancel", role: .cancel) { newFolderName = "" }
-                // [T-backup-newfolder-create-missing] NO `.disabled()` here.
-                // Alert buttons are not regular views: SwiftUI renders an
-                // alert's actions through UIAlertController, and a disabled
-                // action is OMITTED ENTIRELY rather than greyed out. The name
-                // field starts empty, so the guard was true the moment the
-                // alert appeared and the Create button simply did not exist —
-                // the user saw a New Folder dialog offering only Cancel
-                // (reported verbatim: "只有取消", with a screenshot).
-                //
-                // The sibling dialog in BackupDestinationDetailView never had
-                // the modifier and always showed Create, which is why leaving
-                // and re-entering "fixed" it: re-entry goes through that
-                // screen, not this one.
-                //
-                // Empty input is rejected inside the action instead, where it
-                // costs nothing — createFolder() already trims and ignores a
-                // blank name.
-                Button("Create") { Task { await createFolder() } }
             } message: {
                 Text("Created inside \(displayPath).")
             }
-            // [T-sftp-absolute-path] Go-to-path. No `.disabled()` on these
-            // buttons: an alert's actions are UIAlertActions, and a disabled
-            // one is omitted entirely rather than greyed out (that is what
-            // removed the Create button in the New Folder dialog).
-            .alert("Go to Path", isPresented: $showPathEditor) {
+            // [T-sftp-absolute-path] Keep normalization and navigation at
+            // this owner; closing the input prompt must not dismiss Add Server.
+            .compatTextInputAlert(Text("Go to Path"), isPresented: $showPathEditor,
+                                  confirmLabel: Text("Go"), onConfirm: {
+                let target = Self.normalizedInputPath(pathInput,
+                                                      isSFTP: RcloneBackendCatalog.usesAbsolutePaths(backend?.type ?? ""))
+                Task { await list(dir: target) }
+            }) {
                 TextField("Path", text: $pathInput)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                Button("Cancel", role: .cancel) { }
-                Button("Go") {
-                    let target = Self.normalizedInputPath(pathInput,
-                                                          isSFTP: RcloneBackendCatalog.usesAbsolutePaths(backend?.type ?? ""))
-                    Task { await list(dir: target) }
-                }
             } message: {
                 Text("Type a folder path to jump straight to it, including one outside the starting directory.")
             }

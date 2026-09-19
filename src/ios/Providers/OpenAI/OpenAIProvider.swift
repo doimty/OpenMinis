@@ -1196,6 +1196,9 @@ final class OpenAIProvider: LLMProvider {
         let modeLabel = forceResponsesAPI ? "Responses API"
             : isOAuth ? (isCodexBackend ? "OAuth (Codex)" : "OAuth") : "API Key"
         parts.append("  authMode: \(modeLabel)")
+        // Keep the actual wire effort visible even when a long instructions
+        // field consumes the entire 3,000-character pretty-body preview.
+        parts.append("  thinking: \(RequestReasoningDiagnostics.summary(body: body))")
 
         if let accountId = codexAccountId {
             parts.append("  accountId: \(accountId)")
@@ -1231,7 +1234,7 @@ final class OpenAIProvider: LLMProvider {
         if let data = try? JSONSerialization.data(withJSONObject: body, options: [.prettyPrinted, .sortedKeys]),
            let str = String(data: data, encoding: .utf8) {
             let truncated = String(str.prefix(3000))
-            parts.append("  Full Body:")
+            parts.append("  Body Preview (first 3000 chars):")
             parts.append(truncated)
             if str.count > 3000 {
                 parts.append("  ... (\(str.count) chars total)")

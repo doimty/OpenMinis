@@ -510,6 +510,9 @@
 		LOC00001 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = LOC00002 /* AppLocalization.swift */; };
 		15C015000000000000000001 /* SwiftUICompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000002 /* SwiftUICompatibility.swift */; };
 		15C01500000000000000000F /* CompatSystemSymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000010 /* CompatSystemSymbol.swift */; };
+		15C015000000000000000011 /* InputPromptLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000012 /* InputPromptLifecycle.swift */; };
+		15C015000000000000000013 /* CompatTextInputAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000014 /* CompatTextInputAlert.swift */; };
+		15C015000000000000000015 /* RequestReasoningDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000016 /* RequestReasoningDiagnostics.swift */; };
 		15C015000000000000000003 /* CompatNavigationPath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000004 /* CompatNavigationPath.swift */; };
 		15C015000000000000000005 /* CompatPhotoPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000006 /* CompatPhotoPicker.swift */; };
 		15C015000000000000000007 /* LegacyHostingContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C015000000000000000008 /* LegacyHostingContent.swift */; };
@@ -1193,6 +1196,9 @@
 		LOC00002 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		15C015000000000000000002 /* SwiftUICompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftUICompatibility.swift; sourceTree = "<group>"; };
 		15C015000000000000000010 /* CompatSystemSymbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatSystemSymbol.swift; sourceTree = "<group>"; };
+		15C015000000000000000012 /* InputPromptLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputPromptLifecycle.swift; sourceTree = "<group>"; };
+		15C015000000000000000014 /* CompatTextInputAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatTextInputAlert.swift; sourceTree = "<group>"; };
+		15C015000000000000000016 /* RequestReasoningDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestReasoningDiagnostics.swift; sourceTree = "<group>"; };
 		15C015000000000000000004 /* CompatNavigationPath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatNavigationPath.swift; sourceTree = "<group>"; };
 		15C015000000000000000006 /* CompatPhotoPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatPhotoPicker.swift; sourceTree = "<group>"; };
 		15C015000000000000000008 /* LegacyHostingContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyHostingContent.swift; sourceTree = "<group>"; };
@@ -1768,6 +1774,9 @@
 				LOC00002 /* AppLocalization.swift */,
 				15C015000000000000000002 /* SwiftUICompatibility.swift */,
 				15C015000000000000000010 /* CompatSystemSymbol.swift */,
+				15C015000000000000000012 /* InputPromptLifecycle.swift */,
+				15C015000000000000000014 /* CompatTextInputAlert.swift */,
+				15C015000000000000000016 /* RequestReasoningDiagnostics.swift */,
 				15C015000000000000000004 /* CompatNavigationPath.swift */,
 				15C015000000000000000006 /* CompatPhotoPicker.swift */,
 				15C015000000000000000008 /* LegacyHostingContent.swift */,
@@ -3027,6 +3036,9 @@
 				LOC00001 /* AppLocalization.swift in Sources */,
 				15C015000000000000000001 /* SwiftUICompatibility.swift in Sources */,
 				15C01500000000000000000F /* CompatSystemSymbol.swift in Sources */,
+				15C015000000000000000011 /* InputPromptLifecycle.swift in Sources */,
+				15C015000000000000000013 /* CompatTextInputAlert.swift in Sources */,
+				15C015000000000000000015 /* RequestReasoningDiagnostics.swift in Sources */,
 				15C015000000000000000003 /* CompatNavigationPath.swift in Sources */,
 				15C015000000000000000005 /* CompatPhotoPicker.swift in Sources */,
 				15C015000000000000000007 /* LegacyHostingContent.swift in Sources */,

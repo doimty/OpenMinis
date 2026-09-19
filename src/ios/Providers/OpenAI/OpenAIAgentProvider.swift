@@ -541,6 +541,11 @@ final class OpenAIAgentProvider: AgentProvider {
             body["service_tier"] = "priority"
         }
 
+        #if DEBUG
+        // Intent at the Responses builder; logOutgoingRequest separately
+        // reports the final serialized body's effort. No parameter mutation.
+        thinkingLogger.debug("[responses.in] model=\(model.id) level=\(thinkingLevel.rawValue)")
+        #endif
         let (lineStream, _) = try await provider.streamRaw(body: body, isResponsesAPI: true)
 
         return AsyncThrowingStream { continuation in

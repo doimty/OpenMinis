@@ -70,12 +70,12 @@ struct BackupDestinationDetailView: View {
         // down with it — the sheet opened and then closed itself. Only
         // reproducible on FIRST entry, because that is when the load is still
         // in flight; afterwards the state had already settled.
-        .alert("Rename Destination", isPresented: $showRename) {
+        .compatTextInputAlert(Text("Rename Destination"), isPresented: $showRename,
+                              confirmLabel: Text("Save"),
+                              onConfirm: { if let r = activeRemote { rename(r) } }) {
             TextField("Name", text: $draftName)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-            Button("Cancel", role: .cancel) {}
-            Button("Save") { if let r = activeRemote { rename(r) } }
         } message: {
             Text("Letters, numbers, - and _ only.")
         }
@@ -658,12 +658,13 @@ struct RcloneFolderBrowser: View {
                         .disabled(isListing)
                 }
             }
-            .alert("New Folder", isPresented: $showNewFolder) {
+            .compatTextInputAlert(Text("New Folder"), isPresented: $showNewFolder,
+                                  confirmLabel: Text("Create"),
+                                  onConfirm: { Task { await createFolder() } },
+                                  onCancel: { newFolderName = "" }) {
                 TextField("Folder name", text: $newFolderName)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                Button("Cancel", role: .cancel) { newFolderName = "" }
-                Button("Create") { Task { await createFolder() } }
             } message: {
                 Text("Created inside \(currentDir.isEmpty ? "/" : "/" + currentDir).")
             }

@@ -163,20 +163,19 @@ struct CloudSyncSettingsV2View: View {
         // that pattern caused — see refreshIntervalSeconds). SwiftUI cancels this Task
         // on teardown.
         .task { await refreshLoop() }
-        .alert("Device Name", isPresented: $showDeviceNameEditor) {
-            TextField("Device name", text: $deviceNameDraft)
-            Button("Save") {
-                let trimmed = deviceNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty {
-                    UploadPolicy.customDeviceName = nil
-                    deviceName = DeviceIdentity.deviceName
-                } else {
-                    UploadPolicy.customDeviceName = trimmed
-                    deviceName = trimmed
-                }
-                Task { await markDeviceDirty() }
+        .compatTextInputAlert(Text("Device Name"), isPresented: $showDeviceNameEditor,
+                              confirmLabel: Text("Save"), onConfirm: {
+            let trimmed = deviceNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                UploadPolicy.customDeviceName = nil
+                deviceName = DeviceIdentity.deviceName
+            } else {
+                UploadPolicy.customDeviceName = trimmed
+                deviceName = trimmed
             }
-            Button("Cancel", role: .cancel) {}
+            Task { await markDeviceDirty() }
+        }) {
+            TextField("Device name", text: $deviceNameDraft)
         } message: {
             Text("Friendly name shown to your other Minis devices.")
         }
