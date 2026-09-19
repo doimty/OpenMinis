@@ -22,9 +22,10 @@ class RetryHitContractTests(unittest.TestCase):
 
     def test_bottom_inset_floors_unreported_floating_preview(self):
         source = (ROOT / "src/ios/Agent/MessageList/CollectionViewMessageListV3.swift").read_text()
-        self.assertIn("effectiveFloating", source)
+        self.assertIn("effectiveFloatingHeight", source)
         self.assertIn("floatingBarHeight > 1", source)
-        self.assertIn("hasToolBlocks ? 68 : 0", source)
+        self.assertIn("hasToolBlocks ? 100 : 0", source)
+        self.assertIn("223.67 inset = 115.67 inputBar", source, "floor must match measured device preview height")
 
     def test_legacy_host_keeps_bottom_pin_free_but_extends_hit_testing(self):
         # The host view may overflow a short cell estimate; the content view

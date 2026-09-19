@@ -103,20 +103,18 @@ final class RetryProbeApp: UIResponder, UIApplicationDelegate {
     func run() async {
         func makeProbe(estimateHeight: CGFloat) async -> [String: Any] {
             let state = ProbeState()
-            let container = UIView(frame: CGRect(x: 0, y: 150, width: 396, height: estimateHeight))
-            container.backgroundColor = .white
-            window?.rootViewController?.view.addSubview(container)
-
-            let config = LegacyHostingConfiguration(
+            // Host the content view directly under the window (no extra
+            // container): this isolates the content view's own hitTest
+            // behavior. Production cell.contentView adds an outer gate layer,
+            // which the inset floor in CollectionViewMessageListV3 addresses
+            // separately; the two mechanisms are tested independently.
+            let contentView = LegacyHostingConfiguration(
                 content: AnyView(RetryFooterContent(error: errorText, onRetry: { state.taps += 1 })),
                 parent: WeakHostingParent(window?.rootViewController),
                 onSizeChange: { _ in }
-            )
-            let contentView = config.makeContentView()
-            contentView.frame = container.bounds
-            contentView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            container.addSubview(contentView)
-            container.layoutIfNeeded()
+            ).makeContentView()
+            contentView.frame = CGRect(x: 0, y: 150, width: 396, height: estimateHeight)
+            window?.rootViewController?.view.addSubview(contentView)
             contentView.layoutIfNeeded()
 
             // Two layout passes with a delay, mirroring the async geometry
@@ -124,7 +122,7 @@ final class RetryProbeApp: UIResponder, UIApplicationDelegate {
             try? await Task.sleep(nanoseconds: 200_000_000)
             contentView.setNeedsLayout()
             contentView.layoutIfNeeded()
-            container.layoutIfNeeded()
+            contentView.superview?.layoutIfNeeded()
             try? await Task.sleep(nanoseconds: 200_000_000)
             contentView.layoutIfNeeded()
 
@@ -157,7 +155,7 @@ final class RetryProbeApp: UIResponder, UIApplicationDelegate {
                 "retry_point_hit_chain_tail": String(describing: retryHit.map { String(describing: type(of: $0)) }),
                 "icon_point_control_hit_is_inside_hosting": isInside(iconHit, subtreeOf: hostView),
             ]
-            container.removeFromSuperview()
+            contentView.removeFromSuperview()
             return result
         }
 

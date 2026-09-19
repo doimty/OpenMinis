@@ -23,7 +23,7 @@
 
 - `LegacyHostingContent.swift`: added `override func hitTest` that uses the default path first, then forwards touches inside `host.view.bounds` even below our own bounds. No bottom constraint added (intrinsic sizing is load-bearing).
 - `CollectionViewMessageListV3.swift`: bottom inset uses `effectiveFloating = floatingBarHeight > 1 ? floatingBarHeight : (hasToolBlocks ? 68 : 0)`. Pure defensive floor; the VM already exposes the tool-block predicate.
-- Probe `scripts/ios15-retry-probe/ProbeApp.swift` + `scripts/run_ios15_retry_probe.sh`: compile production `LegacyHostingContent` with a footer-mirroring SwiftUI view on the pinned iOS 26.2 simulator; measure overflow and window hit results at short (40pt) and natural (96pt) estimates. Struct/test contracts in `scripts/test_ios15_retry_hit.py`; workflow step wired.
+- Probe `scripts/ios15-retry-probe/ProbeApp.swift` + `scripts/run_ios15_retry_probe.sh`: compile production `LegacyHostingContent` with a footer-mirroring SwiftUI view on the pinned iOS 26.2 simulator; measure overflow and window hit results at short (20pt, button center below bounds) and natural (64pt) estimates. Struct/test contracts in `scripts/test_ios15_retry_hit.py`; workflow step wired.
 
 ## Verification / independent failure signals
 

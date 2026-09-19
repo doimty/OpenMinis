@@ -113,13 +113,15 @@ struct CollectionViewMessageListV3: UIViewControllerRepresentable {
         // would sit under the preview + composer — visually "under the input
         // bar" and untappable because the overlay intercepts. Clamp the
         // contribution to a floor when the VM has tool blocks at all.
+        // The floor is the measured preview height from device logs
+        // (223.67 inset = 115.67 inputBar + ~100 preview + 8 spacing).
         let hasToolBlocks = vm.messages.contains(where: {
             $0.role == .assistant && !$0.isCompactedHistory
                 && $0.blocks.contains { $0.toolStatus != nil }
         })
-        let effectiveFloating: CGFloat = floatingBarHeight > 1
-            ? floatingBarHeight
-            : (hasToolBlocks ? 68 : 0)
+        let effectiveFloating = Self.effectiveFloatingHeight(
+            floatingBarHeight: floatingBarHeight,
+            hasToolBlocks: hasToolBlocks)
         let bottomPad: CGFloat = inputBarHeight + effectiveFloating + 8
         let baseChanged = abs(coord.baseBottomInset - bottomPad) > 0.5
         if baseChanged {
@@ -714,6 +716,17 @@ private final class AssistantFooterCellV3: SelfSizingCell {}
 // MARK: - V3 Coordinator
 
 extension CollectionViewMessageListV3 {
+
+    /// Pure seam for the bottom-inset floor. When the floating tool preview's
+    /// geometry has not been reported yet (observer stall) the preview is
+    /// visibly mounted while `floatingBarHeight` stays <= 1; the last message
+    /// would then sit under the preview + composer and its taps would be
+    /// intercepted by the overlay. Floor equals the measured preview height
+    /// (device log: 223.67 inset = 115.67 inputBar + ~100 preview + 8).
+    static func effectiveFloatingHeight(floatingBarHeight: CGFloat, hasToolBlocks: Bool) -> CGFloat {
+        if floatingBarHeight > 1 { return floatingBarHeight }
+        return hasToolBlocks ? 100 : 0
+    }
 
     /// Scroll mode: the only two states V3 needs.
     enum ScrollMode {
