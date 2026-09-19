@@ -36,3 +36,11 @@ The raw rendering route is retired only for names requiring runtime validation. 
 ## Review/checkpoint
 
 Independent subagent review was unavailable because the tool schema supplied an ACP-only streamTo field to subagent launches; no child review actually ran. Main agent owns review, exact-edit inspection, tests, and delivery. No production edits were made before locking the baseline, writing this plan, and running the red coverage gate.
+
+## Final verification and delivery
+
+- Code commit `31981ccfea891b891c3a7d99cdd16482942d2586`; run `35431955824` completed successfully with pinned Xcode 26.2 / build 17C52 / iphoneos SDK 26.2.
+- Red/green: initial real-source coverage gate failed at 78 late/dynamic calls; after only the reviewed symbol-argument edits it passes. Parser/coverage suite 10/10; native Image/Label/UIImage call-shapes type-check at iOS 15.0 and 16.0; actual production resolver executes 78,582 checks across six availability catalogs. Catalog checks remain simulated availability, not an old-OS runtime.
+- All 43 existing Swift-file changes match the exact-edit plan byte-for-byte. No provider/config/model storage changes. Full app build succeeded with zero compiler error lines.
+- IPA: 84,178,534 bytes, SHA256 `3a0d09f8cad3e95773c81d9738ed9c1c935943bd249a87b8aaba26e61c4c3227`. Manifest/hash, ZIP CRC, bundle minimum 15.0, retained Share extension, compiled resolver in the arm64 product, and absence of the test catalog in the bundle were independently checked. Mach-O minimum is 15.0.0, SDK 26.2.0, UUID `7974ab20-168f-3ce3-a0c5-031275e74ddd`.
+- Delivered via Weixin as `Minis-1.13-ios15-SF-icons-31981cc.ipa`. Device visual acceptance remains pending. Workspace evidence: `reports/openminis-ios15/run-35431955824-31981cc-x8aTSB/verification.json` and sibling build/audit/native logs.
