@@ -365,17 +365,27 @@ class SelfSizingCell: UICollectionViewCell {
         // report, keep the layout's estimate; after it arrives, return the
         // measured height and let the normal invalidation path settle the row.
         if contentConfiguration is LegacyHostingConfiguration {
+            // Accept any sane report. The GeometryReader value is the
+            // fixedSize ideal height at the cell's rendered width; a strict
+            // width match rejected valid reports whenever the host's rendered
+            // width differed from UIKit's proposed width (margins / safe
+            // area), leaving the cell stuck at the layout estimate forever
+            // (the iOS 15 "排版乱" symptom). A later width change re-reports
+            // via onSizeChange, so a stale-width height self-corrects.
+            // Cache policy mirrors the native path: do not cache < 4pt.
             guard let measured = legacyMeasuredSize,
                   measured.width > 1,
-                  measured.height.isFinite,
-                  abs(measured.width - layoutAttributes.size.width) < 2 else {
+                  measured.height.isFinite else {
                 return layoutAttributes
             }
             let copy = layoutAttributes.copy() as! UICollectionViewLayoutAttributes
-            copy.size.height = max(0, ceil(measured.height))
-            lastComputedHeight = copy.size.height
-            lastComputedWidth = layoutAttributes.size.width
-            lastMeasureMediaTime = CACurrentMediaTime()
+            let height = max(0, ceil(measured.height))
+            copy.size.height = height
+            if height >= 4 {
+                lastComputedHeight = height
+                lastComputedWidth = layoutAttributes.size.width
+                lastMeasureMediaTime = CACurrentMediaTime()
+            }
             return copy
         }
 

@@ -138,6 +138,13 @@ class CompatibilityContractTests(unittest.TestCase):
         legacy = (ROOT / "src/ios/Shared/LegacyHostingContent.swift").read_text()
         self.assertIn("let onSizeChange: (CGSize) -> Void", legacy)
         self.assertIn("self.current.onSizeChange(size)", legacy)
+        self.assertNotIn("host.view.bottomAnchor.constraint", legacy,
+                         "pin the hosting view top/leading/trailing only so its height is intrinsic")
+
+    def test_ios15_session_row_is_tappable_on_legacy_os(self):
+        source = (ROOT / "src/ios/Views/ContentView.swift").read_text()
+        self.assertIn(".compatLegacyNavigationTap {", source)
+        self.assertIn("navigationPath.append(session.id)", source)
 
 
 if __name__ == "__main__":

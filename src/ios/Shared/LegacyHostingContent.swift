@@ -66,11 +66,16 @@ private final class LegacyHostingContentView: UIView, UIContentView {
         host.view.backgroundColor = .clear
         host.view.translatesAutoresizingMaskIntoConstraints = false
         addSubview(host.view)
+        // Pin only top/leading/trailing. With the bottom edge free, Auto
+        // Layout sizes the hosting view to its intrinsic (SwiftUI ideal)
+        // height instead of the cell's current frame, so the GeometryReader
+        // report is the true content height even while the cell still holds
+        // an estimate. Pinning the bottom made the report track the estimate
+        // and the iOS 15 chat layout stayed at coarse heights.
         NSLayoutConstraint.activate([
             host.view.leadingAnchor.constraint(equalTo: leadingAnchor),
             host.view.trailingAnchor.constraint(equalTo: trailingAnchor),
             host.view.topAnchor.constraint(equalTo: topAnchor),
-            host.view.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
         updateRoot()
     }

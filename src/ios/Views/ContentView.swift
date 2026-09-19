@@ -2810,6 +2810,16 @@ struct ContentView: View {
                                 // transaction flush from unrelated ContentView
                                 // state churn doesn't deep-compare ChatSession.
                                 .equatable()
+                                // [T-ios15-list-row-tap] On iOS 15 the hidden
+                                // CompatValueNavigationLink renders as a zero-size
+                                // Button (EmptyView label), so tapping the row
+                                // never navigated — only the launch auto-open ever
+                                // entered a session. Make the whole row the tap
+                                // target on the old OS; iOS 16 keeps the native
+                                // value-link row activation.
+                                .compatLegacyNavigationTap {
+                                    navigationPath.append(session.id)
+                                }
                                 // Entry D: long-press then move = drag the
                                 // session id (never the ChatSession value —
                                 // same id-only discipline as the list

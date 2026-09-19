@@ -1,5 +1,12 @@
 # Progress
 
+## 2026-09-19 — iOS 15 usability: session-row tap + legacy chat height fix
+
+- User feedback after the SwiftUI-crash fix: chatting works, but layout is off, and the session list only opens once at launch — tapping rows never navigates.
+- Row tap: `CompatValueNavigationLink` renders as a zero-size `Button` (EmptyView label) on iOS 15, so the hidden background link was never tappable. `stackList` now applies `compatLegacyNavigationTap { navigationPath.append(session.id) }` (iOS 15 only; iOS 16 keeps native value-link activation).
+- Layout: (1) the legacy PLAF branch accepted only width-matched reports; a strict `< 2pt` width gate rejected valid GeometryReader reports (margins/safe-area), freezing cells at coarse estimates — gate now accepts any sane finite height and mirrors the native <4pt no-cache policy. (2) `LegacyHostingContentView` no longer pins `host.view`'s bottom edge, so Auto Layout sizes the hosting view to its intrinsic SwiftUI height and the GeometryReader reports the true content height instead of the cell's current estimate.
+- Structural suite 14/14 local; packager 10/10; parser 8/8. Needs a fresh cloud build + device retest.
+
 ## 2026-09-19 — iOS 15.1.1 SwiftUI legacy-hosting crash diagnosed and patched
 
 - New raw system `.ips` from iPhone14,3 / iOS15.1.1, incident `29F10B9B-BD7D-4509-8019-4C4BF6937016`, is a different/new-build crash. `Minis.debug.dylib` UUID `ff55af62-e986-3005-a22f-c2a83d8ee1f7` confirms it is not the old IPA.
