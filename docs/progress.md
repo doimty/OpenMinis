@@ -307,7 +307,7 @@ No Swift compatibility code has been changed yet. No targets lowered, no depende
 
 ---
 
-## 2026-09-19 — retry hit-test and composer overlap fix delivered
+- Full-hierarchy probe added (commit `9761f48`, run `35453402726` success): footer cell + 180pt composer overlay, mirroring AIChatView. Phase B (short inset) reproduces the user symptom exactly — Retry point hits the OVERLAY; Phase C (the delivered `effectiveFloatingHeight` floor) reaches the cell again. The inset-floor fix is now validated at the full hierarchy level, not just the content view in isolation. Device acceptance still pending.\n\n## 2026-09-19 — retry hit-test and composer overlap fix delivered
 
 - User confirmed the red in-chat Retry is untappable and message text paints below the composer. Two root causes, both pinned to measured device-log values:
   1. **Retry death zone**: `LegacyHostingContent` pins `host.view` top/leading/trailing with no bottom edge, so a short cell estimate leaves the capsule tail below the content view's bounds. UIKit hitTest only descends after the receiver's `pointInside` passes, so that tail is touch-dead. Fix: `override func hitTest` forwards touches inside `host.view`'s frame even below our own bounds.
