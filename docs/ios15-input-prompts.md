@@ -52,3 +52,11 @@ Run `35435115684`, source `6f0841f32ceb1e9d9d91911f2635575d0326ca3a`, passed iOS
 The first adapter mirrored the owner flag through onChange into another presentation boolean. A rapid false/true owner cycle can be coalesced, leaving that mirror false. The corrective design removes the mirror/observer entirely: derive sheet visibility directly from the owner while pending completion suppresses reopening during dismissal. Native appearance records activity, and dismissal rechecks the current owner even if no observer ran. New pure cases cover reopening without an observer edge and revocation without prior synchronization. The next native run must validate the correction; source reasoning alone is not acceptance.
 
 The probe now invokes the same Change Name state action while the collision alert is still up (no artificial dismissal wait), checks a modern two-field builder with modifiers, and records owner/activity/pending/field counts on failure. Close/action seams remain programmatic, not XCUITest taps.
+
+## Final evidence
+
+Corrected source `889af8d99006a6a65a6da3a2424ac8d25f14e3b1`, run `35435999025`: success. All 8 native phases passed, including the previously failing cancel/reopen sequence, immediate collision-action reopening, nested flow retention and modern two-field extraction. Production lifecycle: 61 checks; native call-shapes: iOS15.0/16.0; full app compile/package passed. Independent delta review of the two ownership files found no new P1/P2. Device iOS15 acceptance remains pending.
+
+IPA delivered as `Minis-1.13-ios15-input-fix-889af8d.ipa`, 84,226,993 bytes, SHA256 `936bf1d041327dfd7395b0c4299a7967c3de10c668f5799cd9cebdf8833aa40d`. Actual bundle/binary minimum is 15.0/15.0.0, SDK26.2.0; all new helper markers and the earlier SF Symbols helper are present; test resources are not bundled. Verification and logs: workspace `reports/openminis-ios15/run-35435999025-889af8d-eIwy59/`.
+
+This delivery does not claim an effort-policy fix. The later cumulative log still contains truncated request previews, so the user was asked to reproduce once with the new bounded metadata or provide Copy Requests. A separate, imprecise chat-screen click report is also not accepted as fixed by this input-prompt patch.
