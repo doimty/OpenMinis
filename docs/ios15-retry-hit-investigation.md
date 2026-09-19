@@ -22,7 +22,7 @@
 ## Implementation (this branch)
 
 - `LegacyHostingContent.swift`: added `override func hitTest` that uses the default path first, then forwards touches inside `host.view.bounds` even below our own bounds. No bottom constraint added (intrinsic sizing is load-bearing).
-- `CollectionViewMessageListV3.swift`: bottom inset uses `effectiveFloating = floatingBarHeight > 1 ? floatingBarHeight : (hasToolBlocks ? 68 : 0)`. Pure defensive floor; the VM already exposes the tool-block predicate.
+- `CollectionViewMessageListV3.swift`: bottom inset uses `Self.effectiveFloatingHeight(floatingBarHeight:hasToolBlocks:)`, which returns the reported height when >1 and floors to `hasToolBlocks ? 100 : 0` when the observer has not reported yet. The 100pt floor is the measured preview height from device logs (223.67 inset = 115.67 inputBar + ~100 preview + 8 spacing); the earlier 68pt guess was too small. The helper is a pure seam for structural tests.
 - Probe `scripts/ios15-retry-probe/ProbeApp.swift` + `scripts/run_ios15_retry_probe.sh`: compile production `LegacyHostingContent` with a footer-mirroring SwiftUI view on the pinned iOS 26.2 simulator; measure overflow and window hit results at short (20pt, button center below bounds) and natural (64pt) estimates. Struct/test contracts in `scripts/test_ios15_retry_hit.py`; workflow step wired.
 
 ## Verification / independent failure signals
@@ -32,6 +32,16 @@
 - Failure signals independent of success: dead zone returns nil at the short estimate, the floor makes the inset overshoot/undershoot, the hitTest change routes non-host touches oddly, or the probe's host.view lookup (`subviews.first`) stops matching.
 - Templates are a production-path probe; no iOS 15 runtime or device here. Device visual acceptance of the Retry button and under-input overlap remains pending after delivery.
 
+## Final evidence
+
+Run `35450107512` (source `762a178f36db52690f727dc1f3a1ab42f5534bfb`) completed/success in 24m23s. All gates passed: retry hit-test probe, input prompt gates, SF symbol gates, 15/16 type checks, full App build/package. Nonempty app log, zero error lines, no incompatible-arm64e/newer-iOS link warning.
+
+Probe result: at a 20pt estimate the footer overflows the content view by 30.33pt and the Retry point still hits inside the hosting tree (`_UIHostingView<AnyView>`); at the natural 64pt estimate it also hits inside. The earlier two probe failures were click-point errors in the harness, not fix regressions.
+
+IPA delivered as `Minis-1.13-ios15-retry-hit-762a178.ipa`, 84,230,179 bytes, SHA256 `16e83390aba07150b0c29d8a89e68f43fe97485c96e7384ad39e26b2024b4b62`. ZIP CRC, manifest/hash, minimum15.0, Share retained, Widget/FileProvider removed. Product binary contains `CompatTextInputAlert`, `InputPromptLifecycle`, `RequestReasoningDiagnostics`, `CompatSystemSymbol` and `effectiveFloatingHeight`; Mach-O min15.0.0, SDK26.2.0, UUID `91f680c7-a450-3b39-a0a4-372604058c1b`.
+
+This delivery does not claim an effort-policy fix. Device visual acceptance of the Retry button and under-input overlap remains pending.
+
 ## Checkpoint
 
-Working tree was clean at `b363866`; branch created; fix + probe + tests + workflow are this change set. Cloud compilation and probe execution pending. Do not claim a device fix before the pinned probe and package build pass, and do not treat the earlier successful retry() log as proof the visible button was reachable.
+Working tree was clean at `b363866`; branch `fix/ios15-retry-hit` created; fix + probe + tests + workflow are this change set. The pinned probe and full package build passed before delivery. Do not treat the earlier successful retry() log as proof the visible button was reachable; device acceptance remains pending.
