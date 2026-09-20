@@ -197,13 +197,52 @@ class SelfSizingCell: UICollectionViewCell {
     /// bounds on the legacy path only; iOS 16+'s UIHostingConfiguration
     /// measures synchronously, never leaves this window, and keeps the exact
     /// cell-bounds hit region.
+    /// Find the legacy UIContentView wherever UIKit installed it. Depending
+    /// on the cell class and OS point release, `contentConfiguration` may make
+    /// it the cell's contentView or place it below UIKit's managed content
+    /// container. The hit region must work for both layouts.
+    private var legacyHostingContentView: LegacyHostingContentView? {
+        if let legacy = contentView as? LegacyHostingContentView { return legacy }
+        var pending = contentView.subviews
+        while let view = pending.popLast() {
+            if let legacy = view as? LegacyHostingContentView { return legacy }
+            pending.append(contentsOf: view.subviews)
+        }
+        return nil
+    }
+
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         if super.point(inside: point, with: event) { return true }
         guard contentConfiguration is LegacyHostingConfiguration,
-              let legacy = contentView as? LegacyHostingContentView else {
+              let legacy = legacyHostingContentView else {
             return false
         }
         return legacy.hitRegionContains(convert(point, to: legacy))
+    }
+
+    /// If the legacy host is below UIKit's managed content container, that
+    /// container can reject an overflow point after this cell has accepted it.
+    /// Forward once more from the cell so the host's own hitTest override gets
+    /// a chance to resolve the SwiftUI control (Retry, Resume, or any other
+    /// interaction in a legacy cell).
+    ///
+    /// `super.hitTest` returns SELF when the point is inside our (extended)
+    /// hit region but no subview claimed it — the exact overflow case where
+    /// UIKit's managed content container rejects the point below its own
+    /// bounds while the legacy host has already grown past it. Returning the
+    /// cell would land the touch on a bare, non-interactive cell (visually
+    /// dead). Only bail when super found a real interactive view; when it
+    /// fell back to self, ask the legacy host; if it declines too, keep the
+    /// cell as the receiver rather than dropping the touch.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        guard hit === self else { return hit }
+        guard contentConfiguration is LegacyHostingConfiguration,
+              let legacy = legacyHostingContentView else {
+            return hit
+        }
+        let legacyPoint = convert(point, to: legacy)
+        return legacy.hitTest(legacyPoint, with: event) ?? hit
     }
 
     // [ScrollStall] 1Hz-aggregated cache-hit counters.

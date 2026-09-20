@@ -163,6 +163,10 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("contentConfiguration is LegacyHostingConfiguration", source)
         self.assertIn("contentView as? LegacyHostingContentView", source)
         self.assertIn("hitRegionContains(convert(point, to: legacy))", source)
+        self.assertIn("override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView?", source)
+        self.assertIn("guard hit === self else { return hit }", source,
+                      "super.hitTest returns the cell itself for overflow points; the fallback must only run when super fell back to self")
+        self.assertIn("legacyHostingContentView", source)
         # The guard must return false for the native path so iOS 16+ keeps the
         # exact cell-bounds hit region.
         guard = source.index("contentConfiguration is LegacyHostingConfiguration")

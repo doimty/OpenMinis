@@ -117,8 +117,8 @@ final class ProbeCell: UICollectionViewCell {
         // which is why Phase D reported "no dead zone" but also "not inside
         // host".
         contentConfiguration = config
-        hostingContentView = self.contentSize
-        self.contentSize.layoutIfNeeded()
+        hostingContentView = self.contentView
+        self.contentView.layoutIfNeeded()
         hostingContentView?.setNeedsLayout()
         hostingContentView?.layoutIfNeeded()
     }
@@ -132,6 +132,19 @@ final class ProbeCell: UICollectionViewCell {
             return false
         }
         return legacy.hitRegionContains(convert(point, to: legacy))
+    }
+
+    // Mirror of SelfSizingCell.hitTest — super returns SELF when the point is
+    // inside the extended hit region but the managed content container
+    // rejected it below its own bounds. Forward to the legacy host so the
+    // SwiftUI control (Retry capsule) resolves, exactly like production.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        guard hit === self, let legacy = hostingContentView as? LegacyHostingContentView else {
+            return hit
+        }
+        let legacyPoint = convert(point, to: legacy)
+        return legacy.hitTest(legacyPoint, with: event) ?? hit
     }
 }
 
