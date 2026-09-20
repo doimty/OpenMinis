@@ -54,9 +54,9 @@ private struct LegacyFlowSizesKey: PreferenceKey {
     }
 }
 
-private struct LegacyFlowHeightKey: PreferenceKey {
+private struct LegacyFlowWidthKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 struct LegacyFlowLayout: View {
@@ -65,56 +65,61 @@ struct LegacyFlowLayout: View {
     var vSpacing: CGFloat = 8
     var alignment: HorizontalAlignment = .leading
     @State private var sizes: [AnyHashable: CGSize] = [:]
-    @State private var height: CGFloat = 0
+    @State private var availableWidth: CGFloat = 0
 
     var body: some View {
-        GeometryReader { proxy in
-            let itemSizes = items.map { sizes[$0.id] ?? .zero }
-            let arrangement = LegacyFlowArrangement.pack(
-                sizes: itemSizes, width: proxy.size.width, hSpacing: hSpacing,
-                vSpacing: vSpacing, trailing: alignment == .trailing)
-            ZStack(alignment: .topLeading) {
-                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                    item.view
-                        .fixedSize()
-                        // [T-ios15-legacyflow-measure] overlay, not background:
-                        // a background GeometryReader sits BEHIND the hosted view
-                        // and on some legacy layout passes reports the parent's
-                        // proposal (0 height inside a 0-high ZStack) instead of
-                        // the child's fixedSize ideal size, so the first size
-                        // report arrives as .zero and the flow's height feedback
-                        // never converges past the padding-only strip (observed
-                        // in the composer probe: 64pt chip in a 6pt grid, the
-                        // draft image hidden under the input field). overlay is
-                        // stacked ABOVE the already-laid-out content and reports
-                        // the child's real rendered size.
-                        .overlay(
-                            GeometryReader { geometry in
-                                Color.clear.preference(key: LegacyFlowSizesKey.self,
-                                                       value: [item.id: geometry.size])
-                            }
-                        )
-                        .offset(x: arrangement.positions[index].x, y: arrangement.positions[index].y)
-                }
+        let layoutWidth = max(availableWidth, 1)
+        let itemSizes = items.map { sizes[$0.id] ?? .zero }
+        let arrangement = LegacyFlowArrangement.pack(
+            sizes: itemSizes, width: layoutWidth, hSpacing: hSpacing,
+            vSpacing: vSpacing, trailing: alignment == .trailing)
+
+        ZStack(alignment: .topLeading) {
+            // [T-ios15-legacyflow-natural-height] Make the calculated row
+            // height part of the ZStack's natural size. The old implementation
+            // put the children in a zero-height GeometryReader and then used a
+            // preference callback to drive an outer frame. On the legacy
+            // renderer the callback could report the right height while that
+            // outer frame stayed at zero, leaving 64pt chips visually outside a
+            // 6pt attachment view. This spacer makes the parent participate in
+            // normal layout, so the measured height is also the allocated
+            // height; no height feedback loop is needed.
+            Color.clear
+                .frame(width: layoutWidth,
+                       height: items.isEmpty ? 0 : arrangement.height)
+
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                item.view
+                    .fixedSize()
+                    // [T-ios15-legacyflow-measure] overlay, not background:
+                    // a background GeometryReader sits BEHIND the hosted view
+                    // and on some legacy layout passes reports the parent's
+                    // proposal instead of the child's fixedSize ideal size.
+                    .overlay(
+                        GeometryReader { geometry in
+                            Color.clear.preference(key: LegacyFlowSizesKey.self,
+                                                   value: [item.id: geometry.size])
+                        }
+                    )
+                    .offset(x: arrangement.positions[index].x, y: arrangement.positions[index].y)
             }
-            .frame(width: proxy.size.width, height: arrangement.height, alignment: .topLeading)
-            .preference(key: LegacyFlowHeightKey.self, value: arrangement.height)
         }
-        .frame(height: items.isEmpty ? 0 : height)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .overlay(
+            GeometryReader { proxy in
+                Color.clear.preference(key: LegacyFlowWidthKey.self, value: proxy.size.width)
+            }
+        )
         .onPreferenceChange(LegacyFlowSizesKey.self) { measured in
             if sizes != measured { sizes = measured }
         }
-        .onPreferenceChange(LegacyFlowHeightKey.self) { measured in
-            if abs(height - measured) > 0.5 { height = measured }
+        .onPreferenceChange(LegacyFlowWidthKey.self) { measured in
+            if abs(availableWidth - measured) > 0.5 { availableWidth = measured }
         }
-        // [T-ios15-legacyflow-reset] Reset the height when the item ID set
-        // changes (add/remove/reorder). The height state is a feedback cache;
-        // without a reset, a taller previous content (e.g. 8 tiles) leaves a
-        // stale height behind while the new content's first reports are still
-        // zero-size, and the flow stays oversized or — after the zero report
-        // collapses it — undersized until some unrelated re-layout.
+        // [T-ios15-legacyflow-reset] Discard measurements for removed IDs so
+        // the next layout pass cannot place new content using stale sizes.
         .onChange(of: items.map(\.id)) { _ in
-            height = 0
+            sizes = [:]
         }
     }
 }

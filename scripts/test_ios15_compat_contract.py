@@ -217,20 +217,27 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("bounds.width.isFinite", source)
         self.assertIn("sizeThatFits(CGSize(width: bounds.width", source)
 
-    def test_ios15_legacy_flow_measures_via_overlay_not_background(self):
+    def test_ios15_legacy_flow_uses_natural_height_not_feedback_frame(self):
         source = (ROOT / "src/ios/Shared/LegacyFlowLayout.swift").read_text()
         # The measurement GeometryReader must sit ABOVE the child (overlay), not
         # behind it (background): a background reader inside a 0-height ZStack
         # reports the parent proposal instead of the child's fixedSize ideal
-        # size, so the flow's height feedback never converges and the draft
-        # image stays hidden under the input field.
-        self.assertIn(".overlay(\n                            GeometryReader { geometry in", source)
+        # size. The calculated arrangement height must then participate in the
+        # ZStack's natural size directly; a separate height preference/state
+        # feedback loop can leave the legacy container at zero height while its
+        # chips overflow visually into the composer field.
+        self.assertIn("private struct LegacyFlowWidthKey: PreferenceKey", source)
+        self.assertIn(".overlay(\n                        GeometryReader { geometry in", source)
         self.assertNotIn(".background(GeometryReader { geometry in", source)
         self.assertIn("Color.clear.preference(key: LegacyFlowSizesKey.self", source)
-        # Content id set change must reset the height cache so add/remove /
-        # reorder cannot leave a stale tall height behind.
+        self.assertIn("height: items.isEmpty ? 0 : arrangement.height", source)
+        self.assertIn(".frame(maxWidth: .infinity, alignment: .topLeading)", source)
+        self.assertNotIn("LegacyFlowHeightKey", source)
+        self.assertNotIn(".frame(height: items.isEmpty ? 0 : height)", source)
+        # Content id set change must discard old item measurements so add/remove
+        # and reorder cannot position new content using stale sizes.
         self.assertIn(".onChange(of: items.map(\\.id))", source)
-        self.assertIn("height = 0", source)
+        self.assertIn("sizes = [:]", source)
 
     def test_ios15_chat_geometry_detector_red_and_green(self):
         detector = ROOT / "scripts/check_ios15_chat_geometry.py"

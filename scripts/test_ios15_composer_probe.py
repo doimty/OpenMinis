@@ -29,6 +29,7 @@ class ComposerProbeContracts(unittest.TestCase):
             fixture = (out / "ComposerFixture.swift").read_text()
             self.assertIn(".modifier(ComposerSurface())", fixture)
             self.assertIn(".compatOnGeometryChange(for: CGRect.self)", fixture)
+            self.assertIn("content.onGeometryChange(for: CGRect.self", fixture)
             self.assertIn("recordFrame(name, frame)", fixture)
             self.assertNotIn("ProbeFramesKey", fixture)
             self.assertIn("LegacyGeometryObserver", (out / "ProductionGeometry.swift").read_text())

@@ -63,6 +63,22 @@ No cause is selected until this loop runs. A green forced-legacy run on iOS26.2 
 
 **This is a candidate, not a delivered fix.** The probe is on a forced-legacy iOS26.2 simulator; it can narrow the cause but cannot stand in for iOS15.1.1 device acceptance. The collection-side red is still open and is a different chain from the attachment one.
 
+## Second fix candidate — remove the legacy height feedback loop
+
+The first candidate fixed child measurement (`background` → `overlay`) but the probe still showed a 64pt chip rendered from a 6pt grid frame. The direct geometry probe then showed the mismatch was real in the layout model: the child arrangement reported 70pt while the outer `LegacyFlowLayout` frame stayed at 0pt plus the 6pt input-grid padding.
+
+The next candidate in `src/ios/Shared/LegacyFlowLayout.swift`:
+
+- removes `LegacyFlowHeightKey` and the `@State height` / `.frame(height:)` feedback loop;
+- puts a transparent spacer with `height: arrangement.height` inside the `ZStack`, making the calculated rows part of the container's natural layout size;
+- keeps child measurement on `.overlay`;
+- measures only the available width and re-packs when that width arrives;
+- clears item-size measurements when IDs change, without resetting an independent height state.
+
+The probe oracle was also corrected: the previous `probeFrame` used the iOS 15 preference adapter and could report a pre-offset proposal. On the pinned iOS 26.2 runner it now uses native `onGeometryChange`, keeps a bounded frame-history summary, and checks the actual final frame. The prior screenshots were visually healthy but the numeric frame evidence was stale, so they cannot be used as proof of the old candidate.
+
+This candidate is now being re-run. It is not a delivered iOS 15 fix until the composer matrix is green and a real iOS 15.1.1 device accepts the layout.
+
 ## Same-pattern scan — other UI measurement feedback loops
 
 Scanned for `.background(GeometryReader)` + preference + state height feedback, the same class as the LegacyFlowLayout failure:

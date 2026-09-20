@@ -11,7 +11,10 @@ import UIKit
 
     func recordFrame(_ name: String, _ frame: CGRect) {
         frames[name] = frame
-        frameHistory[name, default: []].append(frame)
+        var history = frameHistory[name, default: []]
+        if history.count >= 16 { history.removeFirst() }
+        history.append(frame)
+        frameHistory[name] = history
     }
 }
 
@@ -30,11 +33,23 @@ private struct ProbeFrameModifier: ViewModifier {
     let name: String
     @Environment(\.probeFrameStore) private var store
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .compatOnGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+        if #available(iOS 16.0, *) {
+            // The runner is iOS 26.2, so use the native observer for the probe
+            // oracle. The production fixture still separately exercises
+            // CompatGeometry; using its legacy preference adapter here would
+            // measure the pre-offset proposal instead of the rendered frame.
+            content.onGeometryChange(for: CGRect.self,
+                                     of: { $0.frame(in: .global) }) { frame in
                 store?.recordFrame(name, frame)
             }
+        } else {
+            content
+                .compatOnGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                    store?.recordFrame(name, frame)
+                }
+        }
     }
 }
 

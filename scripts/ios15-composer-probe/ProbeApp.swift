@@ -114,7 +114,9 @@ struct RowContent: View {
                         "attachment_count": model.attachments.count,
                         "reported_grid_height": Double(store.attachmentHeight),
                         "grid": rect(grid), "first_chip": rect(chips.first), "all_chips": chips.map { rect($0) }, "chip_count": chips.count, "field": rect(field),
-                        "frame_history": store.frameHistory.mapValues { $0.map { rect($0) } }])
+                        "frame_history": store.frameHistory.mapValues { history in
+                            ["count": history.count, "first": rect(history.first), "last": rect(history.last)]
+                        }])
         checks.append(verdict)
         screenshot(name)
     }
