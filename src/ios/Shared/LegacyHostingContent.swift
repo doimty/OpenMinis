@@ -34,9 +34,21 @@ private struct LegacyHostedRoot: View {
     var body: some View {
         content
             .fixedSize(horizontal: false, vertical: true)
-            .background(GeometryReader { proxy in
-                Color.clear.preference(key: LegacyHostedSizeKey.self, value: proxy.size)
-            })
+            // [T-ios15-legacyhost-measure] overlay, not background: a background
+            // GeometryReader sits BEHIND the hosted content and on some legacy
+            // layout passes reports the parent's proposal (the cell's current
+            // estimate, e.g. 40pt) instead of the content's fixedSize ideal
+            // height (e.g. 96pt). The callback then writes the estimate back
+            // into the cell and the collection view never converges — the
+            // composer probe's collection-initial/grow/shrink all stayed red
+            // with the cell pinned at the 40pt estimate while the host view
+            // rendered at 96pt. overlay is stacked ABOVE the already-laid-out
+            // content and reports the real rendered size.
+            .overlay(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: LegacyHostedSizeKey.self, value: proxy.size)
+                }
+            )
             .onPreferenceChange(LegacyHostedSizeKey.self, perform: onSizeChange)
     }
 }

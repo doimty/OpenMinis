@@ -149,6 +149,14 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertNotIn("private final class LegacyHostingContentView", legacy)
         self.assertIn("func hitRegionContains(_ point: CGPoint) -> Bool", legacy)
         self.assertIn("return host.view.bounds.contains(hostPoint)", legacy)
+        # [T-ios15-legacyhost-measure] The hosting content's size callback must
+        # measure the real rendered size, not the parent's proposal. A
+        # background GeometryReader inside a cell still holding the layout
+        # estimate reports that estimate (e.g. 40pt) instead of the content's
+        # ideal height (e.g. 96pt), and the cell never converges.
+        self.assertIn(".overlay(\n                GeometryReader { proxy in", legacy)
+        self.assertNotIn(".background(GeometryReader { proxy in", legacy)
+        self.assertIn("Color.clear.preference(key: LegacyHostedSizeKey.self, value: proxy.size)", legacy)
 
     def test_ios15_self_sizing_cell_extends_hit_region_on_legacy_path(self):
         # The 762a178 content-view-only hitTest forwarding could not fix the

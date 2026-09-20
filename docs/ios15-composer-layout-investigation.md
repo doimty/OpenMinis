@@ -63,6 +63,20 @@ No cause is selected until this loop runs. A green forced-legacy run on iOS26.2 
 
 **This is a candidate, not a delivered fix.** The probe is on a forced-legacy iOS26.2 simulator; it can narrow the cause but cannot stand in for iOS15.1.1 device acceptance. The collection-side red is still open and is a different chain from the attachment one.
 
+## Same-pattern scan — other UI measurement feedback loops
+
+Scanned for `.background(GeometryReader)` + preference + state height feedback, the same class as the LegacyFlowLayout failure:
+
+| Site | Pattern | Risk | Why |
+|---|---|---|---|
+| `LegacyHostingContent.swift:37` `LegacyHostedSizeKey` | `.fixedSize(vertical:true)` + `.background(GeometryReader)` | 🔴 **high** | Same shape as LegacyFlowLayout. The cell's async height callback writes the measured size back into the layout. If the background reader reports the cell's current estimate (40pt) instead of the content's ideal height (96pt), the collection never converges — this is the most likely cause of the probe's collection-initial/grow/shrink all staying red. **Fixed to `.overlay` in the same commit.** |
+| `InlineVoiceInputView.swift:802` `TranscriptContentHeightKey` | `.fixedSize(vertical:true)` + `.background(GeometryReader)` | 🟡 medium | Same shape; already has a 120pt shrink collapse log and a `transcriptMinHeight` floor. Panel lifecycle only, not the attachment/collection chain. |
+| `ChatMessageViews.swift:63` `PreviewContentSizeKey` | `.background(GeometryReader)` in a ScrollView | 🟢 low | Falls back to `maxCardWidth`/`maxCardHeight` caps before the first measurement, so it never collapses to zero. |
+| `AIChatView.swift:3453` `TranscriptHeightKey` | `.background(GeometryReader)` in a ScrollView | 🟢 low | Clamped to `min(max(transcriptHeight, 22), 100)` — 22pt floor prevents zero collapse. |
+| `AIChatView.swift:3649` `AttachmentGridHeightKey` | `.background(GeometryReader)` on the attachment ScrollView | 🟡 medium | This is the outer half of the chain already under test; its inner content (LegacyFlowLayout) is what was failing. |
+
+The general rule: a `.background(GeometryReader)` measuring a `.fixedSize` view inside a container whose own height is still an estimate can report the estimate instead of the ideal size. Use `.overlay` when the measurement must reflect the child's real rendered size, or add an explicit non-zero floor when the parent height is genuinely unknown.
+
 ## Scope / retirement
 
 Diagnostic branch only. No production layout, hit-test, input, model or network behavior change at this checkpoint. Do not enlarge the 100pt workaround. Its historical claim of a measured100pt toolbar is superseded by the earlier acceptance audit and the fresh65pt evidence above.
