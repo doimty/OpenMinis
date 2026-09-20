@@ -1,0 +1,38 @@
+name: ios15-composer-layout-probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [diagnostics/ios15-composer-layout]
+
+permissions:
+  contents: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+
+jobs:
+  probe:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify pinned tools
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          test "$(xcodebuild -version | sed -n '1p')" = 'Xcode 26.2'
+          test "$(xcodebuild -version | sed -n '2p')" = 'Build version 17C52'
+          test "$(xcrun --sdk iphonesimulator --show-sdk-version)" = '26.2'
+      - name: Source extraction contracts
+        run: python3 scripts/test_ios15_composer_probe.py -v
+      - name: Actual legacy composer and collection geometry
+        run: bash scripts/run_ios15_composer_probe.sh "$RUNNER_TEMP/composer-probe"
+      - name: Retain failed and passing evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios15-composer-layout-evidence
+          path: ${{ runner.temp }}/composer-probe/**
+          if-no-files-found: warn
+          retention-days: 14

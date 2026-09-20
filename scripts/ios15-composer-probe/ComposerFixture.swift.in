@@ -1,0 +1,110 @@
+import SwiftUI
+import UIKit
+
+// All geometry is produced by SwiftUI. No hand-positioned chip/cell frames.
+struct ProbeFramesKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+extension View {
+    func probeFrame(_ name: String) -> some View {
+        background(GeometryReader { proxy in
+            Color.clear.preference(key: ProbeFramesKey.self, value: [name: proxy.frame(in: .global)])
+        })
+    }
+}
+
+@MainActor final class FrameStore {
+    var frames: [String: CGRect] = [:]
+    var attachmentHeight: CGFloat = 0
+    var outerGeometryCallbacks = 0
+}
+struct InputAttachment: Identifiable { let id = UUID() }
+@MainActor final class ComposerModel: ObservableObject {
+    @Published var attachments: [InputAttachment] = []
+    @Published var loadingVideoCount: Int = 0
+}
+
+// Image loading is not under test. Real InputAttachmentGridView/drag wiring
+// wraps this explicit 64x64 substitute, the same footprint as AttachmentChip.
+struct AttachmentChip: View {
+    let attachment: InputAttachment
+    let onRemove: () -> Void
+    var body: some View {
+        Button(action: onRemove) {
+            Image(systemName: "photo.fill")
+                .resizable().scaledToFit().padding(8)
+                .frame(width: 64, height: 64)
+                .background(Color.blue.opacity(0.25))
+        }
+        .buttonStyle(.plain)
+        .probeFrame("chip-\(attachment.id)")
+    }
+}
+struct AttachmentGridHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+enum ChatColors {
+    static let inputBg = Color.white
+    static let secondaryBg = Color.gray.opacity(0.1)
+    static let secondaryText = Color.gray
+}
+
+struct ComposerFixture: View {
+    @ObservedObject var vm: ComposerModel
+    let store: FrameStore
+    let primitiveControl: Bool
+    @State private var attachmentGridHeight: CGFloat
+
+    init(vm: ComposerModel, store: FrameStore, seed: CGFloat = 0, primitiveControl: Bool = false) {
+        self.vm = vm
+        self.store = store
+        self.primitiveControl = primitiveControl
+        _attachmentGridHeight = State(initialValue: seed)
+    }
+
+    @ViewBuilder private var inputAttachmentGrid: some View {
+        if primitiveControl {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(vm.attachments) { item in AttachmentChip(attachment: item, onRemove: {}) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16).padding(.top, 6)
+            .probeFrame("grid")
+        } else {
+            InputAttachmentGridView(attachments: vm.attachments,
+                                    loadingVideoCount: vm.loadingVideoCount,
+                                    onRemove: { _ in })
+                .frame(height: ProbeSettings.collapseGrid ? 0 : nil)
+                .probeFrame("grid")
+        }
+    }
+
+    var body: some View {
+        VStack {
+            Spacer(minLength: 0)
+            VStack(spacing: 5) {
+__PRODUCTION_ATTACHMENT_SECTION__
+                Text("输入消息…")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 48).padding(.horizontal, 12)
+                    .background(Color.orange.opacity(0.15))
+                    .probeFrame("field")
+                HStack { Text("＋"); Spacer(); Text("发送") }
+                    .frame(height: 32).padding(.horizontal, 12).padding(.bottom, 10)
+            }
+            .modifier(ComposerSurface())
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .compatOnGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { _ in
+                store.outerGeometryCallbacks += 1
+            }
+            .probeFrame("composer")
+        }
+        .background(Color.gray.opacity(0.06))
+        .onPreferenceChange(ProbeFramesKey.self) { store.frames = $0 }
+        .onChange(of: attachmentGridHeight) { store.attachmentHeight = $0 }
+    }
+}
