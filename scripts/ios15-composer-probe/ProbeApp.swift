@@ -213,10 +213,26 @@ struct RowContent: View {
         await dataSource?.apply(snapshot, animatingDifferences: false)
         await settle()
         sampleCollection("collection-initial", vc: vc, expected: 96)
-        model.height = 160
+        // Production path: content changes flow through a fresh
+        // applyHostedContent (dataSource re-configure), which triggers
+        // updateRoot() -> host.view.invalidateIntrinsicContentSize() so the
+        // hosting view's frame follows the new content height. Re-apply the
+        // hosted content here so the probe exercises the same refresh path
+        // instead of mutating a shared model behind a one-shot configuration.
+        func reconfigure(_ height: CGFloat) {
+            model.height = height
+            for index in 0..<2 {
+                guard let cell = cv.cellForItem(at: IndexPath(item: index, section: 0)) as? CountingCell else { continue }
+                cell.contentKey = "b:fixture-\(index)"
+                cell.applyHostedContent(parent: vc) { RowContent(model: model, index: index) }
+            }
+            cv.collectionViewLayout.invalidateLayout()
+            cv.setNeedsLayout()
+        }
+        reconfigure(160)
         await settle()
         sampleCollection("collection-grow", vc: vc, expected: 160)
-        model.height = 56
+        reconfigure(56)
         await settle()
         sampleCollection("collection-shrink", vc: vc, expected: 56)
 
