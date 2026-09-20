@@ -65,7 +65,7 @@ struct LegacyFlowLayout: View {
     var vSpacing: CGFloat = 8
     var alignment: HorizontalAlignment = .leading
     @State private var sizes: [AnyHashable: CGSize] = [:]
-    @State private var height: CGFloat = 1
+    @State private var height: CGFloat = 0
 
     var body: some View {
         GeometryReader { proxy in
@@ -77,10 +77,23 @@ struct LegacyFlowLayout: View {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     item.view
                         .fixedSize()
-                        .background(GeometryReader { geometry in
-                            Color.clear.preference(key: LegacyFlowSizesKey.self,
-                                                   value: [item.id: geometry.size])
-                        })
+                        // [T-ios15-legacyflow-measure] overlay, not background:
+                        // a background GeometryReader sits BEHIND the hosted view
+                        // and on some legacy layout passes reports the parent's
+                        // proposal (0 height inside a 0-high ZStack) instead of
+                        // the child's fixedSize ideal size, so the first size
+                        // report arrives as .zero and the flow's height feedback
+                        // never converges past the padding-only strip (observed
+                        // in the composer probe: 64pt chip in a 6pt grid, the
+                        // draft image hidden under the input field). overlay is
+                        // stacked ABOVE the already-laid-out content and reports
+                        // the child's real rendered size.
+                        .overlay(
+                            GeometryReader { geometry in
+                                Color.clear.preference(key: LegacyFlowSizesKey.self,
+                                                       value: [item.id: geometry.size])
+                            }
+                        )
                         .offset(x: arrangement.positions[index].x, y: arrangement.positions[index].y)
                 }
             }
@@ -93,6 +106,15 @@ struct LegacyFlowLayout: View {
         }
         .onPreferenceChange(LegacyFlowHeightKey.self) { measured in
             if abs(height - measured) > 0.5 { height = measured }
+        }
+        // [T-ios15-legacyflow-reset] Reset the height when the item ID set
+        // changes (add/remove/reorder). The height state is a feedback cache;
+        // without a reset, a taller previous content (e.g. 8 tiles) leaves a
+        // stale height behind while the new content's first reports are still
+        // zero-size, and the flow stays oversized or — after the zero report
+        // collapses it — undersized until some unrelated re-layout.
+        .onChange(of: items.map(\.id)) { _ in
+            height = 0
         }
     }
 }

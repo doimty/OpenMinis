@@ -36,6 +36,33 @@ Independent failure signals: missing chip frame/height report; a64pt chip occupy
 
 No cause is selected until this loop runs. A green forced-legacy run on iOS26.2 does not exonerate iOS15.1.1; if the exact failure cannot be reproduced, add narrowly-scoped real-device telemetry rather than calling the problem fixed or increasing arbitrary inset floors.
 
+## Run 35490371431 — probe went red on the real production path
+
+- Both composer runs are **completed/failure**, not still running. Run `35490371431` is the second attempt after fixing `await` on the async diffable data source apply.
+- **Mutation was run**: `mutant-zero-grid` (attachment height forced to 0) correctly rejected as invisible. This proves the oracle can go red on a real regression.
+- The useful result is the positive/negative matrix, not the mutation:
+
+| flow | geometry | single-chip grid height | verdict |
+|---|---|---|---|
+| native FlowLayout | native | 70pt | ✅ |
+| native FlowLayout | legacy | 70pt | ✅ |
+| **LegacyFlowLayout** | **legacy** | **6pt** (64pt chip pushed under the input field) | ❌ |
+| **LegacyFlowLayout** | **native** | **6pt** | ❌ |
+
+- **Root cause narrowed to `LegacyFlowLayout` itself**, not the bottom inset, not the hit-test path. The 64pt chip renders fine but the flow reports a 6pt height (padding-only strip), so the draft image is hidden under the input field — exactly the user's screenshot.
+- Collection side is also red across all three phases: cell stays at the 40pt estimate, host content is 96pt, `cached_count=0`, `preferred_calls=6`. The async measured height is not writing back into the layout cache. This is a separate chain from the attachment one.
+
+## Fix candidate implemented (unverified, needs probe rerun)
+
+- `src/ios/Shared/LegacyFlowLayout.swift`:
+  - Child measurement moved from `.background(GeometryReader)` to `.overlay(GeometryReader)`. A background reader sits behind the hosted view and on some legacy layout passes reports the parent proposal (0 height inside a 0-high ZStack) instead of the child's fixedSize ideal size, so the first size report arrives as `.zero` and the height feedback never converges past the padding-only strip.
+  - Height cache reset on content-id set change (`.onChange(of: items.map(\.id))`) so add/remove/reorder cannot leave a stale tall height behind while the new content's first reports are still zero-size.
+- `scripts/ios15-composer-probe/ComposerFixture.swift.in`: recorder now seeds from the initial height on `onAppear`, so a positive seed that already equals the settled measurement no longer reports zero.
+- `scripts/ios15-composer-probe/ProbeApp.swift`: multi-item oracle now asserts **all** chips, not just the first one.
+- Contract tests: `test_ios15_legacy_flow_measures_via_overlay_not_background` added to `test_ios15_compat_contract.py` (19/19); `test_ios15_composer_probe.py` updated (3/3).
+
+**This is a candidate, not a delivered fix.** The probe is on a forced-legacy iOS26.2 simulator; it can narrow the cause but cannot stand in for iOS15.1.1 device acceptance. The collection-side red is still open and is a different chain from the attachment one.
+
 ## Scope / retirement
 
 Diagnostic branch only. No production layout, hit-test, input, model or network behavior change at this checkpoint. Do not enlarge the 100pt workaround. Its historical claim of a measured100pt toolbar is superseded by the earlier acceptance audit and the fresh65pt evidence above.

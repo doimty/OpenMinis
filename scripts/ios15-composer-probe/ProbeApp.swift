@@ -96,13 +96,16 @@ struct RowContent: View {
     private func sampleComposer(_ name: String, model: ComposerModel, store: FrameStore, expectedVisible: Bool = true) {
         let grid = store.frames["grid"]
         let field = store.frames["field"]
-        let chip = model.attachments.first.flatMap { store.frames["chip-\($0.id)"] }
+        let chips = model.attachments.compactMap { store.frames["chip-\($0.id)"] }
         let pass: Bool
         if model.attachments.isEmpty { pass = grid == nil }
-        else if let grid, let field, let chip {
+        else if let grid, let field {
             pass = grid.height >= 69 && store.attachmentHeight >= 69
-                && chip.height >= 63.5 && chip.minY >= grid.minY - 0.5
-                && chip.maxY <= field.minY + 0.5 && !chip.intersects(field)
+                && chips.count == model.attachments.count
+                && chips.allSatisfy {
+                    $0.height >= 63.5 && $0.minY >= grid.minY - 0.5
+                        && $0.maxY <= field.minY + 0.5 && !$0.intersects(field)
+                }
         } else { pass = false }
         let verdict = pass == expectedVisible
         samples.append(["phase": name, "kind": "composer", "passed": verdict,
@@ -110,7 +113,7 @@ struct RowContent: View {
                         "outer_geometry_callbacks": store.outerGeometryCallbacks,
                         "attachment_count": model.attachments.count,
                         "reported_grid_height": Double(store.attachmentHeight),
-                        "grid": rect(grid), "first_chip": rect(chip), "field": rect(field)])
+                        "grid": rect(grid), "first_chip": rect(chips.first), "all_chips": chips.map { rect($0) }, "chip_count": chips.count, "field": rect(field)])
         checks.append(verdict)
         screenshot(name)
     }

@@ -40,7 +40,8 @@ class ComposerProbeContracts(unittest.TestCase):
         self.assertNotIn("cell.preferredLayoutAttributesFitting", s)
         self.assertIn("sampleCollection(\"collection-grow\"", s)
         self.assertIn("sampleComposer(\"baseline-readd\"", s)
-        self.assertIn("chip.maxY <= field.minY", s)
+        self.assertIn("chips.allSatisfy", s)
+        self.assertIn("$0.maxY <= field.minY", s)
 
     def test_extraction_rejects_ambiguous_start(self):
         with self.assertRaises(ValueError):

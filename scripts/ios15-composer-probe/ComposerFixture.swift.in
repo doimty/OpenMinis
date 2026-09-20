@@ -105,6 +105,14 @@ __PRODUCTION_ATTACHMENT_SECTION__
         }
         .background(Color.gray.opacity(0.06))
         .onPreferenceChange(ProbeFramesKey.self) { store.frames = $0 }
+        .onAppear {
+            // [T-ios15-composer-recorder-seed] Without this, a positive
+            // initial height that already equals the settled measurement
+            // never fires onChange and the recorder reports zero — a
+            // correct layout masquerading as a missing observer.
+            store.attachmentHeight = attachmentGridHeight
+            store.seedApplied = true
+        }
         .onChange(of: attachmentGridHeight) { store.attachmentHeight = $0 }
     }
 }
