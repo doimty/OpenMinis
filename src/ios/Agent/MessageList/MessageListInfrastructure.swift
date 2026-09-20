@@ -234,12 +234,29 @@ class SelfSizingCell: UICollectionViewCell {
     /// dead). Only bail when super found a real interactive view; when it
     /// fell back to self, ask the legacy host; if it declines too, keep the
     /// cell as the receiver rather than dropping the touch.
+    ///
+    /// The intermediate chain must still be eligible: a hidden, zero-alpha,
+    /// or interaction-disabled container is a deliberate UI veto, not a
+    /// geometric overflow. Only bypass bounds rejection, never a visibility/
+    /// interaction gate.
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let hit = super.hitTest(point, with: event)
         guard hit === self else { return hit }
         guard contentConfiguration is LegacyHostingConfiguration,
               let legacy = legacyHostingContentView else {
             return hit
+        }
+        // Respect visibility/interaction vetoes along the chain from this
+        // cell down to the legacy content view. super.hitTest returned self
+        // only because the overflow point fell outside the intermediate
+        // container's bounds (geometric rejection); a hidden/disabled
+        // container must still win.
+        var cursor: UIView? = legacy.superview
+        while let view = cursor, view !== self {
+            if view.isHidden || view.alpha <= 0.01 || !view.isUserInteractionEnabled {
+                return hit
+            }
+            cursor = view.superview
         }
         let legacyPoint = convert(point, to: legacy)
         return legacy.hitTest(legacyPoint, with: event) ?? hit

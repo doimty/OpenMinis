@@ -123,12 +123,26 @@ final class ProbeCell: UICollectionViewCell {
         hostingContentView?.layoutIfNeeded()
     }
 
+    // Mirror of SelfSizingCell.legacyHostingContentView — production may
+    // install the legacy content view as the cell's contentView OR below a
+    // UIKit-managed content container. The probe must exercise the same live
+    // descendant lookup so Phase D can validate the supported container path.
+    private var legacyContentView: LegacyHostingContentView? {
+        if let legacy = contentView as? LegacyHostingContentView { return legacy }
+        var pending = contentView.subviews
+        while let view = pending.popLast() {
+            if let legacy = view as? LegacyHostingContentView { return legacy }
+            pending.append(contentsOf: view.subviews)
+        }
+        return nil
+    }
+
     // Mirror of SelfSizingCell.point(inside:with:) — extends the hit region to
     // the hosted content's real bounds on the legacy path so a short estimate
     // does not make the overflow tail touch-dead.
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         if super.point(inside: point, with: event) { return true }
-        guard let legacy = hostingContentView as? LegacyHostingContentView else {
+        guard let legacy = legacyContentView else {
             return false
         }
         return legacy.hitRegionContains(convert(point, to: legacy))
@@ -138,10 +152,19 @@ final class ProbeCell: UICollectionViewCell {
     // inside the extended hit region but the managed content container
     // rejected it below its own bounds. Forward to the legacy host so the
     // SwiftUI control (Retry capsule) resolves, exactly like production.
+    // Also mirrors the production visibility gate: a hidden/disabled
+    // intermediate container must win over the overflow forward.
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let hit = super.hitTest(point, with: event)
-        guard hit === self, let legacy = hostingContentView as? LegacyHostingContentView else {
+        guard hit === self, let legacy = legacyContentView else {
             return hit
+        }
+        var cursor: UIView? = legacy.superview
+        while let view = cursor, view !== self {
+            if view.isHidden || view.alpha <= 0.01 || !view.isUserInteractionEnabled {
+                return hit
+            }
+            cursor = view.superview
         }
         let legacyPoint = convert(point, to: legacy)
         return legacy.hitTest(legacyPoint, with: event) ?? hit
@@ -206,12 +229,22 @@ final class HierarchyRetryProbeApp: UIResponder, UIApplicationDelegate {
             cell.convert(CGPoint(x: cell.bounds.maxX - 36, y: 25), to: window)
         }
 
+        // The subtree root for "did the tap reach the hosted content" is the
+        // recursive legacy lookup (the LegacyHostingContentView wherever UIKit
+        // installed it), NOT the cached contentView. A tap that lands on an
+        // intermediate UIKit-managed container would satisfy isInside(_,
+        // subtreeOf: contentView) without ever reaching the hosting tree;
+        // asserting against the legacy view keeps the phase honest.
+        func hostedContentRoot(of cell: ProbeCell) -> UIView? {
+            cell.legacyContentView
+        }
+
         // Phase A (control): cell mid-screen, NO overlay.
         let (cellA, _) = makeScene(cellY: 220, overlayVisible: false)
         try? await Task.sleep(nanoseconds: 300_000_000)
         let aPoint = retryPointInWindow(of: cellA)
         let aHit = window?.hitTest(aPoint, with: nil)
-        let aInsideCell = isInside(aHit, subtreeOf: cellA.hostingContentView)
+        let aInsideCell = isInside(aHit, subtreeOf: hostedContentRoot(of: cellA))
         cellA.removeFromSuperview()
 
         // Phase B (bug): cell placed UNDER the overlay (short inset).
@@ -220,7 +253,7 @@ final class HierarchyRetryProbeApp: UIResponder, UIApplicationDelegate {
         let bPoint = retryPointInWindow(of: cellB)
         let bHit = window?.hitTest(bPoint, with: nil)
         let bHitsOverlay = isInside(bHit, subtreeOf: overlayB)
-        let bInsideCell = isInside(bHit, subtreeOf: cellB.hostingContentView)
+        let bInsideCell = isInside(bHit, subtreeOf: hostedContentRoot(of: cellB))
         cellB.removeFromSuperview(); overlayB.removeFromSuperview()
 
         // Phase C (fixed): cell ABOVE the same overlay (correct inset).
@@ -228,7 +261,7 @@ final class HierarchyRetryProbeApp: UIResponder, UIApplicationDelegate {
         try? await Task.sleep(nanoseconds: 300_000_000)
         let cPoint = retryPointInWindow(of: cellC)
         let cHit = window?.hitTest(cPoint, with: nil)
-        let cInsideCell = isInside(cHit, subtreeOf: cellC.hostingContentView)
+        let cInsideCell = isInside(cHit, subtreeOf: hostedContentRoot(of: cellC))
         let cHitsOverlay = isInside(cHit, subtreeOf: overlayC)
         cellC.removeFromSuperview(); overlayC.removeFromSuperview()
 
@@ -246,7 +279,7 @@ final class HierarchyRetryProbeApp: UIResponder, UIApplicationDelegate {
         try? await Task.sleep(nanoseconds: 300_000_000)
         let dPoint = cellD.convert(CGPoint(x: cellD.bounds.maxX - 36, y: 70), to: window)
         let dHit = window?.hitTest(dPoint, with: nil)
-        let dInsideHost = isInside(dHit, subtreeOf: cellD.hostingContentView)
+        let dInsideHost = isInside(dHit, subtreeOf: hostedContentRoot(of: cellD))
         let dDeadZone = dHit == nil
         cellD.removeFromSuperview()
 
