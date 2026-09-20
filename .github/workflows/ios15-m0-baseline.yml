@@ -7,7 +7,7 @@ name: ios15-m0-baseline
 on:
   workflow_dispatch:
   push:
-    branches: [compat/ios15, fix/ios15-sf-symbols, fix/ios15-input-prompts, fix/ios15-retry-hit]
+    branches: [compat/ios15, fix/ios15-sf-symbols, fix/ios15-input-prompts, fix/ios15-retry-hit, fix/ios15-cell-hit-region]
 
 permissions:
   contents: read
