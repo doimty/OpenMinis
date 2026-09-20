@@ -107,21 +107,20 @@ final class ProbeCell: UICollectionViewCell {
             parent: WeakHostingParent(nil),
             onSizeChange: { _ in }
         )
-        let hosted = config.makeContentView()
-        hostingContentView = hosted
-        hosted.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(hosted)
-        // Mirror the production constraints: top/leading/trailing only, so the
-        // hosting view grows to its intrinsic height instead of the cell's
-        // frame — the overflow window the cell hit-region extension covers.
-        NSLayoutConstraint.activate([
-            hosted.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            hosted.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            hosted.topAnchor.constraint(equalTo: contentView.topAnchor),
-        ])
-        contentView.layoutIfNeeded()
-        hosted.setNeedsLayout()
-        hosted.layoutIfNeeded()
+        // Mirror production exactly: contentConfiguration replaces the cell's
+        // own content view with LegacyHostingContentView, so the hit chain is
+        // cell -> LegacyHostingContentView -> host.view with NO intermediate
+        // content view that would reject the overflow point. The earlier
+        // version manually added hosted as a subview of the default
+        // ContentView; that default view still ran point(inside:) at the
+        // cell's (short) bounds and killed the tap before it reached hosted,
+        // which is why Phase D reported "no dead zone" but also "not inside
+        // host".
+        contentConfiguration = config
+        hostingContentView = self.contentSize
+        self.contentSize.layoutIfNeeded()
+        hostingContentView?.setNeedsLayout()
+        hostingContentView?.layoutIfNeeded()
     }
 
     // Mirror of SelfSizingCell.point(inside:with:) — extends the hit region to
