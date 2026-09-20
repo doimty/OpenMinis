@@ -2,25 +2,46 @@ import SwiftUI
 import UIKit
 
 // All geometry is produced by SwiftUI. No hand-positioned chip/cell frames.
-struct ProbeFramesKey: PreferenceKey {
-    static var defaultValue: [String: CGRect] = [:]
-    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
-    }
-}
-extension View {
-    func probeFrame(_ name: String) -> some View {
-        background(GeometryReader { proxy in
-            Color.clear.preference(key: ProbeFramesKey.self, value: [name: proxy.frame(in: .global)])
-        })
-    }
-}
-
 @MainActor final class FrameStore {
     var frames: [String: CGRect] = [:]
+    var frameHistory: [String: [CGRect]] = [:]
     var attachmentHeight: CGFloat = 0
     var outerGeometryCallbacks = 0
     var seedApplied = false
+
+    func recordFrame(_ name: String, _ frame: CGRect) {
+        frames[name] = frame
+        frameHistory[name, default: []].append(frame)
+    }
+}
+
+private struct ProbeFrameStoreKey: EnvironmentKey {
+    static let defaultValue: FrameStore? = nil
+}
+
+private extension EnvironmentValues {
+    var probeFrameStore: FrameStore? {
+        get { self[ProbeFrameStoreKey.self] }
+        set { self[ProbeFrameStoreKey.self] = newValue }
+    }
+}
+
+private struct ProbeFrameModifier: ViewModifier {
+    let name: String
+    @Environment(\.probeFrameStore) private var store
+
+    func body(content: Content) -> some View {
+        content
+            .compatOnGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                store?.recordFrame(name, frame)
+            }
+    }
+}
+
+extension View {
+    func probeFrame(_ name: String) -> some View {
+        modifier(ProbeFrameModifier(name: name))
+    }
 }
 struct InputAttachment: Identifiable { let id = UUID() }
 @MainActor final class ComposerModel: ObservableObject {
@@ -105,7 +126,7 @@ __PRODUCTION_ATTACHMENT_SECTION__
             .probeFrame("composer")
         }
         .background(Color.gray.opacity(0.06))
-        .onPreferenceChange(ProbeFramesKey.self) { store.frames = $0 }
+        .environment(\.probeFrameStore, store)
         .onAppear {
             // [T-ios15-composer-recorder-seed] Without this, a positive
             // initial height that already equals the settled measurement

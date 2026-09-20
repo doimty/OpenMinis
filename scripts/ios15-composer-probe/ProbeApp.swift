@@ -113,7 +113,8 @@ struct RowContent: View {
                         "outer_geometry_callbacks": store.outerGeometryCallbacks,
                         "attachment_count": model.attachments.count,
                         "reported_grid_height": Double(store.attachmentHeight),
-                        "grid": rect(grid), "first_chip": rect(chips.first), "all_chips": chips.map { rect($0) }, "chip_count": chips.count, "field": rect(field)])
+                        "grid": rect(grid), "first_chip": rect(chips.first), "all_chips": chips.map { rect($0) }, "chip_count": chips.count, "field": rect(field),
+                        "frame_history": store.frameHistory.mapValues { $0.map { rect($0) } }])
         checks.append(verdict)
         screenshot(name)
     }

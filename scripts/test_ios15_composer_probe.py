@@ -26,8 +26,11 @@ class ComposerProbeContracts(unittest.TestCase):
                               "                inputFieldOrWaveform")
             self.assertIn(section, (out / "ComposerFixture.swift").read_text())
             self.assertEqual(len(manifest["source_sha256"]), 7)
-            self.assertIn(".modifier(ComposerSurface())", (out / "ComposerFixture.swift").read_text())
-            self.assertIn(".compatOnGeometryChange(for: CGRect.self)", (out / "ComposerFixture.swift").read_text())
+            fixture = (out / "ComposerFixture.swift").read_text()
+            self.assertIn(".modifier(ComposerSurface())", fixture)
+            self.assertIn(".compatOnGeometryChange(for: CGRect.self)", fixture)
+            self.assertIn("recordFrame(name, frame)", fixture)
+            self.assertNotIn("ProbeFramesKey", fixture)
             self.assertIn("LegacyGeometryObserver", (out / "ProductionGeometry.swift").read_text())
 
     def test_runtime_observes_frames_not_manual_layout_writes(self):
