@@ -204,7 +204,7 @@ struct RowContent: View {
         }
         var snapshot = NSDiffableDataSourceSnapshot<Int, Int>()
         snapshot.appendSections([0]); snapshot.appendItems([0, 1])
-        dataSource?.apply(snapshot, animatingDifferences: false)
+        await dataSource?.apply(snapshot, animatingDifferences: false)
         await settle()
         sampleCollection("collection-initial", vc: vc, expected: 96)
         model.height = 160
