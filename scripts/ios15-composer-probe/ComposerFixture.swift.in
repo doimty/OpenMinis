@@ -20,6 +20,7 @@ extension View {
     var frames: [String: CGRect] = [:]
     var attachmentHeight: CGFloat = 0
     var outerGeometryCallbacks = 0
+    var seedApplied = false
 }
 struct InputAttachment: Identifiable { let id = UUID() }
 @MainActor final class ComposerModel: ObservableObject {
