@@ -127,7 +127,7 @@ final class ProbeCell: UICollectionViewCell {
     // install the legacy content view as the cell's contentView OR below a
     // UIKit-managed content container. The probe must exercise the same live
     // descendant lookup so Phase D can validate the supported container path.
-    private var legacyContentView: LegacyHostingContentView? {
+    var legacyContentView: LegacyHostingContentView? {
         if let legacy = contentView as? LegacyHostingContentView { return legacy }
         var pending = contentView.subviews
         while let view = pending.popLast() {
