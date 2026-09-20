@@ -31,6 +31,8 @@ class ComposerProbeContracts(unittest.TestCase):
             self.assertIn(".compatOnGeometryChange(for: CGRect.self)", fixture)
             self.assertIn("content.onGeometryChange(for: CGRect.self", fixture)
             self.assertIn("recordFrame(name, frame)", fixture)
+            self.assertIn(".onDisappear", fixture)
+            self.assertIn("store?.frames[name] = nil", fixture)
             self.assertNotIn("ProbeFramesKey", fixture)
             self.assertIn("LegacyGeometryObserver", (out / "ProductionGeometry.swift").read_text())
 

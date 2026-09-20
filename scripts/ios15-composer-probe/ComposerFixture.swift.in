@@ -35,20 +35,30 @@ private struct ProbeFrameModifier: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 16.0, *) {
-            // The runner is iOS 26.2, so use the native observer for the probe
-            // oracle. The production fixture still separately exercises
-            // CompatGeometry; using its legacy preference adapter here would
-            // measure the pre-offset proposal instead of the rendered frame.
-            content.onGeometryChange(for: CGRect.self,
-                                     of: { $0.frame(in: .global) }) { frame in
-                store?.recordFrame(name, frame)
-            }
-        } else {
-            content
-                .compatOnGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+        Group {
+            if #available(iOS 16.0, *) {
+                // The runner is iOS 26.2, so use the native observer for the
+                // probe oracle. The production fixture still separately
+                // exercises CompatGeometry; using its legacy preference
+                // adapter here would measure the pre-offset proposal instead
+                // of the rendered frame.
+                content.onGeometryChange(for: CGRect.self,
+                                         of: { $0.frame(in: .global) }) { frame in
                     store?.recordFrame(name, frame)
                 }
+            } else {
+                content
+                    .compatOnGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                        store?.recordFrame(name, frame)
+                    }
+            }
+        }
+        .onDisappear {
+            // The view left the hierarchy (e.g. the attachment ScrollView is
+            // removed when attachments become empty). Drop its recorded frame
+            // so the oracle can distinguish "gone" from "still laid out".
+            store?.frames[name] = nil
+            store?.frameHistory[name] = nil
         }
     }
 }
