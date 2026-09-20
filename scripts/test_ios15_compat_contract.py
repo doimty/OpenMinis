@@ -143,6 +143,32 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("self.current.onSizeChange(size)", legacy)
         self.assertNotIn("host.view.bottomAnchor.constraint", legacy,
                          "pin the hosting view top/leading/trailing only so its height is intrinsic")
+        # The legacy content view must be reachable from the cell (not private)
+        # and expose a hit-region helper that SelfSizingCell consults.
+        self.assertIn("final class LegacyHostingContentView", legacy)
+        self.assertNotIn("private final class LegacyHostingContentView", legacy)
+        self.assertIn("func hitRegionContains(_ point: CGPoint) -> Bool", legacy)
+        self.assertIn("return host.view.bounds.contains(hostPoint)", legacy)
+
+    def test_ios15_self_sizing_cell_extends_hit_region_on_legacy_path(self):
+        # The 762a178 content-view-only hitTest forwarding could not fix the
+        # footer Retry/Resume capsules on device: UIKit rejects touches at the
+        # RECEIVER's edge before consulting subviews, and the receiver is the
+        # CELL, not the content view. SelfSizingCell must therefore extend its
+        # hit region to the hosting view's real bounds on the legacy path,
+        # while leaving iOS 16+'s UIHostingConfiguration untouched.
+        source = (ROOT / "src/ios/Agent/MessageList/MessageListInfrastructure.swift").read_text()
+        self.assertIn("override func point(inside point: CGPoint, with event: UIEvent?) -> Bool",
+                      source)
+        self.assertIn("contentConfiguration is LegacyHostingConfiguration", source)
+        self.assertIn("contentView as? LegacyHostingContentView", source)
+        self.assertIn("hitRegionContains(convert(point, to: legacy))", source)
+        # The guard must return false for the native path so iOS 16+ keeps the
+        # exact cell-bounds hit region.
+        guard = source.index("contentConfiguration is LegacyHostingConfiguration")
+        after_guard = source[guard:guard + 600]
+        self.assertIn("return false", after_guard)
+        self.assertNotIn("hitRegionContains", after_guard.split("return false")[0])
 
     def test_ios15_session_row_is_tappable_on_legacy_os(self):
         source = (ROOT / "src/ios/Views/ContentView.swift").read_text()

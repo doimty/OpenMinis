@@ -42,7 +42,7 @@ private struct LegacyHostedRoot: View {
 }
 
 @MainActor
-private final class LegacyHostingContentView: UIView, UIContentView {
+final class LegacyHostingContentView: UIView, UIContentView {
     private var current: LegacyHostingConfiguration
     private let host = UIHostingController(rootView: AnyView(EmptyView()))
     private var lastSize: CGSize = .zero
@@ -142,6 +142,21 @@ private final class LegacyHostingContentView: UIView, UIContentView {
             return host.view.hitTest(hostPoint, with: event)
         }
         return nil
+    }
+
+    /// True when `point` (in this view's coordinate space) lies inside the
+    /// hosting view's real bounds — i.e. inside the SwiftUI content even when
+    /// it falls below this view's own bounds during the pre-measure estimate
+    /// window. UIKit rejects touches at the RECEIVER's edge before consulting
+    /// subviews, and that receiver is the CELL, not this content view: the
+    /// content view's own hitTest override is never consulted for a point
+    /// below the cell's bounds. SelfSizingCell therefore extends its hit
+    /// region to this region on the iOS 15 legacy path, so the overflow tail
+    /// (footer Retry/Resume capsules, the tail of a thinking block) stays
+    /// tappable while the async GeometryReader report is in flight.
+    func hitRegionContains(_ point: CGPoint) -> Bool {
+        let hostPoint = convert(point, to: host.view)
+        return host.view.bounds.contains(hostPoint)
     }
 
     override var intrinsicContentSize: CGSize {

@@ -182,6 +182,30 @@ class SelfSizingCell: UICollectionViewCell {
 
     private static let sizingLogger = AppLogger(category: "CellSizing")
 
+    /// [T-ios15-cell-hit-region] The iOS 15 legacy hosting path sizes the
+    /// hosting view to its intrinsic (ideal) height while this cell still
+    /// holds the layout's estimate, so the hosted content's tail can extend
+    /// BELOW the cell's bounds until the async GeometryReader report lands.
+    /// UIKit rejects touches outside the receiver's bounds before it ever
+    /// consults subviews, and the receiver is THIS cell — the content view's
+    /// own hitTest forwarding (see LegacyHostingContentView.hitTest) is never
+    /// reached for a point below the cell bounds. The overflow tail is then
+    /// visible (the legacy content view does not clip by default) but
+    /// touch-dead: the chat footer's Retry and Resume capsules are exactly
+    /// that tail, and the 762a178 content-view-only forwarding could not fix
+    /// them on device. Extend the hit region to the hosting view's real
+    /// bounds on the legacy path only; iOS 16+'s UIHostingConfiguration
+    /// measures synchronously, never leaves this window, and keeps the exact
+    /// cell-bounds hit region.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        if super.point(inside: point, with: event) { return true }
+        guard contentConfiguration is LegacyHostingConfiguration,
+              let legacy = contentView as? LegacyHostingContentView else {
+            return false
+        }
+        return legacy.hitRegionContains(convert(point, to: legacy))
+    }
+
     // [ScrollStall] 1Hz-aggregated cache-hit counters.
     private static var dedupHits: Int = 0
     private static var dedupLastFlush: CFTimeInterval = 0

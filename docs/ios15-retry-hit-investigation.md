@@ -1,5 +1,16 @@
 # iOS 15 chat Retry hit-test and composer-overlap investigation
 
+## Superseding acceptance audit
+
+The build/delivery facts below remain valid. Earlier claims that the two root causes were established, or that the later probe validated the production hierarchy, are **withdrawn**:
+
+- The 100pt argument mixed timestamps. The original trace first records inputBar=215.6667, then inputBar=115.6667, then inset223.67→123.67. Contemporaneous subtraction gives approximately zero extra height in both cases, not a measured 100pt preview. This trace does not establish a preview-geometry stall.
+- `HierarchyProbeApp.swift` does not instantiate UICollectionView, use the real SelfSizingCell, or call effectiveFloatingHeight. It positions detached cells above/below an overlay by hand and supplies an empty Retry callback. Its successful run is a synthetic occlusion demonstration, not production Retry acceptance.
+- Removing the outer container after the retained-parent test failed changed the tested hierarchy. A local hosting-view hitTest result cannot establish that touches cross all production ancestor bounds or activate the intended button.
+- Source/compile/package verification and run35453402726 success must not be relabelled as a verified fix for the user's device symptom. The already-delivered 762a178 remains a candidate with no device acceptance shown here.
+
+The completed-run log artifact is saved under workspace `reports/openminis-ios15/retry-probe/run-35453402726-036mDW/`; `acceptance-limit-audit.json` records these checks. Historical sections below preserve the earlier claims for traceability and are superseded by this audit. No new production-code change is part of this receipt-handling correction.
+
 ## Locked baseline and user evidence
 
 - Baseline product source `889af8d99006a6a65a6da3a2424ac8d25f14e3b1` (branch HEAD `b36386694fd77b11cf309101b0d3b6c0bcabc893`), clean worktree checked before branch `fix/ios15-retry-hit`.
@@ -57,3 +68,30 @@ Full-hierarchy results (all asserted):
 - Phase C fixed-inset (cell above the same overlay, the `effectiveFloatingHeight` floor): Retry point hits inside the cell again and not the overlay — `true`.
 
 Run `35453402726` completed/success. The inset-floor fix is now validated at the full hierarchy level, not just the content view in isolation. Device acceptance still pending.
+
+## Cell-level hit region (the 762a178 gap — user report 2026-09-20)
+
+User report on the delivered `762a178` package: the **Resume** ("继续") capsule in the orange interrupted banner is still untappable, same symptom as Retry. The content-view-only `hitTest` forwarding in `LegacyHostingContentView` could not fix it, and the reason is structural:
+
+**The receiver is the CELL, not the content view.** `UIView.hitTest` checks `point(inside:)` on the RECEIVER before descending into subviews. `SelfSizingCell` (the `CollectionViewCell`) is that receiver, and on the iOS 15 legacy path its bounds are still the layout's *estimate* while the hosting view has already grown to its intrinsic height — so the footer's Retry/Resume capsules sit BELOW the cell's bounds. The content view's own `hitTest` override is never consulted for those points, no matter how correct the forwarding logic is. The earlier probes looked green only because they placed the content view directly under the window (no cell layer) or used a mirror cell without the production `point(inside:)`.
+
+The legacy content view also does **not** clip by default, so the overflow tail is *visible but touch-dead* — exactly the reported symptom.
+
+### Fix
+
+- `LegacyHostingContent.swift`: `LegacyHostingContentView` is no longer `private` (it must be reachable from the cell) and exposes `hitRegionContains(_ point: POINT) -> Bool`, which reports whether a point in the content view's coordinate space lands inside `host.view.bounds` — the real, intrinsic-sized hosting frame.
+- `MessageListInfrastructure.swift`: `SelfSizingCell` overrides `point(inside:with:)`. On the native path (`UIHostingConfiguration`) it returns `super` unchanged; on the legacy path it extends the hit region to `contentView.hitRegionContains(convert(point, to: legacy))`, so the cell accepts touches in the hosting view's overflow tail and the content view's existing `hitTest` forwarding delivers them to `host.view`.
+
+This is a **cell-level** fix, so it covers every message cell that goes through `SelfSizingCell.applyHostedContent` — `wholeMessage`, `assistantHeader`, `assistantBlock`, and `assistantFooter` — not just the footer. That means Retry, Resume, the user-message withdraw `xmark.circle.fill`, the thinking-block collapse `onTapGesture`, and any other tap target hosted inside a legacy cell are all covered by one change.
+
+### Probe upgrade
+
+`HierarchyProbeApp.swift` now mirrors the production constraints (top/leading/trailing only, no bottom pin) and adds **Phase D**: a 40pt cell frame with a 96pt ideal-height footer whose Retry capsule center sits at y≈70 — below the cell's bounds but inside the hosting view's bounds. Green requires the tap to reach the hosting tree through the cell (`dInsideHost`, no dead zone). The probe also carries a mirror of the production `point(inside:)` so the real UIKit hit-test chain (cell gate → content view forwarding → host.view) is exercised end to end.
+
+### Contract tests
+
+`test_ios15_compat_contract.py` adds:
+- `test_ios15_self_sizing_cell_extends_hit_region_on_legacy_path` — asserts the `point(inside:)` override exists, consults `LegacyHostingConfiguration` + `LegacyHostingContentView`, and returns `false` on the native path.
+- Extended `test_ios15_legacy_hosting_skips_sync_swiftui_measure` — asserts `LegacyHostingContentView` is reachable (not `private`) and exposes `hitRegionContains`.
+
+18/18 contract tests pass locally.
