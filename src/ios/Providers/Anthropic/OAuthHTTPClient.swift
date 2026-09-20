@@ -520,7 +520,7 @@ private final class TokenBoxRegistry: @unchecked Sendable {
 /// (`postTokenRequest`) speak the same Claude-Code fingerprint. Any drift
 /// between the two sources is what lets Cloudflare / the Anthropic OAuth
 /// backend reject token requests with 403 even though chat requests pass.
-private enum ClaudeCodeMimicry {
+enum ClaudeCodeMimicry {
     /// Canonical OAuth access-token endpoint. Keep in sync with
     /// `ClaudeOAuthManager.accessTokenEndpoint`.
     static let accessTokenEndpoint = "https://claude.ai/v1/oauth/token"
@@ -544,8 +544,8 @@ private enum ClaudeCodeMimicry {
         guard !betaFlags.isEmpty else { return nil }
         let newFlags = betaFlags.joined(separator: ",")
         if let existing, !existing.isEmpty {
-            let existingSet: Set<String> = existing.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
-            let merged = Set(betaFlags) + existingSet
+            let existingSet: Set<String> = Set(existing.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) })
+            let merged = Set(betaFlags).union(existingSet)
             return merged.sorted().joined(separator: ",")
         }
         return newFlags
