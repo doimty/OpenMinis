@@ -1,0 +1,47 @@
+name: ios15-session-width-contract-probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [diagnostics/ios15-session-width-contract]
+    paths:
+      - .github/workflows/ios15-session-width-probe.yml
+      - scripts/ios15-session-width-probe/**
+      - scripts/run_ios15_session_width_probe.sh
+      - src/ios/Shared/LegacyHostingContent.swift
+      - src/ios/Shared/NSTextContainerSetSizeGuard.*
+      - src/ios/Views/Chat/SelectableMarkdownView.swift
+
+permissions:
+  contents: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+
+jobs:
+  session-width-contract:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - name: Checkout diagnostic commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          submodules: false
+      - name: Verify source and fixture contracts
+        run: python3 scripts/ios15-session-width-probe/test_probe.py
+      - name: Run current versus candidate width contract matrix
+        run: |
+          set -o pipefail
+          bash scripts/run_ios15_session_width_probe.sh "$RUNNER_TEMP/session-width" \
+            2>&1 | tee "$RUNNER_TEMP/session-width-run.log"
+      - name: Preserve native evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios15-session-width-contract
+          path: |
+            ${{ runner.temp }}/session-width
+            ${{ runner.temp }}/session-width-run.log
+          if-no-files-found: warn
+          retention-days: 14
