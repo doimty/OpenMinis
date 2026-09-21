@@ -62,16 +62,20 @@ hardened nonce/case/row/frame/control/hypothesis validation. No src file changed
    unchanged content; row 0 observed for starvation vs recovery.
 3. `recovery-grow` — real height change via fresh `applyHostedContent`; both
    rows must recover (control).
-4. `same-size-reconfigure` — identical height re-applied; observe whether the
-   observation edge is re-delivered.
-5. `seed-invalidation` — seed 999 then generic clear; observe whether the seed
-   survives (baseline) or is cleared (candidate).
+4. `same-size-reconfigure` — identical height re-applied; require both matching
+   frames AND a rearmed legacy observation. A still-correct cached frame alone
+   is not proof that the observation edge was delivered.
+5. `seed-recovery-control` — change to120pt and require fresh legacy observations
+   before testing the seed, so same-size-reconfigure loss cannot contaminate C2.
+6. `seed-invalidation` — seed176 then generic clear; observe whether it survives
+   (baseline) or returns120 (candidate). Both rows remain in the viewport. The
+   original999pt seed virtualized row0 away and invalidated the two-row fixture.
 
 ## Verdict semantics
 
 - **INVALID** (never bug-red): compile failure, launch failure/timeout, missing
-  report, wrong nonce/runtime, or a lost control case (`initial` /
-  `recovery-grow` not green in either variant).
+  report, wrong nonce/runtime, or a lost control case (`initial`,
+  `recovery-grow`, `seed-recovery-control` not green in either variant).
 - Hypothesis cases are recorded per variant with `hypothesis_match`; the final
   `summary.json` compares baseline vs candidate side by side. Root-cause
   judgment is left to the primary reviewer.

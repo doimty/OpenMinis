@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PROBE_APP = HERE / "ProbeApp.swift"
 
 REQUIRED_CASES = ("initial", "clear-same-content", "recovery-grow",
-                  "same-size-reconfigure", "seed-invalidation")
+                  "same-size-reconfigure", "seed-recovery-control", "seed-invalidation")
 
 
 def validate_report(report, nonce, variant):
@@ -65,19 +65,21 @@ def validate_report(report, nonce, variant):
             if "cachedHeight" not in r or (r['cachedHeight'] is not None and not number(r['cachedHeight'])):
                 raise ValueError("missing/invalid layout cache")
         heights=[r['cellFrame'][3] for r in rows]
-        if s['case'] in ('initial','recovery-grow'):
-            wanted=96 if s['case']=='initial' else 160
+        if s['case'] in ('initial','recovery-grow','seed-recovery-control'):
+            wanted={'initial':96,'recovery-grow':160,'seed-recovery-control':120}[s['case']]
             if not all(near(h,wanted) for h in heights) or not all(near(r['hostFrame'][3],wanted) for r in rows):
                 raise ValueError("raw control frames disagree: INVALID")
+            if s['case']=='seed-recovery-control' and not all(near(r['cache']['legacyMeasuredHeight'],120) for r in rows):
+                raise ValueError("seed control lacks a fresh observation: INVALID")
             if s.get('hypothesis_match') is not None:
                 raise ValueError("control must not masquerade as hypothesis")
         else:
             if s['case']=='clear-same-content':
                 observed=near(heights[0],40 if variant=='baseline' else 96)
             elif s['case']=='same-size-reconfigure':
-                observed=all(near(h,160) for h in heights)
+                observed=all(near(h,160) for h in heights) and all(near(r['cache']['legacyMeasuredHeight'],160) for r in rows)
             else:
-                observed=near(heights[1],999 if variant=='baseline' else 160)
+                observed=near(heights[1],176 if variant=='baseline' else 120)
             if type(s.get('hypothesis_match')) is not bool or s['hypothesis_match'] != observed:
                 raise ValueError("hypothesis flag disagrees with raw height")
     return report
@@ -145,10 +147,10 @@ class ExtractionTests(unittest.TestCase):
 
 class ValidatorTests(unittest.TestCase):
     def sample(self, case, variant='baseline'):
-        real=96 if case in ('initial','clear-same-content') else 160
+        real=96 if case in ('initial','clear-same-content') else (120 if case in ('seed-recovery-control','seed-invalidation') else 160)
         heights=[real,real]
         if variant=='baseline' and case=='clear-same-content':heights[0]=40
-        if variant=='baseline' and case=='seed-invalidation':heights[1]=999
+        if variant=='baseline' and case=='seed-invalidation':heights[1]=176
         rows=[]
         for index,h in enumerate(heights):
             y=0 if index==0 else heights[0]+8
@@ -159,7 +161,7 @@ class ValidatorTests(unittest.TestCase):
                                   'legacyMeasuredHeight':float(real),'seededHeight':None,
                                   'seededWidth':None,'configGeneration':3,'hasWindow':True,'inCollection':True}})
         return {'case':case,'rows':rows,'expectation':'x','preferredCalls':10,
-                'hypothesis_match':None if case in ('initial','recovery-grow') else True}
+                'hypothesis_match':None if case in ('initial','recovery-grow','seed-recovery-control') else True}
 
     def report(self, variant="baseline"):
         return {"os": "26.2", "variant": variant, "runID": "nonce",
@@ -209,6 +211,17 @@ class ValidatorTests(unittest.TestCase):
     def test_false_hypothesis_summary_rejected(self):
         r=self.report();r['samples'][1]['hypothesis_match']=False
         with self.assertRaisesRegex(ValueError,'disagrees'):validate_report(r,'nonce','baseline')
+
+    def test_matching_reconfigure_frames_do_not_imply_rearmed_observation(self):
+        r=self.report();s=r['samples'][3]
+        for row in s['rows']:row['cache']['legacyMeasuredHeight']=None
+        with self.assertRaisesRegex(ValueError,'disagrees'):validate_report(r,'nonce','baseline')
+        s['hypothesis_match']=False
+        self.assertIs(validate_report(r,'nonce','baseline'),r)
+
+    def test_seed_control_must_reestablish_observation(self):
+        r=self.report();r['samples'][4]['rows'][0]['cache']['legacyMeasuredHeight']=None
+        with self.assertRaisesRegex(ValueError,'seed control'):validate_report(r,'nonce','baseline')
 
     def test_nonfinite_frame_rejected(self):
         r=self.report();r['samples'][0]['rows'][0]['hostFrame'][3]=float('nan')

@@ -209,27 +209,42 @@ struct RowContent: View {
         // Case 4 — identical reconfigure (hypothesis C4).
         configure(160)
         await settle()
-        let same = near(height(0), 160) && near(height(1), 160)
-        sample("same-size-reconfigure", expectation: "recover-same-size", hypothesis: same,
-               note: "identical height re-applied; observe whether the observation edge is re-delivered")
+        let same = (0..<2).allSatisfy { index in
+            guard let cell = cv.cellForItem(at: IndexPath(item:index,section:0)) as? CountingCell else { return false }
+            return near(height(index),160) && near(cell.probeCacheSnapshot.legacyMeasuredSize?.height,160)
+        }
+        sample("same-size-reconfigure", expectation: "same-size-observation-rearmed", hypothesis: same,
+               note: "matching frame alone is insufficient: the legacy observation must also be re-delivered")
 
-        // Case 5 — stale-seed invalidation (hypothesis C2).
+        // Independent positive control before C2: reconfigure above may have
+        // erased the observation without changing the still-cached frames.
+        configure(120)
+        await settle()
+        let seedReady = (0..<2).allSatisfy { index in
+            guard let cell = cv.cellForItem(at: IndexPath(item:index,section:0)) as? CountingCell else { return false }
+            return near(height(index),120) && near(cell.probeCacheSnapshot.legacyMeasuredSize?.height,120)
+        }
+        sample("seed-recovery-control", expectation:"fresh-observation-120", hypothesis:nil,
+               check:seedReady, note:"separate C2 from same-size-reconfigure observation loss")
+
+        // A bounded stale seed keeps BOTH rows inside the viewport. 999pt
+        // virtualized row0 away, invalidating the two-row observation fixture.
         if let cell = cv.cellForItem(at: IndexPath(item: 1, section: 0)) as? CountingCell {
-            cell.seedMeasuredHeight(999, width: cv.bounds.width)
+            cell.seedMeasuredHeight(176, width: cv.bounds.width)
             cell.clearCachedHeight()
         }
         vc.messageListLayout.invalidateHeight(at: 1)
         cv.collectionViewLayout.invalidateLayout()
         cv.setNeedsLayout()
         await settle()
-        let staleSeed = near(height(1), 999)
-        let seedCleared = near(height(1), 160)
+        let staleSeed = near(height(1), 176)
+        let seedCleared = near(height(1), 120)
         sample("seed-invalidation",
                expectation: variant == "baseline" ? "stale-seed-wins" : "seed-cleared",
                hypothesis: variant == "baseline" ? staleSeed : seedCleared,
-               note: "seed 999 then clear; baseline must show the seed survives clearCachedHeight")
+               note: "seed176 then clear after independent120pt recovery; observe whether stale seed survives")
 
-        let controlsPassed = checks.count == 2 && checks.allSatisfy { $0 }
+        let controlsPassed = checks.count == 3 && checks.allSatisfy { $0 }
         let report: [String: Any] = [
             "os": UIDevice.current.systemVersion,
             "variant": variant,
