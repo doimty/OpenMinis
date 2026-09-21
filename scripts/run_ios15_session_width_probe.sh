@@ -89,6 +89,7 @@ if device['state'] != 'Booted':
 subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True, timeout=180)
 run('install', udid, str(Path(os.environ['BUILD']) / 'SessionWidthProbe.app'))
 command = ['xcrun', 'simctl', 'launch', '--console', '--terminate-running-process',
+           '--env', f'PROBE_RUN_ID={os.environ["PROBE_RUN_ID"]}',
            udid, 'com.openminis.session-width-probe']
 try:
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -112,6 +113,8 @@ if result.returncode or not report_path.exists():
 report = json.loads(report_path.read_text())
 if report.get('os') != '26.2':
     raise SystemExit(f"FAIL: unexpected runtime {report.get('os')!r}")
+if report.get('runID') != os.environ['PROBE_RUN_ID']:
+    raise SystemExit(f"FAIL: report runID mismatch: {report.get('runID')!r}")
 if len(report.get('samples', [])) != 24:
     raise SystemExit(f"FAIL: expected 24 samples, got {len(report.get('samples', []))}")
 print('MATRIX_COMPLETE:', len(report['samples']))
