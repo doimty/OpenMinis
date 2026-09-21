@@ -3,13 +3,14 @@ name: ios15-debug-bridge-probe
 on:
   workflow_dispatch:
   push:
-    branches: [fix/ios15-debug-bridge-names]
+    branches: [fix/ios15-debug-bridge-names, fix/ios15-debug-cli-operands]
     paths:
       - .github/workflows/ios15-debug-bridge-probe.yml
       - scripts/ios15-debug-bridge-probe/**
       - scripts/prepare_debug_bridge_probe.py
       - scripts/run_debug_bridge_probe.sh
       - scripts/test_debug_bridge_names.py
+      - scripts/test_debug_cli_operands.py
       - src/ios/Debug/DebugLocalDispatch.swift
       - src/ios/Debug/MinisDebugLogReader.swift
       - src/ios/NativeOffloads/DebugOffload.m
@@ -32,6 +33,8 @@ jobs:
           submodules: false
       - name: Source and report contract checks
         run: python3 scripts/test_debug_bridge_names.py -v
+      - name: Native CLI operand baseline and candidate tests
+        run: python3 scripts/test_debug_cli_operands.py --output "$RUNNER_TEMP/debug-cli-operands"
       - name: Real native baseline and candidate bridge tests
         run: |
           set -euo pipefail
@@ -45,5 +48,6 @@ jobs:
           path: |
             ${{ runner.temp }}/debug-bridge-probe
             ${{ runner.temp }}/debug-bridge-probe-run.log
+            ${{ runner.temp }}/debug-cli-operands
           if-no-files-found: warn
           retention-days: 14

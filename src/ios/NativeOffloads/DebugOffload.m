@@ -85,10 +85,10 @@ static NSString *const HELP_TEXT =
 
 #pragma mark - Arg helpers (shared by all subcommands, incl. Release-safe `logs`)
 
-/// Pick up the first non-flag argument after the subcommand (positional[1]).
+/// Pick up the first operand; noff_positional_args already excludes the subcommand.
 static NSString *_Nullable second_positional(int argc, char **argv) {
     NSArray<NSString *> *pos = noff_positional_args(argc, argv);
-    return pos.count >= 2 ? pos[1] : nil;
+    return pos.firstObject;
 }
 
 /// Build NSNumber from a --flag string; nil if absent.
