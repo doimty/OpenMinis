@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Source/probe guards, not the native runtime-name test."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 
-from prepare_debug_bridge_probe import DEFAULT_BASELINE, SWIFT_SOURCES, OFFLOAD_SOURCE, dispatcher_slice, prepare, validate_report
+from prepare_debug_bridge_probe import DEFAULT_BASELINE, SWIFT_SOURCES, OFFLOAD_SOURCE, INPUT_PATHS, dispatcher_slice, prepare, validate_report
 ROOT=Path(__file__).resolve().parents[1]
+PROBE_INFRA_FIXTURE='scripts/run_debug_bridge_probe.sh'
 
 
 class BridgeSourceTests(unittest.TestCase):
@@ -43,6 +45,35 @@ class BridgeSourceTests(unittest.TestCase):
         import re
         self.assertIsNone(re.search(r'^\s*#if DEBUG', (ROOT/SWIFT_SOURCES[1]).read_text(),re.M))
 
+    def test_worktree_bytes_cannot_claim_head_commit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'repo';root.mkdir()
+            for p in INPUT_PATHS:
+                target=root/p;target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_bytes((ROOT/p).read_bytes())
+            env=dict(os.environ,GIT_AUTHOR_NAME='Probe Fixture',GIT_AUTHOR_EMAIL='probe@example.invalid',
+                     GIT_COMMITTER_NAME='Probe Fixture',GIT_COMMITTER_EMAIL='probe@example.invalid')
+            def git(*args):
+                return subprocess.check_output(['git','-C',str(root),*args],env=env,stderr=subprocess.STDOUT,text=True).strip()
+            git('init','-q');git('add','--',*INPUT_PATHS);git('commit','-qm','fixture')
+            head=git('rev-parse','HEAD')
+            clean=prepare(root,Path(tmp)/'clean',head)
+            self.assertEqual(clean['candidate_commit'],head)
+            self.assertEqual(clean['candidate_source_kind'],'commit')
+            path=root/SWIFT_SOURCES[0];original=path.read_bytes()
+            path.write_bytes(original+b'\n// provenance fixture\n')
+            dirty=prepare(root,Path(tmp)/'dirty',head)
+            self.assertIsNone(dirty['candidate_commit'])
+            self.assertEqual(dirty['candidate_head_commit'],head)
+            self.assertEqual(dirty['candidate_source_kind'],'worktree')
+            self.assertNotEqual(dirty['candidate_input_sha256'],clean['candidate_input_sha256'])
+            self.assertTrue(any(SWIFT_SOURCES[0] in p for p in dirty['candidate_dirty_inputs']))
+            path.write_bytes(original)
+            (root/PROBE_INFRA_FIXTURE).write_text((root/PROBE_INFRA_FIXTURE).read_text()+'\n# provenance fixture\n')
+            infra=prepare(root,Path(tmp)/'infra',head)
+            self.assertIsNone(infra['candidate_commit'])
+            self.assertNotEqual(infra['candidate_input_sha256'],clean['candidate_input_sha256'])
+
 
 class ReportTests(unittest.TestCase):
     def report(self,variant):
@@ -75,6 +106,18 @@ class ReportTests(unittest.TestCase):
     def test_summary_cannot_hide_failed_check(self):
         r=self.report('candidate');r['coldDispatcherLookup']=False
         with self.assertRaisesRegex(ValueError,'contradicts'):validate_report(r,'nonce','candidate')
+
+    def test_partial_baseline_lookup_is_not_full_two_class_red(self):
+        for key in ('coldLogReaderLookup','warmDispatcherIdentity','warmLogReaderIdentity'):
+            r=self.report('baseline');r[key]=True
+            with self.subTest(key=key),self.assertRaisesRegex(ValueError,'two-class'):
+                validate_report(r,'nonce','baseline')
+
+    def test_baseline_names_must_match_real_namespaced_defect(self):
+        for key in ('runtimeDispatcherName','runtimeLogReaderName'):
+            r=self.report('baseline');r[key]='Unexpected'
+            with self.subTest(key=key),self.assertRaisesRegex(ValueError,'namespaced'):
+                validate_report(r,'nonce','baseline')
 
 
 if __name__=='__main__':unittest.main(verbosity=2)

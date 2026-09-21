@@ -10,6 +10,10 @@ import subprocess
 DEFAULT_BASELINE = '3773812539d0090d2ea4c7b175d4d2a1df3bbee9'
 SWIFT_SOURCES = ('src/ios/Debug/DebugLocalDispatch.swift', 'src/ios/Debug/MinisDebugLogReader.swift')
 OFFLOAD_SOURCE = 'src/ios/NativeOffloads/DebugOffload.m'
+PROBE_FILES = ('ProbeApp.swift', 'ProbeStubs.swift', 'BridgeProbe.h')
+PROBE_INFRA = ('scripts/prepare_debug_bridge_probe.py', 'scripts/run_debug_bridge_probe.sh',
+               'scripts/test_debug_bridge_names.py', '.github/workflows/ios15-debug-bridge-probe.yml')
+INPUT_PATHS = SWIFT_SOURCES + (OFFLOAD_SOURCE,) + tuple('scripts/ios15-debug-bridge-probe/'+name for name in PROBE_FILES) + PROBE_INFRA
 
 
 def dispatcher_slice(source):
@@ -35,8 +39,10 @@ def validate_report(report, nonce, variant):
     if report.get('passed') is not all(report[k] for k in checks):
         raise ValueError('verdict contradicts native checks')
     if variant == 'baseline':
-        if report['passed'] or report['coldDispatcherLookup'] or 'DebugLocalDispatch unavailable' not in str(report.get('backgroundError', '')):
-            raise ValueError('baseline did not reproduce the expected class-lookup failure')
+        if report['passed'] or any(report[k] for k in checks) or 'DebugLocalDispatch unavailable' not in str(report.get('backgroundError', '')):
+            raise ValueError('baseline did not reproduce the expected two-class lookup failure')
+        if report.get('runtimeDispatcherName') != 'Minis.DebugLocalDispatch' or report.get('runtimeLogReaderName') != 'Minis.MinisDebugLogReader':
+            raise ValueError('baseline runtime names do not match the namespaced defect')
     elif variant == 'candidate':
         if not report['passed']:
             raise ValueError('candidate bridge is still broken')
@@ -58,11 +64,17 @@ def prepare(root, output, baseline):
     else:
         raise ValueError('output cannot modify production src')
     output.mkdir(parents=True, exist_ok=True)
-    candidate_commit = subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'], text=True).strip()
-    metadata = {'baseline_commit': baseline, 'candidate_commit': candidate_commit, 'variants': {}, 'probe_sha256': {}}
-    for name in ('ProbeApp.swift', 'ProbeStubs.swift', 'BridgeProbe.h'):
-        path=root/'scripts/ios15-debug-bridge-probe'/name
-        metadata['probe_sha256'][name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    candidate_head = subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'], text=True).strip()
+    dirty = subprocess.check_output(['git','-C',str(root),'status','--porcelain=v1','--untracked-files=all','--',*INPUT_PATHS],text=True).splitlines()
+    input_hashes = {path: hashlib.sha256((root/path).read_bytes()).hexdigest() for path in INPUT_PATHS}
+    metadata = {'baseline_commit': baseline, 'candidate_head_commit': candidate_head,
+                'candidate_commit': None if dirty else candidate_head,
+                'candidate_source_kind': 'worktree' if dirty else 'commit',
+                'candidate_dirty_inputs': dirty,
+                'candidate_input_sha256': hashlib.sha256(json.dumps(input_hashes,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
+                'candidate_input_hashes': input_hashes, 'variants': {}, 'probe_sha256': {}}
+    for name in PROBE_FILES:
+        metadata['probe_sha256'][name] = input_hashes['scripts/ios15-debug-bridge-probe/'+name]
     for variant in ('baseline','candidate'):
         target=output/variant; target.mkdir(exist_ok=True)
         inputs={}
