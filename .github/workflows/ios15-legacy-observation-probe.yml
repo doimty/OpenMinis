@@ -25,6 +25,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # The comparison reads its immutable pre-fix source commit.
+          fetch-depth: 0
       - name: Extraction and evidence contracts
         run: python3 scripts/ios15-legacy-observation-probe/test_observation_probe.py -v
       - name: Native forced-legacy collection observation

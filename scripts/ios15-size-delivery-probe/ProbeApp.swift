@@ -65,32 +65,39 @@ final class SizeDeliveryProbeApp: UIResponder, UIApplicationDelegate {
         // Intentionally unmounted: this is a notification contract, not a
         // rendering oracle. Only the explicit test-seam samples drive it.
         let view = LegacyHostingContentView(configuration: makeConfiguration(recorder, owner: "A"))
-        let sample: (CGFloat) -> CGSize = { CGSize(width: 320, height: $0) }
+        // The seam now takes a generation-stamped payload; stamp the CURRENT
+        // configuration generation so the guard accepts the explicit sample
+        // while the coalescing/ownership contract under test is unchanged.
+        let emit: (CGFloat) -> Void = { height in
+            view.contentSizeChanged(LegacyHostedSize(
+                generation: view.probeConfigurationGeneration,
+                size: CGSize(width: 320, height: height)))
+        }
         let expected: String
         switch name {
         case "single-sample-control":
-            view.contentSizeChanged(sample(48))
+            emit(48)
             expected = "one A delivery, height48"
         case "duplicate-sample-control":
-            view.contentSizeChanged(sample(48))
-            view.contentSizeChanged(sample(48))
+            emit(48)
+            emit(48)
             expected = "one A delivery, height48; identical sample is deduplicated"
         case "coalesced-shrink":
-            view.contentSizeChanged(sample(72))
-            view.contentSizeChanged(sample(36))
+            emit(72)
+            emit(36)
             expected = "one A delivery containing the latest height36, not the first height72"
         case "coalesced-growth":
-            view.contentSizeChanged(sample(36))
-            view.contentSizeChanged(sample(72))
+            emit(36)
+            emit(72)
             expected = "one A delivery containing the latest height72, not the first height36"
         case "replacement-without-new-sample":
-            view.contentSizeChanged(sample(96))
+            emit(96)
             view.configuration = makeConfiguration(recorder, owner: "B")
             expected = "no B delivery for an A-root measurement; cancellation or delivery to A is allowed"
         case "replacement-with-new-sample":
-            view.contentSizeChanged(sample(96))
+            emit(96)
             view.configuration = makeConfiguration(recorder, owner: "B")
-            view.contentSizeChanged(sample(36))
+            emit(36)
             expected = "B receives height36 only; no A-root height96 is relabeled as B"
         default:
             fatalError("Unknown test case")

@@ -5,16 +5,35 @@ Run anywhere (Linux included): python3 -m unittest -v test_revision_probe.py
 """
 import json
 import math
+import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from prepare_revision_probe import (SOURCE_PATHS, SPLIT, CLEAR_OLD, CLEAR_C1, GETTER_HEAD, GETTER_TAIL,
-                                    ROUTING, GATE, prepare, restore_infrastructure, restore_legacy)
+from prepare_revision_probe import (SOURCE_PATHS, SPLIT, BASELINE_COMMIT, CLEAR_OLD, CLEAR_C1,
+                                    GETTER_HEAD, GETTER_TAIL, ROUTING, GATE,
+                                    prepare, restore_infrastructure, restore_legacy, make_legacy)
 
 HERE = Path(__file__).resolve().parent
 ROOT = Path(__file__).resolve().parents[2]
 PROBE_APP = HERE / "ProbeApp.swift"
+
+
+
+def locked(path):
+    return subprocess.check_output(["git", "-C", str(ROOT), "show", f"{BASELINE_COMMIT}:{path}"], text=True)
+
+
+def normalize_swift(text):
+    no_comments = re.sub(r"//[^\n]*", "", text)
+    return re.sub(r"\s+", " ", no_comments).strip()
+
+
+def clear_body(source):
+    start = source.index("func clearCachedHeight() {")
+    end = source.index("}", start) + 1
+    return source[start:end]
 
 REQUIRED_CASES = ("initial", "clear-same-content", "recovery-grow",
                   "same-size-reconfigure", "seed-recovery-control", "seed-invalidation")
@@ -94,14 +113,14 @@ class ExtractionTests(unittest.TestCase):
         self.out = Path(tmp.name)
         self.manifest = prepare(ROOT, self.out, HERE)
 
-    def test_baseline_infrastructure_restores_to_production_bytes(self):
+    def test_baseline_infrastructure_restores_to_locked_old_commit(self):
         text = (self.out / "ProductionInfrastructure-baseline.swift").read_text()
-        production = (ROOT / SOURCE_PATHS[3]).read_text().split(SPLIT, 1)[0]
-        self.assertEqual(restore_infrastructure(text), production)
+        old_infra = locked(SOURCE_PATHS[3]).split(SPLIT, 1)[0]
+        self.assertEqual(restore_infrastructure(text), old_infra)
 
-    def test_baseline_legacy_is_byte_copy_of_production(self):
+    def test_baseline_legacy_is_byte_copy_of_locked_old_commit(self):
         self.assertEqual((self.out / "LegacyHostingContent-baseline.swift").read_bytes(),
-                         (ROOT / SOURCE_PATHS[1]).read_bytes())
+                         locked(SOURCE_PATHS[1]).encode())
 
     def test_c1_diff_is_exactly_the_declared_clear_edit(self):
         base = (self.out / "ProductionInfrastructure-baseline.swift").read_text()
@@ -117,12 +136,27 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual((self.out / "ProductionInfrastructure-c3.swift").read_bytes(),
                          (self.out / "ProductionInfrastructure-c1.swift").read_bytes())
 
-    def test_c3_legacy_restores_to_production_bytes_and_carries_generation_guard(self):
+    def test_c3_legacy_restores_to_locked_old_commit_and_carries_generation_guard(self):
         text = (self.out / "LegacyHostingContent-c3.swift").read_text()
         self.assertIn("LegacyHostedSize", text)
         self.assertIn("payload.generation == configurationGeneration", text)
         self.assertIn("value: LegacyHostedSize(generation: generation, size: proxy.size)", text)
-        self.assertEqual(restore_legacy(text), (ROOT / SOURCE_PATHS[1]).read_text())
+        self.assertEqual(restore_legacy(text), locked(SOURCE_PATHS[1]))
+
+    def test_production_legacy_is_byte_identical_to_verified_c3(self):
+        # The landed production file must equal the C3 variant that native run
+        # 35596858464 verified, generated from the LOCKED pre-change commit.
+        verified = make_legacy(locked(SOURCE_PATHS[1]), "c3")
+        self.assertEqual((ROOT / SOURCE_PATHS[1]).read_text(), verified)
+
+    def test_production_clear_matches_verified_c1_modulo_comments(self):
+        # Production clearCachedHeight must keep the C1 statement set; only the
+        # probe-tag comment was rewritten for production.
+        production = (ROOT / SOURCE_PATHS[3]).read_text()
+        self.assertEqual(normalize_swift(clear_body(production)), normalize_swift(CLEAR_C1))
+        self.assertNotIn("legacyMeasuredSize = nil", clear_body(production))
+        self.assertIn("seededHeight = nil", clear_body(production))
+        self.assertIn("seededWidth = nil", clear_body(production))
 
     def test_all_variants_carry_readonly_getters(self):
         for variant in VARIANTS:
@@ -134,9 +168,12 @@ class ExtractionTests(unittest.TestCase):
             self.assertIn('"inCollection": inCollection', text)
             self.assertNotIn('"hasWindow": window != nil', text)
 
-    def test_companion_sources_are_byte_copies(self):
+    def test_companion_sources_are_byte_copies_of_locked_commit(self):
         for p in (SOURCE_PATHS[0], SOURCE_PATHS[2]):
-            self.assertEqual((self.out / Path(p).name).read_bytes(), (ROOT / p).read_bytes())
+            self.assertEqual((self.out / Path(p).name).read_bytes(), locked(p).encode())
+
+    def test_manifest_records_locked_baseline(self):
+        self.assertEqual(self.manifest["baseline_commit"], BASELINE_COMMIT)
 
     def test_manifest_records_hashes_and_edit_list(self):
         self.assertEqual(len(self.manifest["source_sha256"]), len(SOURCE_PATHS))

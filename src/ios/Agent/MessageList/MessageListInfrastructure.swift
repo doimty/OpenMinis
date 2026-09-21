@@ -776,12 +776,18 @@ class SelfSizingCell: UICollectionViewCell {
     }
 
     /// Clear the cached computed height so the next preferredLayoutAttributesFitting
-    /// call re-measures via systemLayoutSizeFitting instead of returning stale data.
+    /// call re-measures instead of returning stale data. Keeps the same-owner
+    /// async legacy observation: on iOS 15 it is the only synchronous-free size
+    /// source and the producer dedups equal sizes, so clearing it during a
+    /// generic invalidation would strand the row at the layout estimate until a
+    /// real size change arrives. applyContentConfiguration still clears it when
+    /// the content itself changes.
     func clearCachedHeight() {
         lastComputedHeight = nil
         lastComputedWidth = nil
         lastMeasureMediaTime = nil
-        legacyMeasuredSize = nil
+        seededHeight = nil
+        seededWidth = nil
     }
 
     override func prepareForReuse() {

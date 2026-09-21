@@ -5,7 +5,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
+
+# Locked commit whose tree contains the PRE-change (baseline-red) bytes verified
+# in native run 35596858464 / revision run 35587424276. The generator must never
+# read the new production source as the old baseline.
+BASELINE_COMMIT = "8b601279c962f9b37e1e1b1f32a857cef98fafb1"
+
+
+def git_source(root: Path, commit: str, path: str) -> str:
+    return subprocess.check_output(["git", "-C", str(root), "show", f"{commit}:{path}"], text=True)
 
 SOURCE_PATHS = (
     "src/ios/Shared/LegacyFlowLayout.swift",
@@ -218,11 +228,12 @@ def make_legacy(source: str, variant: str) -> str:
     return source
 
 
-def prepare(root: Path, out: Path, probe_dir: Path | None = None) -> dict:
+def prepare(root: Path, out: Path, probe_dir: Path | None = None,
+            baseline_commit: str = BASELINE_COMMIT) -> dict:
     root, out = Path(root), Path(out)
     probe_dir = Path(probe_dir) if probe_dir else Path(__file__).resolve().parent
     out.mkdir(parents=True, exist_ok=True)
-    source = {p: (root / p).read_text() for p in SOURCE_PATHS}
+    source = {p: git_source(root, baseline_commit, p) for p in SOURCE_PATHS}
     variants = {}
     for variant in ("baseline", "c1", "c3"):
         infra = make_infrastructure(source[SOURCE_PATHS[3]], variant)
@@ -238,7 +249,8 @@ def prepare(root: Path, out: Path, probe_dir: Path | None = None) -> dict:
     probe_files = ("ProbeApp.swift", "run_revision_probe.sh", "prepare_revision_probe.py",
                    "test_revision_probe.py", "README.md")
     manifest = {
-        "source_sha256": {p: hashlib.sha256((root / p).read_bytes()).hexdigest() for p in SOURCE_PATHS},
+        "baseline_commit": baseline_commit,
+        "source_sha256": {p: hashlib.sha256(source[p].encode()).hexdigest() for p in SOURCE_PATHS},
         "probe_sha256": {p: hashlib.sha256((probe_dir / p).read_bytes()).hexdigest()
                          for p in probe_files if (probe_dir / p).is_file()},
         "variants": variants,

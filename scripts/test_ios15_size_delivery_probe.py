@@ -1,30 +1,33 @@
 #!/usr/bin/env python3
 """Generator invariants only. These tests do not run Apple's notification code."""
-import difflib
 from pathlib import Path
 import tempfile
 import unittest
 
 from prepare_ios15_size_delivery_probe import (
     PRIVATE_SEAM, TEST_SEAM, RELATIVE_SOURCE, CASE_NAMES,
-    prepare, testable_source, validate_native_report,
+    prepare, testable_source, restore_source, validate_native_report,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class SourceCopyTests(unittest.TestCase):
-    def test_current_source_is_already_testable_without_behavioral_rewrite(self):
+    def test_generated_copy_restores_exactly_to_production_source(self):
         source = (ROOT / RELATIVE_SOURCE).read_text()
         generated = testable_source(source)
-        self.assertEqual(generated, source)
-        delta = list(difflib.unified_diff(source.splitlines(), generated.splitlines()))
-        changed = [line for line in delta if line.startswith(('+', '-')) and not line.startswith(('+++', '---'))]
-        self.assertEqual(changed, [])
+        self.assertNotEqual(generated, source)
+        self.assertIn('func contentSizeChanged(_ payload: LegacyHostedSize)', generated)
+        self.assertIn('var probeConfigurationGeneration: UInt', generated)
+        self.assertIn('struct LegacyHostedSize', generated)
+        self.assertEqual(restore_source(generated), source)
 
     def test_old_private_source_only_widens_access(self):
-        source = PRIVATE_SEAM + '\n'
-        self.assertEqual(testable_source(source), TEST_SEAM + '\n')
+        fixture = ('private struct LegacyHostedSize: Equatable { let generation: UInt; let size: CGSize }\n'
+                   + PRIVATE_SEAM + '\n'
+                   + '    override func layoutSubviews() {}\n')
+        generated = testable_source(fixture)
+        self.assertEqual(restore_source(generated), fixture)
 
     def test_missing_seam_fails(self):
         with self.assertRaisesRegex(ValueError, 'exactly one'):
@@ -42,7 +45,9 @@ class SourceCopyTests(unittest.TestCase):
             generated = Path(tmp) / 'LegacyHostingContentTestable.swift'
             self.assertTrue(generated.is_file())
             self.assertEqual(metadata['production_source'], str(RELATIVE_SOURCE))
-            self.assertEqual(metadata['production_source_sha256'], metadata['generated_source_sha256'])
+            # The generated copy only widens access + adds a probe getter:
+            # restoring it must recover the production bytes exactly.
+            self.assertEqual(restore_source(generated.read_text()), before.decode())
         self.assertEqual(source_path.read_bytes(), before)
 
     def test_generation_refuses_production_directory(self):

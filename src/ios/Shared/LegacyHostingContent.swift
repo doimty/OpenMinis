@@ -22,14 +22,22 @@ final class WeakHostingParent {
     init(_ value: UIViewController?) { self.value = value }
 }
 
+private struct LegacyHostedSize: Equatable {
+    let generation: UInt
+    let size: CGSize
+}
+
 private struct LegacyHostedSizeKey: PreferenceKey {
-    static var defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
+    static var defaultValue = LegacyHostedSize(generation: 0, size: .zero)
+    static func reduce(value: inout LegacyHostedSize, nextValue: () -> LegacyHostedSize) {
+        value = nextValue()
+    }
 }
 
 private struct LegacyHostedRoot: View {
     let content: AnyView
-    let onSizeChange: (CGSize) -> Void
+    let generation: UInt
+    let onSizeChange: (LegacyHostedSize) -> Void
 
     var body: some View {
         content
@@ -46,7 +54,9 @@ private struct LegacyHostedRoot: View {
             // content and reports the real rendered size.
             .overlay(
                 GeometryReader { proxy in
-                    Color.clear.preference(key: LegacyHostedSizeKey.self, value: proxy.size)
+                    Color.clear.preference(
+                        key: LegacyHostedSizeKey.self,
+                        value: LegacyHostedSize(generation: generation, size: proxy.size))
                 }
             )
             .onPreferenceChange(LegacyHostedSizeKey.self, perform: onSizeChange)
@@ -104,8 +114,9 @@ final class LegacyHostingContentView: UIView, UIContentView {
         configurationGeneration &+= 1
         pendingSize = nil
         lastSize = .zero
-        host.rootView = AnyView(LegacyHostedRoot(content: current.content) { [weak self] size in
-            self?.contentSizeChanged(size)
+        let generation = configurationGeneration
+        host.rootView = AnyView(LegacyHostedRoot(content: current.content, generation: generation) { [weak self] payload in
+            self?.contentSizeChanged(payload)
         })
         attachIfNeeded()
         host.view.invalidateIntrinsicContentSize()
@@ -206,7 +217,11 @@ final class LegacyHostingContentView: UIView, UIContentView {
         return CGSize(width: width, height: max(0, ceil(size.height)))
     }
 
-    func contentSizeChanged(_ size: CGSize) {
+    private func contentSizeChanged(_ payload: LegacyHostedSize) {
+        // Reject a delayed preference produced by a superseded root before it
+        // can update lastSize or enter the current configuration's callback.
+        guard payload.generation == configurationGeneration else { return }
+        let size = payload.size
         guard size.width > 1, size.height.isFinite,
               abs(size.width - lastSize.width) > 0.5 || abs(size.height - lastSize.height) > 0.5 else { return }
         lastSize = size

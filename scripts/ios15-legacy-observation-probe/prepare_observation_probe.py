@@ -3,7 +3,13 @@
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
+
+# Locked commit whose tree contains the PRE-change bytes verified by native run
+# 35587424276. The generator must never read the new production source as the
+# old baseline.
+BASELINE_COMMIT = "8b601279c962f9b37e1e1b1f32a857cef98fafb1"
 
 SOURCE_PATHS = [
     "src/ios/Shared/LegacyFlowLayout.swift",
@@ -88,10 +94,14 @@ def restore_production(text):
     return text[:start] + text[end:]
 
 
+def git_source(root, commit, path):
+    return subprocess.check_output(["git", "-C", str(root), "show", f"{commit}:{path}"], text=True)
+
+
 def prepare(root, out, probe_dir=None):
     root, out, probe_dir = Path(root), Path(out), Path(probe_dir) if probe_dir else Path(__file__).resolve().parent
     out.mkdir(parents=True, exist_ok=True)
-    source = {p: (root / p).read_text() for p in SOURCE_PATHS}
+    source = {p: git_source(root, BASELINE_COMMIT, p) for p in SOURCE_PATHS}
     infra_full = source[SOURCE_PATHS[3]]
     if infra_full.count(SPLIT) != 1:
         raise ValueError("Cell State Bridge split marker drifted")
@@ -124,7 +134,8 @@ def prepare(root, out, probe_dir=None):
     generated = {p.name: hashlib.sha256((out / p.name).read_bytes()).hexdigest()
                  for p in out.glob("*.swift")}
     manifest = {
-        "source_sha256": {p: hashlib.sha256((root / p).read_bytes()).hexdigest() for p in SOURCE_PATHS},
+        "baseline_commit": BASELINE_COMMIT,
+        "source_sha256": {p: hashlib.sha256(source[p].encode()).hexdigest() for p in SOURCE_PATHS},
         "generated_sha256": generated,
         "probe_sha256": probe_sha,
         "routing_edits": ["applyHostedContent: force legacy via ProbeSettings.forceLegacy (both variants)"],

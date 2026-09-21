@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate a test-access copy; never rewrite the production source.
 
-Only the access level of the actual notification method is widened. No sizing,
-coalescing, callback, lifecycle, or dispatch logic is changed by this script.
+Only the access level of the notification method and payload are widened in the
+generated copy (plus a probe-only generation getter). No sizing, coalescing,
+callback, lifecycle, or dispatch logic is changed by this script.
 """
 import argparse
 import hashlib
@@ -11,8 +12,10 @@ from pathlib import Path
 import subprocess
 
 RELATIVE_SOURCE = Path('src/ios/Shared/LegacyHostingContent.swift')
-PRIVATE_SEAM = '    private func contentSizeChanged(_ size: CGSize) {'
-TEST_SEAM = '    func contentSizeChanged(_ size: CGSize) {'
+PRIVATE_SEAM = '    private func contentSizeChanged(_ payload: LegacyHostedSize) {'
+TEST_SEAM = '    func contentSizeChanged(_ payload: LegacyHostedSize) {'
+GETTER_HEAD = '\n    // === BEGIN SIZE-DELIVERY PROBE GETTER ==='
+GETTER_TAIL = '    // === END SIZE-DELIVERY PROBE GETTER ===\n'
 CASE_NAMES = (
     'single-sample-control', 'duplicate-sample-control', 'coalesced-shrink',
     'coalesced-growth', 'replacement-without-new-sample', 'replacement-with-new-sample',
@@ -39,11 +42,40 @@ def validate_native_report(report, expected_run_id):
 
 
 def testable_source(source):
-    private_count = source.count(PRIVATE_SEAM)
-    internal_count = source.count(TEST_SEAM)
-    if private_count + internal_count != 1:
+    if source.count(PRIVATE_SEAM) == 1:
+        source = source.replace(PRIVATE_SEAM, TEST_SEAM, 1)
+    elif source.count(TEST_SEAM) != 1:
         raise ValueError('expected exactly one contentSizeChanged seam')
-    return source.replace(PRIVATE_SEAM, TEST_SEAM, 1)
+    # The payload type is file-private; the probe (another file in the same
+    # module) must see it to construct explicit samples.
+    if source.count('private struct LegacyHostedSize: Equatable') != 1:
+        raise ValueError('expected exactly one private LegacyHostedSize payload')
+    source = source.replace('private struct LegacyHostedSize: Equatable', 'struct LegacyHostedSize: Equatable', 1)
+    getter = (GETTER_HEAD + '\n'
+              '    /// Probe-only read of the current configuration generation so\n'
+              '    /// explicit seam samples carry a generation the guard accepts.\n'
+              '    var probeConfigurationGeneration: UInt { configurationGeneration }\n'
+              + GETTER_TAIL)
+    anchor = '    override func layoutSubviews() {'
+    if source.count(anchor) != 1:
+        raise ValueError('layoutSubviews anchor drifted')
+    source = source.replace(anchor, getter + anchor, 1)
+    return source
+
+
+def restore_source(generated):
+    if generated.count(GETTER_HEAD) != 1 or generated.count(GETTER_TAIL) != 1:
+        raise ValueError('getter markers drifted')
+    start = generated.index(GETTER_HEAD)
+    end = generated.index(GETTER_TAIL) + len(GETTER_TAIL)
+    text = generated[:start] + generated[end:]
+    if text.count('struct LegacyHostedSize: Equatable') != 1:
+        raise ValueError('payload visibility marker drifted')
+    text = text.replace('struct LegacyHostedSize: Equatable', 'private struct LegacyHostedSize: Equatable', 1)
+    if text.count(TEST_SEAM) != 1:
+        raise ValueError('test seam marker drifted')
+    text = text.replace(TEST_SEAM, PRIVATE_SEAM, 1)
+    return text
 
 
 def prepare(root, output):
@@ -66,7 +98,7 @@ def prepare(root, output):
         'production_source': str(RELATIVE_SOURCE),
         'production_source_sha256': sha(original),
         'generated_source_sha256': sha(generated),
-        'allowed_transformation': 'contentSizeChanged access is internal in the production fix; old private source is widened in the generated copy only',
+        'allowed_transformation': 'generated copy widens contentSizeChanged access, de-privates the LegacyHostedSize payload, and adds a probe-only generation getter; production bytes are untouched',
         'probe_inputs_sha256': {
             relative: hashlib.sha256((root / relative).read_bytes()).hexdigest()
             for relative in (

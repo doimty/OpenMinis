@@ -5,12 +5,14 @@ Run anywhere (Linux included): python3 -m unittest -v test_observation_probe.py
 """
 import json
 import math
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from prepare_observation_probe import (SOURCE_PATHS, CLEAR_OLD, CLEAR_CANDIDATE, GETTER_HEAD, GETTER_TAIL,
-                                       ROUTING_EDIT, GATE, SPLIT, prepare, restore_production)
+from prepare_observation_probe import (SOURCE_PATHS, BASELINE_COMMIT, CLEAR_OLD, CLEAR_CANDIDATE,
+                                       GETTER_HEAD, GETTER_TAIL, ROUTING_EDIT, GATE, SPLIT,
+                                       prepare, restore_production)
 
 HERE = Path(__file__).resolve().parent
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +20,10 @@ PROBE_APP = HERE / "ProbeApp.swift"
 
 REQUIRED_CASES = ("initial", "clear-same-content", "recovery-grow",
                   "same-size-reconfigure", "seed-recovery-control", "seed-invalidation")
+
+
+def locked(path):
+    return subprocess.check_output(["git", "-C", str(ROOT), "show", f"{BASELINE_COMMIT}:{path}"], text=True)
 
 
 def validate_report(report, nonce, variant):
@@ -92,10 +98,12 @@ class ExtractionTests(unittest.TestCase):
         self.out = Path(tmp.name)
         self.manifest = prepare(ROOT, self.out, HERE)
 
-    def test_baseline_restores_to_production_bytes(self):
+    def test_baseline_restores_to_locked_old_commit(self):
         baseline = (self.out / "ProductionInfrastructure-baseline.swift").read_text()
-        production = (ROOT / SOURCE_PATHS[3]).read_text().split(SPLIT, 1)[0]
-        self.assertEqual(restore_production(baseline), production)
+        self.assertEqual(restore_production(baseline), locked(SOURCE_PATHS[3]).split(SPLIT, 1)[0])
+
+    def test_manifest_records_locked_baseline(self):
+        self.assertEqual(self.manifest["baseline_commit"], BASELINE_COMMIT)
 
     def test_candidate_diff_is_exactly_the_declared_clear_edit(self):
         baseline = (self.out / "ProductionInfrastructure-baseline.swift").read_text()
@@ -114,9 +122,9 @@ class ExtractionTests(unittest.TestCase):
             self.assertEqual(text.count(GETTER_TAIL), 1)
             self.assertIn("probeCacheSnapshot", text)
 
-    def test_companion_sources_are_byte_copies(self):
+    def test_companion_sources_are_byte_copies_of_locked_commit(self):
         for p in SOURCE_PATHS[:3]:
-            self.assertEqual((self.out / Path(p).name).read_bytes(), (ROOT / p).read_bytes())
+            self.assertEqual((self.out / Path(p).name).read_bytes(), locked(p).encode())
 
     def test_manifest_records_hashes_and_edit_list(self):
         self.assertEqual(len(self.manifest["source_sha256"]), len(SOURCE_PATHS))
