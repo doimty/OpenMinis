@@ -139,6 +139,8 @@ class ExtractionTests(unittest.TestCase):
         self.assertIn("cell.applyHostedContent(parent: vc)", text)
         self.assertIn("messageListLayout.invalidateHeight(at:", text)
         self.assertIn("cell.probeCacheSnapshot.json", text)
+        self.assertIn("{ [weak vc, model = self.model]", text)
+        self.assertIn("await dataSource?.apply(snapshot, animatingDifferences: false)", text)
 
 
 class ValidatorTests(unittest.TestCase):

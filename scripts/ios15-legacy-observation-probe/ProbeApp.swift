@@ -167,7 +167,7 @@ struct RowContent: View {
             vc.messageListLayout.setEstimatedHeight(40, at: index)
             vc.messageListLayout.setContentKey("b:fixture-\(index)", at: index)
         }
-        dataSource = UICollectionViewDiffableDataSource<Int, Int>(collectionView: cv) { [weak vc] cv, ip, item in
+        dataSource = UICollectionViewDiffableDataSource<Int, Int>(collectionView: cv) { [weak vc, model = self.model] cv, ip, item in
             guard let vc else { return nil }
             let cell = cv.dequeueReusableCell(withReuseIdentifier: "row", for: ip) as! CountingCell
             cell.contentKey = "b:fixture-\(item)"
@@ -176,7 +176,7 @@ struct RowContent: View {
         }
         var snapshot = NSDiffableDataSourceSnapshot<Int, Int>()
         snapshot.appendSections([0]); snapshot.appendItems([0, 1])
-        dataSource?.apply(snapshot, animatingDifferences: false)
+        await dataSource?.apply(snapshot, animatingDifferences: false)
         await settle()
 
         // Case 1 — real first layout positive control.
