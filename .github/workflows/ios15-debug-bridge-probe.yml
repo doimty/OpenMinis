@@ -1,0 +1,49 @@
+name: ios15-debug-bridge-probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/ios15-debug-bridge-names]
+    paths:
+      - .github/workflows/ios15-debug-bridge-probe.yml
+      - scripts/ios15-debug-bridge-probe/**
+      - scripts/prepare_debug_bridge_probe.py
+      - scripts/run_debug_bridge_probe.sh
+      - scripts/test_debug_bridge_names.py
+      - src/ios/Debug/DebugLocalDispatch.swift
+      - src/ios/Debug/MinisDebugLogReader.swift
+      - src/ios/NativeOffloads/DebugOffload.m
+
+permissions:
+  contents: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+
+jobs:
+  runtime-bridge:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Checkout with immutable baseline history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          submodules: false
+      - name: Source and report contract checks
+        run: python3 scripts/test_debug_bridge_names.py -v
+      - name: Real native baseline and candidate bridge tests
+        run: |
+          set -euo pipefail
+          bash scripts/run_debug_bridge_probe.sh "$RUNNER_TEMP/debug-bridge-probe" \
+            2>&1 | tee "$RUNNER_TEMP/debug-bridge-probe-run.log"
+      - name: Preserve native evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ios15-debug-bridge-probe
+          path: |
+            ${{ runner.temp }}/debug-bridge-probe
+            ${{ runner.temp }}/debug-bridge-probe-run.log
+          if-no-files-found: warn
+          retention-days: 14

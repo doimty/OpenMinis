@@ -16,7 +16,7 @@ import Foundation
 /// is shared across invocations (same lifetime as the app).
 ///
 /// Release builds compile this file out via `#if DEBUG`.
-@objc public final class DebugLocalDispatch: NSObject {
+@objc(DebugLocalDispatch) public final class DebugLocalDispatch: NSObject {
 
     @objc(sharedInstance)
     public static let shared = DebugLocalDispatch()

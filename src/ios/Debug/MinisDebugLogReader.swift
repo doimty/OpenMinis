@@ -23,7 +23,7 @@ import OSLog
 ///
 /// NOTE: not `#if DEBUG`-gated — Release availability is the whole point
 /// (T-ios-minis-debug-logs-oslogstore).
-@objc public final class MinisDebugLogReader: NSObject {
+@objc(MinisDebugLogReader) public final class MinisDebugLogReader: NSObject {
 
     @objc(sharedInstance)
     public static let shared = MinisDebugLogReader()
