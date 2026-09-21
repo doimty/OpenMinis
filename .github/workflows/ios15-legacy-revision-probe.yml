@@ -1,0 +1,41 @@
+name: ios15-legacy-revision-probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [diagnostics/ios15-legacy-observation]
+    paths:
+      - .github/workflows/ios15-legacy-revision-probe.yml
+      - scripts/ios15-legacy-revision-probe/**
+
+permissions:
+  contents: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+
+jobs:
+  revision:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Extraction and evidence contracts
+        run: python3 scripts/ios15-legacy-revision-probe/test_revision_probe.py -v
+      - name: Native baseline C1 and generation-aware comparison
+        run: |
+          set -euo pipefail
+          bash scripts/ios15-legacy-revision-probe/run_revision_probe.sh \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/legacy-revision" \
+            2>&1 | tee "$RUNNER_TEMP/legacy-revision-run.log"
+      - name: Preserve native evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: legacy-revision
+          path: |
+            ${{ runner.temp }}/legacy-revision
+            ${{ runner.temp }}/legacy-revision-run.log
+          if-no-files-found: warn
+          retention-days: 14
