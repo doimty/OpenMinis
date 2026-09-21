@@ -5223,7 +5223,14 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
     override var intrinsicContentSize: CGSize {
         let original = super.intrinsicContentSize
         guard bounds.width > 1, bounds.width.isFinite else {
-            return original
+            // During the legacy iOS 15 bridge's first intrinsic-size query,
+            // bounds.width is not established yet. Returning UITextView's
+            // original size here leaks its ideal width into SwiftUI, which
+            // can promote the live text view to the 10M NSTextContainer
+            // sentinel. Preserve the height estimate, but declare that this
+            // view has no intrinsic horizontal demand until a real width is
+            // available.
+            return CGSize(width: UIView.noIntrinsicMetric, height: original.height)
         }
         let height = sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height
         return CGSize(width: UIView.noIntrinsicMetric, height: height)
