@@ -1,0 +1,45 @@
+name: ios15-legacy-observation-probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [diagnostics/ios15-legacy-observation]
+    paths:
+      - .github/workflows/ios15-legacy-observation-probe.yml
+      - scripts/ios15-legacy-observation-probe/**
+      - src/ios/Shared/LegacyHostingContent.swift
+      - src/ios/Shared/LegacyFlowLayout.swift
+      - src/ios/Agent/MessageList/MessageListInfrastructure.swift
+      - src/ios/Agent/MessageList/MessageListLayout.swift
+
+permissions:
+  contents: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+
+jobs:
+  observation:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Extraction and evidence contracts
+        run: python3 scripts/ios15-legacy-observation-probe/test_observation_probe.py -v
+      - name: Native forced-legacy collection observation
+        run: |
+          set -euo pipefail
+          bash scripts/ios15-legacy-observation-probe/run_observation_probe.sh \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/legacy-observation" \
+            2>&1 | tee "$RUNNER_TEMP/legacy-observation-run.log"
+      - name: Preserve observation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: legacy-observation
+          path: |
+            ${{ runner.temp }}/legacy-observation
+            ${{ runner.temp }}/legacy-observation-run.log
+          if-no-files-found: warn
+          retention-days: 14
