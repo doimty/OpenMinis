@@ -89,8 +89,8 @@ if device['state'] != 'Booted':
 subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True, timeout=180)
 run('install', udid, str(Path(os.environ['BUILD']) / 'SessionWidthProbe.app'))
 command = ['xcrun', 'simctl', 'launch', '--console', '--terminate-running-process',
-           '--env', f'PROBE_RUN_ID={os.environ["PROBE_RUN_ID"]}',
-           udid, 'com.openminis.session-width-probe']
+           udid, 'com.openminis.session-width-probe',
+           f'--probe-run-id={os.environ["PROBE_RUN_ID"]}']
 try:
     result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, timeout=150)

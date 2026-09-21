@@ -183,6 +183,7 @@ struct ProbeReport: Codable {
 @MainActor
 final class ProbeRunner {
     let root: UIViewController
+    let runID: String
     let output: URL
     var contractIndex = 0
     var phaseIndex = 0
@@ -199,8 +200,9 @@ final class ProbeRunner {
         ("early", 0.12), ("settled", 0.42), ("late", 0.78)
     ]
 
-    init(root: UIViewController) {
+    init(root: UIViewController, runID: String) {
         self.root = root
+        self.runID = runID
         output = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Documents/session-width-probe", isDirectory: true)
         try? FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
@@ -379,7 +381,7 @@ final class ProbeRunner {
         }
         let report = ProbeReport(
             kind: "legacy-hosting-session-width-contract-probe",
-            runID: ProcessInfo.processInfo.environment["PROBE_RUN_ID"] ?? "missing",
+            runID: runID,
             os: UIDevice.current.systemVersion,
             samples: samples,
             events: events,
@@ -426,7 +428,14 @@ final class SessionWidthProbeApp: UIResponder, UIApplicationDelegate {
         window.rootViewController = controller
         self.window = window
         window.makeKeyAndVisible()
-        runner = ProbeRunner(root: controller)
+        let runID = ProcessInfo.processInfo.arguments
+            .first(where: { $0.hasPrefix("--probe-run-id=") })
+            .map { String($0.dropFirst("--probe-run-id=".count)) } ?? "missing"
+        guard UUID(uuidString: runID) != nil else {
+            print("[SessionWidthProbe] INVALID: missing or malformed run id")
+            return true
+        }
+        runner = ProbeRunner(root: controller, runID: runID)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.runner?.startNextContract()
         }

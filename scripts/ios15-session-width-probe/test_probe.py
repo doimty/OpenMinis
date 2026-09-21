@@ -36,6 +36,7 @@ class ProbeInputTests(unittest.TestCase):
             self.assertNotIn(observed_height, source)
         self.assertIn("five-code-block", source)
         self.assertIn("not private conversation text", source)
+        self.assertIn("--probe-run-id=", source)
 
     def test_manifest_declares_limits(self):
         with tempfile.TemporaryDirectory() as tmp:
