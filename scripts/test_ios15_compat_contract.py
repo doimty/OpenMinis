@@ -140,7 +140,11 @@ class CompatibilityContractTests(unittest.TestCase):
 
         legacy = (ROOT / "src/ios/Shared/LegacyHostingContent.swift").read_text()
         self.assertIn("let onSizeChange: (CGSize) -> Void", legacy)
-        self.assertIn("self.current.onSizeChange(size)", legacy)
+        self.assertIn("private var pendingSize: CGSize?", legacy)
+        self.assertIn("let latest = self.pendingSize ?? size", legacy)
+        self.assertIn("self.current.onSizeChange(latest)", legacy)
+        self.assertIn("configurationGeneration", legacy)
+        self.assertNotIn("self.current.onSizeChange(size)", legacy)
         self.assertNotIn("host.view.bottomAnchor.constraint", legacy,
                          "pin the hosting view top/leading/trailing only so its height is intrinsic")
         # The legacy content view must be reachable from the cell (not private)

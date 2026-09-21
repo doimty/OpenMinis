@@ -59,7 +59,13 @@ final class LegacyHostingContentView: UIView, UIContentView {
     private let host = UIHostingController(rootView: AnyView(EmptyView()))
     private var lastSize: CGSize = .zero
     private var lastWidth: CGFloat = 0
+    /// Latest measured size waiting for the main-queue delivery hop. SwiftUI
+    /// can publish a shrink/grow again before that hop runs; delivering the
+    /// first sample leaves the collection layout holding a stale row height.
+    private var pendingSize: CGSize?
     private var sizeNotificationPending = false
+    private var configurationGeneration: UInt = 0
+    private var pendingNotificationGeneration: UInt = 0
 
     var configuration: any UIContentConfiguration {
         get { current }
@@ -95,6 +101,8 @@ final class LegacyHostingContentView: UIView, UIContentView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     private func updateRoot() {
+        configurationGeneration &+= 1
+        pendingSize = nil
         lastSize = .zero
         host.rootView = AnyView(LegacyHostedRoot(content: current.content) { [weak self] size in
             self?.contentSizeChanged(size)
@@ -198,18 +206,30 @@ final class LegacyHostingContentView: UIView, UIContentView {
         return CGSize(width: width, height: max(0, ceil(size.height)))
     }
 
-    private func contentSizeChanged(_ size: CGSize) {
+    func contentSizeChanged(_ size: CGSize) {
         guard size.width > 1, size.height.isFinite,
               abs(size.width - lastSize.width) > 0.5 || abs(size.height - lastSize.height) > 0.5 else { return }
         lastSize = size
-        guard !sizeNotificationPending else { return }
+        // Keep the newest sample while the layout invalidation is deferred.
+        // The previous implementation captured the first sample and dropped
+        // later ones, so a tall pre-collapse measurement could remain reserved
+        // after the hosted content had already shrunk.
+        pendingSize = size
+        let generation = configurationGeneration
+        guard !sizeNotificationPending || pendingNotificationGeneration != generation else { return }
         sizeNotificationPending = true
+        pendingNotificationGeneration = generation
         // Never invalidate a collection layout from inside SwiftUI's measure.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            // A queued callback from the previous content configuration must
+            // not deliver its measurement through the replacement's callback.
+            guard self.configurationGeneration == generation else { return }
             self.sizeNotificationPending = false
+            let latest = self.pendingSize ?? size
+            self.pendingSize = nil
             self.invalidateIntrinsicContentSize()
-            self.current.onSizeChange(size)
+            self.current.onSizeChange(latest)
         }
     }
 

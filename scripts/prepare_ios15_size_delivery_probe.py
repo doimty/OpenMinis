@@ -39,8 +39,10 @@ def validate_native_report(report, expected_run_id):
 
 
 def testable_source(source):
-    if source.count(PRIVATE_SEAM) != 1:
-        raise ValueError('expected exactly one private contentSizeChanged seam')
+    private_count = source.count(PRIVATE_SEAM)
+    internal_count = source.count(TEST_SEAM)
+    if private_count + internal_count != 1:
+        raise ValueError('expected exactly one contentSizeChanged seam')
     return source.replace(PRIVATE_SEAM, TEST_SEAM, 1)
 
 
@@ -64,7 +66,7 @@ def prepare(root, output):
         'production_source': str(RELATIVE_SOURCE),
         'production_source_sha256': sha(original),
         'generated_source_sha256': sha(generated),
-        'allowed_transformation': 'contentSizeChanged private access -> internal; no behavior changes',
+        'allowed_transformation': 'contentSizeChanged access is internal in the production fix; old private source is widened in the generated copy only',
         'probe_inputs_sha256': {
             relative: hashlib.sha256((root / relative).read_bytes()).hexdigest()
             for relative in (

@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-09-21 — user confirms the new bug is excessive space between two tool rows
+
+- New private screenshot SHA256 `417a38ec414fa5bc6354b6a8aee084e023b74a2097ea94aeac9c35af8770f3c2`,1280×2769. User explicitly clarified “new bug” / “the two are spaced so far apart”: **only the huge blank vertical gap between two compact tool records is the acceptance target**. The assistant had also treated preview occlusion as a reported bug; that was an incorrect scope expansion. Do not change the floating preview/inset or merge the old Retry issue into this task. No more requests to identify the symptom or resend this screenshot.
+- Screenshot clock07:53:10 precedes the received runtime excerpt. The1125pt event is not a synchronized screenshot reproduction.
+- Actual ToolCapsuleView pill is36pt independent of long output length; do not call changing shell output a visible collapse. The existing debug test view omits the real floating preview and currently lacks an app-root launch route.
+- Diagnostic branch `diagnostics/ios15-tool-card-geometry` fromed8393e; production source unchanged. Contract/plan: `docs/ios15-tool-card-geometry-probe.md`. Preliminary probe exercises actual legacy size notification code on the pinned simulator, with access-only generated copy and explicit samples; not a rendering/UI acceptance oracle. Independent preflight completed; main resolved queue barriers, full matrix validation and stale-artifact concerns.12 local generator/report tests + existing structural18/18 and Bash/Node YAML checks passed.
+- Diagnostic-only commit `028b069ab14e52b17a1a36d47147b0df4f48c336` pushed to the fork's new branch with tracking. Its native run `35547693286` compiled on Xcode26.2/17C52 and ran the simulator. Controls passed, while all12 non-control repetitions were red: shrink/grow delivered the first queued size, and a queued old size was delivered through the replacement callback. This is a real legacy size-notification contract defect, not yet a screenshot proof.
+- Candidate fix is local in `LegacyHostingContent.swift`: retain the latest pending size and tag queued deliveries by configuration generation, so stale old heights cannot be applied to a replacement cell. Contract tests and the existing18 compatibility tests pass locally. The same workflow must rerun after this source change; no IPA or device result yet.
+
+## 2026-09-21 — runtime capture: large settle shift observed, no new fix
+
+- Fresh local/fork baseline `fix/ios15-cell-hit-region` / `ed8393eb4333989d907b6b80eb5f280b4d03fb4e`; final cloud run `35518769240` completed/success. Retained IPA SHA256 `b8eace6c96a73e71278cf239f654f23d8db7cc41c7ce214269c087745fe1e76d`,84,272,849 bytes, manifest/hash/ZIP CRC and MinimumOS15.0 checked. This does not uniquely identify the phone's installed build.
+- User supplied a runtime log without a caption: SHA256 `d3d00e9b3c04c92cd13d354a21086f0feb218b5997499b2278659d9ec506f45c`,500,150 bytes/1,889 lines,24.458 seconds starting mid-command.
+- Strongest geometry observation:07:53:38.980 deferred flush index25 height1161→36;07:53:39.032 reports screen shift+1125, same anchor frameY2697 and offset3341→2216; contentSize3954→2829. No proof yet that36 is wrong/stale or that this identifies the user's exact visual complaint. Do not ship a guessed height/inset patch.
+- pid45 eventually exits0 after207.05s; tool success follows; req15 stream opens in2.22s and a reasoning item arrives. Not permanently stuck at the excerpt's end; no complete model reply is captured.
+-34 WARNs are13 sampled TextContainerGuard records,14 scroll-callback gap records,7 CADisplayLink gap records.59ms is a scroll callback gap, **not** a measured render frame; display-link gaps reach33.3ms.1,544 ignored-file info records are log-volume evidence, not a proven slowdown cause.
+- Full calibrated analysis: `docs/ios15-runtime-log-2026-09-21.md`. Workspace report directory includes a reusable body-excluding parser,5 passing parser tests, summary, and one reused independent review. No true iOS production-path reproduction; no Swift/Xcode here. No production edits/commit/push/new build or package. Await precise user-visible symptom before advancing from observations to a fix.
+
 ## 2026-09-19 — device rejects the latest layout fix; screenshot attribution corrected
 
 - User explicitly confirms the previously supplied chat screenshot is from the **latest `161a1c8` IPA**, not an earlier build. Treat it as failed device acceptance. Do not ask for another identical screenshot or a reinstall to establish its version.
