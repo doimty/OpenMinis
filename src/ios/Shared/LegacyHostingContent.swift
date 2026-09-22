@@ -1,5 +1,14 @@
+import Combine
 import SwiftUI
 import UIKit
+
+/// Hosted UIKit renderers may need one layout pass before a GeometryReader
+/// height is safe to promote into UICollectionView's row cache. Plain SwiftUI
+/// content does not conform, so it keeps the existing first-report behavior.
+protocol LegacyHostedMeasurementReadiness: AnyObject {
+    var legacyHostedMeasurementReady: Bool { get }
+    var legacyHostedMeasurementDidBecomeReady: (() -> Void)? { get set }
+}
 
 /// UIContentConfiguration is available on iOS 14. Keep the cell's existing
 /// configuration/generation ownership instead of managing a second cell tree.
@@ -22,13 +31,18 @@ final class WeakHostingParent {
     init(_ value: UIViewController?) { self.value = value }
 }
 
+private final class LegacyHostedMeasurementRevision: ObservableObject {
+    @Published var value: UInt = 0
+}
+
 private struct LegacyHostedSize: Equatable {
     let generation: UInt
+    let revision: UInt
     let size: CGSize
 }
 
 private struct LegacyHostedSizeKey: PreferenceKey {
-    static var defaultValue = LegacyHostedSize(generation: 0, size: .zero)
+    static var defaultValue = LegacyHostedSize(generation: 0, revision: 0, size: .zero)
     static func reduce(value: inout LegacyHostedSize, nextValue: () -> LegacyHostedSize) {
         value = nextValue()
     }
@@ -37,6 +51,7 @@ private struct LegacyHostedSizeKey: PreferenceKey {
 private struct LegacyHostedRoot: View {
     let content: AnyView
     let generation: UInt
+    @ObservedObject var revision: LegacyHostedMeasurementRevision
     let onSizeChange: (LegacyHostedSize) -> Void
 
     var body: some View {
@@ -56,7 +71,7 @@ private struct LegacyHostedRoot: View {
                 GeometryReader { proxy in
                     Color.clear.preference(
                         key: LegacyHostedSizeKey.self,
-                        value: LegacyHostedSize(generation: generation, size: proxy.size))
+                        value: LegacyHostedSize(generation: generation, revision: revision.value, size: proxy.size))
                 }
             )
             .onPreferenceChange(LegacyHostedSizeKey.self, perform: onSizeChange)
@@ -76,6 +91,9 @@ final class LegacyHostingContentView: UIView, UIContentView {
     private var sizeNotificationPending = false
     private var configurationGeneration: UInt = 0
     private var pendingNotificationGeneration: UInt = 0
+    private var measurementPreferenceRevision: UInt = 0
+    private let measurementRevision = LegacyHostedMeasurementRevision()
+    private var measurementReadinessRefreshPending = false
 
     var configuration: any UIContentConfiguration {
         get { current }
@@ -114,8 +132,11 @@ final class LegacyHostingContentView: UIView, UIContentView {
         configurationGeneration &+= 1
         pendingSize = nil
         lastSize = .zero
+        measurementPreferenceRevision = 0
+        measurementRevision.value = 0
         let generation = configurationGeneration
-        host.rootView = AnyView(LegacyHostedRoot(content: current.content, generation: generation) { [weak self] payload in
+        host.rootView = AnyView(LegacyHostedRoot(
+            content: current.content, generation: generation, revision: measurementRevision) { [weak self] payload in
             self?.contentSizeChanged(payload)
         })
         attachIfNeeded()
@@ -217,6 +238,50 @@ final class LegacyHostingContentView: UIView, UIContentView {
         return CGSize(width: width, height: max(0, ceil(size.height)))
     }
 
+    private func installMeasurementReadinessObservers() -> [LegacyHostedMeasurementReadiness] {
+        var readinessViews: [LegacyHostedMeasurementReadiness] = []
+        var pending: [UIView] = [host.view]
+        while let view = pending.popLast() {
+            if let readiness = view as? LegacyHostedMeasurementReadiness {
+                readinessViews.append(readiness)
+                readiness.legacyHostedMeasurementDidBecomeReady = { [weak self] in
+                    self?.refreshMeasurementPreference()
+                }
+            }
+            pending.append(contentsOf: view.subviews)
+        }
+        return readinessViews
+    }
+
+    private func hostedMeasurementIsReady() -> Bool {
+        installMeasurementReadinessObservers().allSatisfy { $0.legacyHostedMeasurementReady }
+    }
+
+    private func refreshMeasurementPreference() {
+        guard !measurementReadinessRefreshPending else { return }
+        // Invalidate the old revision synchronously. A delivery already queued
+        // by the provisional preference must see the new revision and bail out
+        // before it can reach the cell, even though the root refresh itself is
+        // deferred to the next main-queue turn.
+        measurementPreferenceRevision &+= 1
+        let revision = measurementPreferenceRevision
+        measurementReadinessRefreshPending = true
+        lastSize = .zero
+        pendingSize = nil
+        sizeNotificationPending = false
+        let generation = configurationGeneration
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.measurementReadinessRefreshPending = false
+            guard self.configurationGeneration == generation,
+                  self.measurementPreferenceRevision == revision else { return }
+            // Publish only the preference revision. The hosted content remains
+            // the same SwiftUI tree, so becoming ready cannot recursively
+            // recreate a fresh text view and lose the readiness token.
+            self.measurementRevision.value = revision
+        }
+    }
+
     private func contentSizeChanged(_ payload: LegacyHostedSize) {
         // REENTRY-DIAG-BEGIN
         #if DEBUG
@@ -226,13 +291,23 @@ final class LegacyHostingContentView: UIView, UIContentView {
                 kind: "host-size", owner: context.collection, subject: self, parent: context.cell,
                 generation: payload.generation, phase: "preference",
                 values: ["width": Double(payload.size.width), "height": Double(payload.size.height),
-                         "currentGen": Double(configurationGeneration), "previousH": Double(lastSize.height)])
+                         "currentGen": Double(configurationGeneration),
+                         "revision": Double(payload.revision),
+                         "currentRevision": Double(measurementPreferenceRevision),
+                         "previousH": Double(lastSize.height)])
         }
         #endif
         // REENTRY-DIAG-END
         // Reject a delayed preference produced by a superseded root before it
         // can update lastSize or enter the current configuration's callback.
-        guard payload.generation == configurationGeneration else { return }
+        guard payload.generation == configurationGeneration,
+              payload.revision == measurementPreferenceRevision else { return }
+        // A GeometryReader can publish the host's finite outer width while a
+        // nested UIKit renderer is still answering its unbounded intrinsic
+        // query. Do not promote that provisional height into the cell until
+        // every renderer that opts into this contract has a finite width.
+        // The next real child layout changes the preference and retries here.
+        guard hostedMeasurementIsReady() else { return }
         let size = payload.size
         guard size.width > 1, size.height.isFinite,
               abs(size.width - lastSize.width) > 0.5 || abs(size.height - lastSize.height) > 0.5 else { return }
@@ -246,12 +321,14 @@ final class LegacyHostingContentView: UIView, UIContentView {
         guard !sizeNotificationPending || pendingNotificationGeneration != generation else { return }
         sizeNotificationPending = true
         pendingNotificationGeneration = generation
+        let revision = payload.revision
         // Never invalidate a collection layout from inside SwiftUI's measure.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            // A queued callback from the previous content configuration must
-            // not deliver its measurement through the replacement's callback.
-            guard self.configurationGeneration == generation else { return }
+            // A queued callback from the previous content configuration or
+            // preference revision must not deliver a stale measurement.
+            guard self.configurationGeneration == generation,
+                  self.measurementPreferenceRevision == revision else { return }
             self.sizeNotificationPending = false
             let latest = self.pendingSize ?? size
             self.pendingSize = nil

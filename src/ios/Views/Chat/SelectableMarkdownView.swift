@@ -4921,8 +4921,57 @@ final class MinisLayoutManager: NSLayoutManager {
 // MARK: - SelectableMarkdownTextView
 
 /// Non-editable, selectable UITextView subclass for rendering Markdown as NSAttributedString.
-final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate {
+final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate, LegacyHostedMeasurementReadiness {
     private var attachmentViews: [UIView] = []
+    /// Width of the latest finite TextKit measurement. A legacy host must not
+    /// promote its first unbounded intrinsic-height estimate until this is
+    /// established for the current content and live bounds.
+    private var legacyHostedMeasuredWidth: CGFloat?
+    private var legacyHostedReadinessWasReady = false
+
+    var legacyHostedMeasurementDidBecomeReady: (() -> Void)?
+
+    var legacyHostedMeasurementReady: Bool {
+        let boundsWidth = bounds.width
+        let containerWidth = textContainer.size.width
+        guard legacyHostedWidthIsSane(boundsWidth), legacyHostedWidthIsSane(containerWidth) else {
+            return false
+        }
+        guard textStorage.length > 0 else { return true }
+        guard let measuredWidth = legacyHostedMeasuredWidth else { return false }
+        return abs(measuredWidth - boundsWidth) <= 1
+            && abs(measuredWidth - containerWidth) <= 1
+    }
+
+    private func legacyHostedWidthIsSane(_ width: CGFloat) -> Bool {
+        guard width > 1, width.isFinite else { return false }
+        let collectionWidth = findCollectionView()?.bounds.width ?? 0
+        return width <= max(collectionWidth, UIScreen.main.bounds.width) + 1
+    }
+
+    fileprivate func resetLegacyHostedMeasurementReadiness() {
+        legacyHostedMeasuredWidth = nil
+        legacyHostedReadinessWasReady = false
+    }
+
+    private func notifyLegacyHostedMeasurementReadinessIfNeeded() {
+        let ready = legacyHostedMeasurementReady
+        if ready && !legacyHostedReadinessWasReady {
+            legacyHostedReadinessWasReady = true
+            legacyHostedMeasurementDidBecomeReady?()
+        } else if !ready {
+            legacyHostedReadinessWasReady = false
+        }
+    }
+
+    override func sizeThatFits(_ size: CGSize) -> CGSize {
+        let result = super.sizeThatFits(size)
+        if legacyHostedWidthIsSane(size.width) {
+            legacyHostedMeasuredWidth = size.width
+        }
+        notifyLegacyHostedMeasurementReadinessIfNeeded()
+        return result
+    }
     /// Returns true if the text storage contains NSTextAttachment objects but no attachment views
     /// have been created yet. Used by updateUIView to detect the LazyVStack reappear case where
     /// the async updateAttachmentViews call was dropped because window was nil at the time.
@@ -7646,6 +7695,7 @@ struct SelectableMarkdownView: UIViewRepresentable {
         let _prevW = context.coordinator.lastRenderedWidth
         let _widthChanged = _curW > 1 && _prevW > 1 && abs(_curW - _prevW) > 0.5
         if _widthChanged && markdown == context.coordinator.lastMarkdown && !fontChanged {
+            textView.resetLegacyHostedMeasurementReadiness()
             // [WordFade] Width change (rotation) re-lays-out everything; snap
             // any mid-fade words to full opacity so none stick translucent.
             context.coordinator.fadeAnimator.cancelAll()
@@ -7738,6 +7788,7 @@ struct SelectableMarkdownView: UIViewRepresentable {
             return
         }
         let oldMarkdown = context.coordinator.lastMarkdown
+        textView.resetLegacyHostedMeasurementReadiness()
         context.coordinator.lastMarkdown = markdown
 
         if fontChanged {
@@ -8307,6 +8358,10 @@ struct SelectableMarkdownView: UIViewRepresentable {
 
     @available(iOS 16.0, *)
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: SelectableMarkdownTextView, context: Context) -> CGSize? {
+        // SwiftUI may ask for the new binding's size before updateUIView
+        // commits that binding into the UIKit text storage. Any readiness token
+        // from the previous content must be invalidated before that probe.
+        uiView.resetLegacyHostedMeasurementReadiness()
         let width = proposal.width ?? UIScreen.main.bounds.width
         // Key the size cache on the SwiftUI binding length, not
         // uiView.textStorage.length. Within a single render pass SwiftUI calls

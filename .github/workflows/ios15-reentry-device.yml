@@ -11,6 +11,8 @@ on:
       - scripts/reentry-diagnostics/**
       - scripts/package_ios15_ipa.py
       - scripts/test_package_ios15_ipa.py
+      - scripts/test_ios15_legacy_measurement_readiness.py
+      - src/ios/MinisTests/LegacyHostedMeasurementReadinessTests.swift
       - src/ios/Shared/AppLogger.swift
       - src/ios/Shared/LegacyHostingContent.swift
       - src/ios/Agent/MessageList/**
@@ -184,6 +186,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/test_ios15_compat_contract.py -v
+          python3 scripts/test_ios15_legacy_measurement_readiness.py -v
 
       - name: TrollStore IPA packager tests
         run: |
@@ -223,6 +226,22 @@ jobs:
           test -s "$RUNNER_TEMP/m1/xcodebuild.log"
           # Compiler failure is an invalid build, never a reproduced UI bug.
           exit "$status"
+
+      - name: Compile MinisTests for device
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project src/ios/Minis.xcodeproj \
+            -scheme Minis \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/test-build/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=NO \
+            build-for-testing \
+            > "$RUNNER_TEMP/test-build.log" 2>&1
+          test -s "$RUNNER_TEMP/test-build.log"
 
       - name: Package TrollStore IPA
         run: |
