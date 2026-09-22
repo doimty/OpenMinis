@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import plistlib
+import re
 import shutil
 import stat
 import subprocess
@@ -248,7 +249,10 @@ def package_app(
     keep_incompatible_plugins: bool = False,
     entitlements: Path | None = None,
     ipa_name: str | None = None,
+    diagnostic_commit: str | None = None,
 ) -> dict:
+    if diagnostic_commit is not None and not re.fullmatch(r"[0-9a-f]{40}", diagnostic_commit):
+        raise PackageError("diagnostic commit must be a full lowercase Git SHA")
     info = validate_app(source_app)
     output_dir.mkdir(parents=True, exist_ok=True)
     stage = output_dir / "stage"
@@ -256,6 +260,19 @@ def package_app(
         shutil.rmtree(stage)
     staged_app = stage / "Payload" / APP_NAME
     shutil.copytree(source_app, staged_app, symlinks=False)
+    if diagnostic_commit is not None or "MinisReentryDiagnostics" in info or "MinisDiagnosticCommit" in info:
+        # Opt in only on the staged copy, before signing. An ordinary repack
+        # must not inherit activation from a previously diagnostic source.
+        info = dict(info)
+        if diagnostic_commit is not None:
+            info["MinisReentryDiagnostics"] = True
+            info["MinisDiagnosticCommit"] = diagnostic_commit
+        else:
+            info.pop("MinisReentryDiagnostics", None)
+            info.pop("MinisDiagnosticCommit", None)
+        info_path = staged_app / "Info.plist"
+        fmt = plistlib.FMT_BINARY if info_path.read_bytes().startswith(b"bplist") else plistlib.FMT_XML
+        info_path.write_bytes(plistlib.dumps(info, fmt=fmt))
     if keep_incompatible_plugins:
         kept = [path.name for path in plugin_bundles(staged_app)]
         stripped: list[dict] = []
@@ -269,7 +286,11 @@ def package_app(
             raise PackageError(f"entitlements file not found: {entitlement_path}")
         adhoc_sign(staged_app, entitlement_path)
         signed = True
-    name = ipa_name or default_ipa_name(info)
+    diagnostic_name = (
+        f"Minis-{info.get('CFBundleShortVersionString', 'unknown')}-ios15-reentry-diagnostic-{diagnostic_commit[:8]}.ipa"
+        if diagnostic_commit is not None else None
+    )
+    name = ipa_name or diagnostic_name or default_ipa_name(info)
     ipa = output_dir / name
     zip_payload(stage, ipa)
     if ipa.stat().st_size <= 0:
@@ -295,9 +316,12 @@ def package_app(
         "signed": signed,
         "plugins_kept": kept,
         "plugins_stripped": stripped,
-        "purpose": "TrollStore / jailbreak sideload",
+        "purpose": "diagnostic-only re-entry trace (not a layout fix)" if diagnostic_commit else "TrollStore / jailbreak sideload",
         "source_app": str(source_app),
     }
+    if diagnostic_commit is not None:
+        manifest["diagnostic_commit"] = diagnostic_commit
+        manifest["diagnostics_schema"] = 1
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest
@@ -313,6 +337,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--keep-incompatible-plugins", action="store_true")
     parser.add_argument("--entitlements", type=Path)
     parser.add_argument("--ipa-name")
+    parser.add_argument("--diagnostic-commit", help="Opt staged Debug IPA into scalar re-entry diagnostics for this Git SHA")
     return parser
 
 
@@ -327,6 +352,7 @@ def main(argv: list[str] | None = None) -> int:
             keep_incompatible_plugins=args.keep_incompatible_plugins,
             entitlements=args.entitlements,
             ipa_name=args.ipa_name,
+            diagnostic_commit=args.diagnostic_commit,
         )
     except PackageError as exc:
         print(f"error: {exc}", file=sys.stderr)

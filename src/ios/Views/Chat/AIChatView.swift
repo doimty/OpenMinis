@@ -1204,6 +1204,15 @@ struct AIChatView: View {
             }
         }
         .onAppear {
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            if ReentryDiagnostics.active {
+                ReentryDiagnostics.shared.record(
+                    kind: "mount", owner: vm, phase: "chat-appear", session: sessionId,
+                    values: ["cachedNew": cached.isNew ? 1 : 0, "messages": Double(vm.messages.count)])
+            }
+            #endif
+            // REENTRY-DIAG-END
             let sinceInit = (CFAbsoluteTimeGetCurrent() - AIChatViewModel.onAppearTimestamp) * 1000
             minisLogger.info("[SessionLoad] onAppear T+\(String(format: "%.0f", sinceInit))ms isNew=\(cached.isNew) msgs=\(vm.messages.count)")
             // [T-inputbar-stale-across-reentry] Re-arm the leading-edge seed on
@@ -1296,6 +1305,15 @@ struct AIChatView: View {
                     // Cached VM already has messages — trigger scroll-to-bottom
                     // since isLoadingSession won't transition and its onChange won't fire.
                     if !vm.messages.isEmpty {
+                        // REENTRY-DIAG-BEGIN
+                        #if DEBUG
+                        if ReentryDiagnostics.active {
+                            ReentryDiagnostics.shared.record(
+                                kind: "force-emission", owner: vm, phase: "onAppear-reuse", session: sessionId,
+                                values: ["nearBottom": vm.isNearBottom ? 1 : 0])
+                        }
+                        #endif
+                        // REENTRY-DIAG-END
                         vm.forceScrollToBottom.send()
                     }
                     let totalElapsed = (CFAbsoluteTimeGetCurrent() - reuseStart) * 1000
@@ -1338,6 +1356,13 @@ struct AIChatView: View {
             injectPendingShareIfNeeded()
         }
         .onDisappear {
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            if ReentryDiagnostics.active {
+                ReentryDiagnostics.shared.record(kind: "unmount", owner: vm, phase: "chat-disappear", session: sessionId)
+            }
+            #endif
+            // REENTRY-DIAG-END
             isChatViewVisible = false
             // [T-voice-inputbar-collapse-selfheal] The health probe must not
             // outlive the view — its report would describe a composer that no

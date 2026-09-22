@@ -753,6 +753,22 @@ extension CollectionViewMessageListV3 {
         var maxContentWidth: CGFloat = 0
         var lastInputFocused: Bool = false
 
+        // REENTRY-DIAG-BEGIN
+        #if DEBUG
+        private func reentryDiagnosticViewport(_ kind: String, phase: String) {
+            guard ReentryDiagnostics.active, let cv = viewController?.collectionView else { return }
+            ReentryDiagnostics.shared.record(
+                kind: kind, owner: cv, subject: vm, phase: phase, session: vm?.sessionId,
+                values: ["offset": Double(cv.contentOffset.y), "contentH": Double(cv.contentSize.height),
+                         "width": Double(cv.bounds.width), "viewportH": Double(cv.bounds.height),
+                         "insetBottom": Double(cv.adjustedContentInset.bottom),
+                         "tracking": cv.isTracking ? 1 : 0, "decel": cv.isDecelerating ? 1 : 0,
+                         "auto": scrollMode == .autoScrolling ? 1 : 0,
+                         "items": Double(previousSnapshotIds.count), "inWindow": cv.window == nil ? 0 : 1])
+        }
+        #endif
+        // REENTRY-DIAG-END
+
         #if DEBUG
         deinit {
             // [DecelDisplayLink] CADisplayLink retains its target — must
@@ -1156,6 +1172,11 @@ extension CollectionViewMessageListV3 {
                 self.syncScrollFlags()
             }
 
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticViewport("mount", phase: "coordinator-attach")
+            #endif
+            // REENTRY-DIAG-END
             bindViewModel(vm)
         }
 
@@ -1389,6 +1410,16 @@ extension CollectionViewMessageListV3 {
                                                   width: viewController?.collectionView.bounds.width ?? 390)
                 layout.setEstimatedHeight(est, at: indexPath.item)
             }
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            if ReentryDiagnostics.active {
+                ReentryDiagnostics.shared.record(
+                    kind: "configure", owner: viewController?.collectionView, subject: cell, parent: vm,
+                    index: indexPath.item, generation: cell.reentryDiagnosticGeneration,
+                    values: ["width": Double(cell.bounds.width), "height": Double(cell.bounds.height)])
+            }
+            #endif
+            // REENTRY-DIAG-END
         }
 
         /// Subscriptions for bridge detailBlock → sheet presenter forwarding.
@@ -1808,6 +1839,11 @@ extension CollectionViewMessageListV3 {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] in
                     guard let self else { return }
+                    // REENTRY-DIAG-BEGIN
+                    #if DEBUG
+                    self.reentryDiagnosticViewport("scroll-request", phase: "force-signal")
+                    #endif
+                    // REENTRY-DIAG-END
                     let cv = self.viewController?.collectionView
                     let layout = self.viewController?.messageListLayout
                     let cachedCount = layout?.debugCachedHeightCount ?? 0
@@ -2394,6 +2430,11 @@ extension CollectionViewMessageListV3 {
 
         private func applySnapshot(messages rawMessages: [ChatMessage], caller: String = "?") {
             guard let vm, !vm.isLoadingSession else { return }
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticViewport("snapshot", phase: caller)
+            #endif
+            // REENTRY-DIAG-END
 
             // [T-bridge-message-ui-leak] Single UI-collection sink for EVERY
             // path that pushes messages to the list (loadSession, live inject,
@@ -4196,6 +4237,11 @@ extension CollectionViewMessageListV3 {
 
         func scrollToBottomNow(animated: Bool = false) {
             guard let cv = viewController?.collectionView else { return }
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticViewport("scroll-request", phase: animated ? "bottom-animated" : "bottom-immediate")
+            #endif
+            // REENTRY-DIAG-END
             // Sub-viewport overflow path: re-evaluate compensation, then pin.
             if applySubViewportCompensation(caller: "scrollToBottom") {
                 syncScrollFlags()
@@ -4869,6 +4915,11 @@ extension CollectionViewMessageListV3 {
         // MARK: - UIScrollViewDelegate
 
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticViewport("user-drag", phase: "begin")
+            #endif
+            // REENTRY-DIAG-END
             AppLogger(category: "ScrollDiag").info("[ScrollDiag][willBeginDragging] offset=\(String(format: "%.0f", scrollView.contentOffset.y)) contentSize=\(String(format: "%.0f", scrollView.contentSize.height)) visibleCells=\(viewController?.collectionView?.visibleCells.count ?? -1)")
             #if DEBUG
             // [DecelDisplayLink] Safety: if the user grabs again mid-decel, stop
@@ -5045,6 +5096,11 @@ extension CollectionViewMessageListV3 {
         private var settleJustFinished = false
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticViewport("viewport", phase: "did-scroll")
+            #endif
+            // REENTRY-DIAG-END
             // [ScrollDecel] Detect dropped frames during the deceleration phase
             // (cheap: early-returns unless decelerating + frame gap exceeded).
             logDecelFrameIfSlow(scrollView)
@@ -5168,6 +5224,11 @@ extension CollectionViewMessageListV3 {
             guard let layout = viewController?.messageListLayout,
                   let cv = viewController?.collectionView else { return }
 
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticViewport("settle", phase: "begin")
+            #endif
+            // REENTRY-DIAG-END
             let deferredCount = layout.deferredHeightCount
             AppLogger(category: "Settle").debug("[Settle] BEGIN mode=\(scrollMode == .autoScrolling ? "auto" : "browse") nearBottom=\(nearBottom) offset=\(String(format: "%.1f", cv.contentOffset.y)) contentSize=\(String(format: "%.1f", cv.contentSize.height)) deferredHeights=\(deferredCount) hasPendingSnapshot=\(hasPendingSnapshot)")
 
@@ -5252,6 +5313,11 @@ extension CollectionViewMessageListV3 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.settleJustFinished = false
             }
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticViewport("settle", phase: "end")
+            #endif
+            // REENTRY-DIAG-END
             AppLogger(category: "Settle").debug("[Settle] END offset=\(String(format: "%.1f", cv.contentOffset.y)) contentSize=\(String(format: "%.1f", cv.contentSize.height))")
         }
 

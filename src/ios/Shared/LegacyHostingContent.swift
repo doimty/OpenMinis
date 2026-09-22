@@ -218,6 +218,18 @@ final class LegacyHostingContentView: UIView, UIContentView {
     }
 
     private func contentSizeChanged(_ payload: LegacyHostedSize) {
+        // REENTRY-DIAG-BEGIN
+        #if DEBUG
+        if ReentryDiagnostics.active {
+            let context = reentryDiagnosticContext(self)
+            ReentryDiagnostics.shared.record(
+                kind: "host-size", owner: context.collection, subject: self, parent: context.cell,
+                generation: payload.generation, phase: "preference",
+                values: ["width": Double(payload.size.width), "height": Double(payload.size.height),
+                         "currentGen": Double(configurationGeneration), "previousH": Double(lastSize.height)])
+        }
+        #endif
+        // REENTRY-DIAG-END
         // Reject a delayed preference produced by a superseded root before it
         // can update lastSize or enter the current configuration's callback.
         guard payload.generation == configurationGeneration else { return }
@@ -243,6 +255,17 @@ final class LegacyHostingContentView: UIView, UIContentView {
             self.sizeNotificationPending = false
             let latest = self.pendingSize ?? size
             self.pendingSize = nil
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            if ReentryDiagnostics.active {
+                let context = reentryDiagnosticContext(self)
+                ReentryDiagnostics.shared.record(
+                    kind: "host-size", owner: context.collection, subject: self, parent: context.cell,
+                    generation: generation, phase: "delivered",
+                    values: ["width": Double(latest.width), "height": Double(latest.height)])
+            }
+            #endif
+            // REENTRY-DIAG-END
             self.invalidateIntrinsicContentSize()
             self.current.onSizeChange(latest)
         }

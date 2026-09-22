@@ -39,6 +39,24 @@ enum MessageListItem: Hashable {
 }
 
 
+// REENTRY-DIAG-BEGIN
+#if DEBUG
+/// Read-only ancestor IDs; never force layout or query intrinsic sizes.
+@MainActor
+func reentryDiagnosticContext(_ view: UIView) -> (cell: SelfSizingCell?, collection: UICollectionView?) {
+    var cell: SelfSizingCell?
+    var cursor: UIView? = view
+    for _ in 0..<64 {
+        guard let current = cursor else { break }
+        if let match = current as? SelfSizingCell { cell = match }
+        if let collection = current as? UICollectionView { return (cell, collection) }
+        cursor = current.superview
+    }
+    return (cell, nil)
+}
+#endif
+// REENTRY-DIAG-END
+
 // MARK: - Self-Sizing Cell
 
 /// A plain UICollectionViewCell that correctly reports its preferred size
@@ -61,6 +79,23 @@ class SelfSizingCell: UICollectionViewCell {
     /// configuration changed between the moment UIKit scheduled the
     /// self-sizing pass and the moment it actually runs.
     private var configGeneration: UInt = 0
+    // REENTRY-DIAG-BEGIN
+    #if DEBUG
+    var reentryDiagnosticGeneration: UInt { configGeneration }
+    private func reentryDiagnosticReturn(_ result: UICollectionViewLayoutAttributes,
+                                          input: UICollectionViewLayoutAttributes,
+                                          phase: String) {
+        guard ReentryDiagnostics.active else { return }
+        let context = reentryDiagnosticContext(self)
+        ReentryDiagnostics.shared.record(
+            kind: "cell-return", owner: context.collection, subject: self,
+            index: input.indexPath.item, generation: configGeneration, phase: phase,
+            values: ["inputH": Double(input.size.height), "height": Double(result.size.height),
+                     "width": Double(result.size.width), "frameH": Double(bounds.height),
+                     "inWindow": window == nil ? 0 : 1])
+    }
+    #endif
+    // REENTRY-DIAG-END
 
     /// Last successfully computed height — used as fallback when self-sizing
     /// is skipped (e.g. during bounds-change passes) to avoid re-entering
@@ -162,6 +197,18 @@ class SelfSizingCell: UICollectionViewCell {
                 onSizeChange: { [weak self] size in
                     guard let self, self.configGeneration == generation,
                           self.window != nil else { return }
+                    // REENTRY-DIAG-BEGIN
+                    #if DEBUG
+                    if ReentryDiagnostics.active {
+                        let context = reentryDiagnosticContext(self)
+                        ReentryDiagnostics.shared.record(
+                            kind: "host-size", owner: context.collection, subject: self,
+                            generation: generation, phase: "cell-accepted",
+                            values: ["width": Double(size.width), "height": Double(size.height),
+                                     "frameH": Double(self.bounds.height)])
+                    }
+                    #endif
+                    // REENTRY-DIAG-END
                     self.clearCachedHeight()
                     self.legacyMeasuredSize = size
                     self.seededHeight = nil
@@ -319,6 +366,11 @@ class SelfSizingCell: UICollectionViewCell {
                 Self.dedupHits = 0
                 Self.dedupLastFlush = now
             }
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticReturn(copy, input: layoutAttributes, phase: "computed-cache")
+            #endif
+            // REENTRY-DIAG-END
             return copy
         }
 
@@ -433,6 +485,11 @@ class SelfSizingCell: UICollectionViewCell {
             lastMeasureMediaTime = CACurrentMediaTime()
             let copy = layoutAttributes.copy() as! UICollectionViewLayoutAttributes
             copy.size.height = sh
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticReturn(copy, input: layoutAttributes, phase: "seed")
+            #endif
+            // REENTRY-DIAG-END
             return copy
         }
 
@@ -456,6 +513,11 @@ class SelfSizingCell: UICollectionViewCell {
             guard let measured = legacyMeasuredSize,
                   measured.width > 1,
                   measured.height.isFinite else {
+                // REENTRY-DIAG-BEGIN
+                #if DEBUG
+                reentryDiagnosticReturn(layoutAttributes, input: layoutAttributes, phase: "legacy-estimate")
+                #endif
+                // REENTRY-DIAG-END
                 return layoutAttributes
             }
             let copy = layoutAttributes.copy() as! UICollectionViewLayoutAttributes
@@ -466,6 +528,11 @@ class SelfSizingCell: UICollectionViewCell {
                 lastComputedWidth = layoutAttributes.size.width
                 lastMeasureMediaTime = CACurrentMediaTime()
             }
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticReturn(copy, input: layoutAttributes, phase: "legacy-observation")
+            #endif
+            // REENTRY-DIAG-END
             return copy
         }
 

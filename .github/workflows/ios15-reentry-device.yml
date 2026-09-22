@@ -1,0 +1,304 @@
+# Device-only diagnostic IPA. No layout fix or Simulator UI acceptance claimed.
+# Reuses the established/pinned device dependency and packaging path.
+name: ios15-reentry-device
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [diagnostics/ios15-session-reentry]
+    paths:
+      - .github/workflows/ios15-reentry-device.yml
+      - scripts/reentry-diagnostics/**
+      - scripts/package_ios15_ipa.py
+      - scripts/test_package_ios15_ipa.py
+      - src/ios/Shared/AppLogger.swift
+      - src/ios/Shared/LegacyHostingContent.swift
+      - src/ios/Agent/MessageList/**
+      - src/ios/Views/Chat/SelectableMarkdownView.swift
+      - src/ios/Views/Chat/AIChatView.swift
+
+concurrency:
+  group: ios15-reentry-device-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+  EXPECTED_XCODE: "Xcode 26.2"
+  EXPECTED_XCODE_BUILD: "Build version 17C52"
+  EXPECTED_IOS_SDK: "26.2"
+  EXPECTED_ISH: "3f6384c70eefd1a370f121d3492a5f21f7767df9"
+  # Pins for the vendored local VAD package's binary (built from C++ source
+  # at IPHONEOS_DEPLOYMENT_TARGET=15.0, see deps/build_vad_framework.sh).
+  # Checksums are the published values from the wrapper Package.swift tag
+  # 1.0.3; the probe workflow independently audits the resulting binary.
+  NATIVE_CXX_SHA: 1648fc13a04a90521a2ef3887885ef2506208605
+  ONNX_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/onnxruntime.xcframework.zip
+  ONNX_SHA256: 498ba860229e0ce45e6983ce44478a836b0c0763451ed37a8b1f8e74a8a0dc1f
+  APM_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/webrtc_audio_processing.xcframework.zip
+  APM_SHA256: 3ee3d36e9207a09fa3133c405f08a49a0d023f173ee5b4a47c047362aba56856
+
+jobs:
+  baseline:
+    name: Native collector checks + iOS 15 device diagnostic build
+    runs-on: macos-26
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Pin Xcode 26.2
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          test -d "$DEVELOPER_DIR"
+          xcode_version="$(xcodebuild -version)"
+          printf '%s\n' "$xcode_version"
+          test "$(printf '%s\n' "$xcode_version" | sed -n '1p')" = "$EXPECTED_XCODE"
+          test "$(printf '%s\n' "$xcode_version" | sed -n '2p')" = "$EXPECTED_XCODE_BUILD"
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          printf 'iphoneos SDK %s\n' "$sdk"
+          test "$sdk" = "$EXPECTED_IOS_SDK"
+
+      - name: Native scalar collector and no-op mutation checks
+        run: |
+          set -euo pipefail
+          python3 scripts/reentry-diagnostics/test_isolation.py -v
+          bash scripts/reentry-diagnostics/run_collector_tests.sh "$RUNNER_TEMP/reentry-collector"
+          python3 scripts/reentry-diagnostics/test_trace.py -v
+
+      - name: SF Symbols compatibility gates
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sf-symbols"
+          python3 -m venv "$RUNNER_TEMP/sf-symbol-venv"
+          "$RUNNER_TEMP/sf-symbol-venv/bin/pip" install --disable-pip-version-check \
+            tree-sitter==0.25.2 tree-sitter-swift==0.7.3
+          "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_ios15_sf_symbols.py -v \
+            2>&1 | tee "$RUNNER_TEMP/sf-symbols/audit.log"
+          bash scripts/check_ios15_symbols.sh 2>&1 | tee "$RUNNER_TEMP/sf-symbols/native.log"
+
+      - name: Init pinned iSH submodule only
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive deps/ish
+          sha="$(git -C deps/ish rev-parse HEAD)"
+          printf 'deps/ish %s\n' "$sha"
+          test "$sha" = "$EXPECTED_ISH"
+
+      - name: Input prompt compatibility gates
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/input-prompts"
+          "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_ios15_input_prompts.py -v \
+            2>&1 | tee "$RUNNER_TEMP/input-prompts/audit.log"
+          bash scripts/check_ios15_input_prompts.sh 2>&1 | tee "$RUNNER_TEMP/input-prompts/native.log"
+          bash scripts/run_ios15_input_prompt_probe.sh "$RUNNER_TEMP/input-prompts/native-ui" \
+            2>&1 | tee "$RUNNER_TEMP/input-prompts/probe.log"
+
+      - name: Retry hit-test probe
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/retry-probe"
+          bash scripts/run_ios15_retry_probe.sh "$RUNNER_TEMP/retry-probe" \
+            2>&1 | tee "$RUNNER_TEMP/retry-probe/probe.log"
+          "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_ios15_retry_hit.py -v \
+            2>&1 | tee "$RUNNER_TEMP/retry-probe/contract.log"
+
+      - name: Cache native iOS deps
+        id: native-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            deps/libs
+            deps/include
+            deps/frameworks
+            deps/resources
+            deps/lame-build
+            vendor/RealTimeCutVADLibrary/Frameworks
+          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/build_vad_framework.sh','deps/rclone-mobile/go.sum') }}
+
+      - name: Install native build tools
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          brew install llvm lld libarchive pkg-config meson
+          export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
+          command -v meson
+          command -v ninja
+          test -x /opt/homebrew/opt/llvm/bin/clang
+          command -v ld.lld
+          ld.lld --version | sed -n '1p'
+
+      - name: Setup Go 1.25
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: "1.25.0"
+          cache-dependency-path: deps/rclone-mobile/go.sum
+
+      - name: Provider customization template
+        run: |
+          set -euo pipefail
+          cp src/ios/Configs/ProviderCustomization.xcconfig.example \
+             src/ios/Configs/ProviderCustomization.xcconfig
+
+      - name: Build native iOS dependencies
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
+          command -v ld.lld
+          ./deps/build_lame.sh
+          ./deps/build_ffmpeg.sh
+          ./deps/build_ish.sh
+          ./deps/prepare_alpine_rootfs.sh
+          ./deps/build_rclone_ios.sh
+          ./deps/build_vad_framework.sh
+          ls -ld deps/libs deps/frameworks deps/resources vendor/RealTimeCutVADLibrary/Frameworks
+
+      - name: Save native iOS deps cache
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            deps/libs
+            deps/include
+            deps/frameworks
+            deps/resources
+            deps/lame-build
+            vendor/RealTimeCutVADLibrary/Frameworks
+          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/build_vad_framework.sh','deps/rclone-mobile/go.sum') }}
+
+      - name: Diagnostic parser regression tests
+        run: |
+          set -euo pipefail
+          python3 scripts/test_ios15_build_log.py -v
+
+      - name: Compatibility structural contract tests
+        run: |
+          set -euo pipefail
+          python3 scripts/test_ios15_compat_contract.py -v
+
+      - name: TrollStore IPA packager tests
+        run: |
+          set -euo pipefail
+          python3 scripts/test_package_ios15_ipa.py -v
+
+      - name: Compatibility type-check smoke (15/16)
+        run: |
+          set -euo pipefail
+          bash scripts/check_ios15_swiftui_compat.sh
+
+      - name: Build real iOS 15 device app with observation-only hooks
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m1"
+          set +e
+          # Do not pass a global IPHONEOS_DEPLOYMENT_TARGET override: that
+          # forced FileProvider (kept at 16.0) down to 15 and hid app errors.
+          xcodebuild \
+            -project src/ios/Minis.xcodeproj \
+            -scheme Minis \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/m1/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=NO \
+            build \
+            > "$RUNNER_TEMP/m1/xcodebuild.log" 2>&1
+          status=$?
+          set -e
+          printf 'xcodebuild_exit=%s\n' "$status" | tee "$RUNNER_TEMP/m1/exit.txt"
+          # Summarize with the tested extractor so source-comment echoes (lines
+          # containing `error:` in /// docs or string literals) are not counted
+          # as compiler diagnostics. The xcodebuild exit status stays the gate.
+          python3 scripts/ios15_build_log.py "$RUNNER_TEMP/m1/xcodebuild.log" --output-dir "$RUNNER_TEMP/m1"
+          test -s "$RUNNER_TEMP/m1/xcodebuild.log"
+          # Compiler failure is an invalid build, never a reproduced UI bug.
+          exit "$status"
+
+      - name: Package TrollStore IPA
+        run: |
+          set -euo pipefail
+          python3 scripts/package_ios15_ipa.py \
+            --derived-data "$RUNNER_TEMP/m1/DerivedData" \
+            --configuration Debug \
+            --output-dir "$RUNNER_TEMP/ipa" \
+            --entitlements scripts/ios15-trollstore.entitlements \
+            --diagnostic-commit "$GITHUB_SHA"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          manifest = json.loads((Path(os.environ['RUNNER_TEMP'])/'ipa'/'manifest.json').read_text())
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Upload TrollStore IPA
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: minis-ios15-reentry-diagnostic
+          path: |
+            ${{ runner.temp }}/ipa/*.ipa
+            ${{ runner.temp }}/ipa/manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Record evidence
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m0" "$RUNNER_TEMP/m1"
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          def sha256(p):
+              h=hashlib.sha256()
+              with open(p,'rb') as f:
+                  for chunk in iter(lambda: f.read(1024*1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+          temp0=Path(os.environ['RUNNER_TEMP'])/'m0'
+          temp1=Path(os.environ['RUNNER_TEMP'])/'m1'
+          app=next(temp0.glob('DerivedData/Build/Products/Debug-iphoneos/Minis.app'), None)
+          ev={
+            'commit': subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
+            'xcode': subprocess.check_output(['xcodebuild','-version'], text=True).strip().splitlines(),
+            'iphoneos_sdk': subprocess.check_output(['xcrun','--sdk','iphoneos','--show-sdk-version'], text=True).strip(),
+            'swift': subprocess.check_output(['swift','--version'], text=True).strip().splitlines()[0],
+            'ish': subprocess.check_output(['git','-C','deps/ish','rev-parse','HEAD'], text=True).strip(),
+            'native_cache_hit': os.environ.get('CACHE_HIT','unknown'),
+            'purpose': 'device diagnostic IPA; original UI symptom requires device capture',
+            'reentry_ui_test': 'NOT_RUN',
+            'm1_log_bytes': (temp1/'xcodebuild.log').stat().st_size if (temp1/'xcodebuild.log').exists() else 0,
+          }
+          (temp1/'versions.json').write_text(json.dumps(ev, indent=2)+'\n')
+          print(json.dumps(ev, indent=2))
+          PY
+        env:
+          CACHE_HIT: ${{ steps.native-cache.outputs.cache-hit }}
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reentry-device-build-evidence
+          path: |
+            ${{ runner.temp }}/m0/xcodebuild.log
+            ${{ runner.temp }}/m1/xcodebuild.log
+            ${{ runner.temp }}/m1/errors.txt
+            ${{ runner.temp }}/m1/summary.json
+            ${{ runner.temp }}/m1/versions.json
+            ${{ runner.temp }}/m1/exit.txt
+            ${{ runner.temp }}/sf-symbols/*.log
+            ${{ runner.temp }}/input-prompts/**
+            ${{ runner.temp }}/retry-probe/**
+            ${{ runner.temp }}/reentry-collector/**
+          if-no-files-found: warn
+          retention-days: 14

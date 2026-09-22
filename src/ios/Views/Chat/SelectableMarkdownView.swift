@@ -5230,11 +5230,37 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
             // sentinel. Preserve the height estimate, but declare that this
             // view has no intrinsic horizontal demand until a real width is
             // available.
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            reentryDiagnosticText(phase: "intrinsic-unset", height: original.height)
+            #endif
+            // REENTRY-DIAG-END
             return CGSize(width: UIView.noIntrinsicMetric, height: original.height)
         }
         let height = sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height
+        // REENTRY-DIAG-BEGIN
+        #if DEBUG
+        reentryDiagnosticText(phase: "intrinsic-finite", height: height)
+        #endif
+        // REENTRY-DIAG-END
         return CGSize(width: UIView.noIntrinsicMetric, height: height)
     }
+
+    // REENTRY-DIAG-BEGIN
+    #if DEBUG
+    private func reentryDiagnosticText(phase: String, height: CGFloat, width: CGFloat? = nil) {
+        guard ReentryDiagnostics.active else { return }
+        let context = reentryDiagnosticContext(self)
+        ReentryDiagnostics.shared.record(
+            kind: "text-size", owner: context.collection, subject: self, parent: context.cell,
+            generation: context.cell?.reentryDiagnosticGeneration ?? 0, phase: phase,
+            values: ["width": Double(width ?? bounds.width), "boundsW": Double(bounds.width),
+                     "tcW": Double(textContainer.size.width), "height": Double(height),
+                     "frameH": Double(bounds.height), "length": Double(textStorage.length),
+                     "inWindow": window == nil ? 0 : 1])
+    }
+    #endif
+    // REENTRY-DIAG-END
 
     // [T-ios-table-cell-image-menu] iOS 16 ONLY: UITextView attaches a built-in
     // UIContextMenuInteraction that, when an inline NSTextAttachment carries an
@@ -7097,6 +7123,11 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
         isInvalidatingCellSize = true
         defer { isInvalidatingCellSize = false }
         let newHeight = sizeThatFits(CGSize(width: measureWidth, height: .greatestFiniteMagnitude)).height
+        // REENTRY-DIAG-BEGIN
+        #if DEBUG
+        reentryDiagnosticText(phase: "correction-measure", height: newHeight, width: measureWidth)
+        #endif
+        // REENTRY-DIAG-END
         // sizeThatFits clamps textContainer.size.height — restore it (only
         // when actually clamped, to avoid a redundant setSize: → fillLayoutHole).
         if textContainer.size.height < CGFloat.greatestFiniteMagnitude {

@@ -149,6 +149,51 @@ class PackageTests(unittest.TestCase):
             stored = json.loads((output / "manifest.json").read_text())
             self.assertEqual(stored["ipa_sha256"], manifest["ipa_sha256"])
 
+    def test_diagnostic_stamp_is_opt_in_and_does_not_mutate_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source", binary_plist=True)
+            original = (app / "Info.plist").read_bytes()
+            commit = "a" * 40
+            result = package_app(app, root / "diagnostic", skip_sign=True,
+                                 diagnostic_commit=commit)
+            with zipfile.ZipFile(root / "diagnostic" / result["ipa_name"]) as archive:
+                info = plistlib.loads(archive.read("Payload/Minis.app/Info.plist"))
+            self.assertIs(info["MinisReentryDiagnostics"], True)
+            self.assertEqual(info["MinisDiagnosticCommit"], commit)
+            self.assertEqual(result["diagnostic_commit"], commit)
+            self.assertEqual((app / "Info.plist").read_bytes(), original)
+            ordinary = package_app(app, root / "ordinary", skip_sign=True)
+            with zipfile.ZipFile(root / "ordinary" / ordinary["ipa_name"]) as archive:
+                info = plistlib.loads(archive.read("Payload/Minis.app/Info.plist"))
+            self.assertNotIn("MinisReentryDiagnostics", info)
+            self.assertNotIn("diagnostic_commit", ordinary)
+
+    def test_ordinary_repack_does_not_inherit_diagnostic_activation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source")
+            info_path = app / "Info.plist"
+            info = plistlib.loads(info_path.read_bytes())
+            info.update(MinisReentryDiagnostics=True, MinisDiagnosticCommit="a" * 40)
+            write_plist(info_path, info)
+            original = info_path.read_bytes()
+            result = package_app(app, root / "out", skip_sign=True)
+            with zipfile.ZipFile(root / "out" / result["ipa_name"]) as archive:
+                staged = plistlib.loads(archive.read("Payload/Minis.app/Info.plist"))
+            self.assertNotIn("MinisReentryDiagnostics", staged)
+            self.assertNotIn("MinisDiagnosticCommit", staged)
+            self.assertEqual(info_path.read_bytes(), original)
+
+    def test_invalid_diagnostic_commit_is_rejected_before_staging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source")
+            for value in ("short", "g" * 40, "a" * 39 + "\n", "../" + "a" * 40):
+                with self.subTest(value=value), self.assertRaises(PackageError):
+                    package_app(app, root / "out", skip_sign=True, diagnostic_commit=value)
+            self.assertFalse((root / "out").exists())
+
     def test_keep_incompatible_plugins_leaves_16x_appex(self):
         with tempfile.TemporaryDirectory() as tmp:
             app = make_app(Path(tmp) / "src", plugins={"MinisFileProvider.appex": "16.0"})

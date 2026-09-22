@@ -37,6 +37,15 @@ final class MessageListLayout: UICollectionViewLayout {
         // Don't overwrite if we already have a real measured height.
         guard heightCache[index] == nil else { return }
         precalcHeights[index] = height
+        // REENTRY-DIAG-BEGIN
+        #if DEBUG
+        if ReentryDiagnostics.active {
+            ReentryDiagnostics.shared.record(
+                kind: "precalc", owner: collectionView, subject: self, index: index,
+                values: ["height": Double(height), "width": Double(collectionView?.bounds.width ?? -1)])
+        }
+        #endif
+        // REENTRY-DIAG-END
     }
 
     /// When true, ALL self-sizing invalidation is deferred (heights stored in
@@ -230,6 +239,17 @@ final class MessageListLayout: UICollectionViewLayout {
         }
         totalHeight = y
         lastItemCount = itemCount
+        // REENTRY-DIAG-BEGIN
+        #if DEBUG
+        if ReentryDiagnostics.active {
+            ReentryDiagnostics.shared.record(
+                kind: "prepare", owner: collectionView, subject: self,
+                values: ["items": Double(itemCount), "height": Double(totalHeight),
+                         "offset": Double(collectionView?.contentOffset.y ?? -1),
+                         "width": Double(collectionView?.bounds.width ?? -1)])
+        }
+        #endif
+        // REENTRY-DIAG-END
         // [ScrollStall] prepare() runs on every invalidateLayout; on long
         // sessions iterating the full itemCount can show up as scroll hitches.
         let elapsed = (CACurrentMediaTime() - t0) * 1000
@@ -484,6 +504,19 @@ final class MessageListLayout: UICollectionViewLayout {
             let viewportTop = cv.contentOffset.y
             let pos = originalAttributes.frame.maxY <= viewportTop ? "above"
                 : (cellTop < viewportTop + cv.bounds.height ? "inside" : "below")
+            // REENTRY-DIAG-BEGIN
+            #if DEBUG
+            if ReentryDiagnostics.active {
+                ReentryDiagnostics.shared.record(
+                    kind: "layout-height", owner: cv, subject: self, index: index, phase: estimateSrc,
+                    values: ["oldH": Double(oldHeight), "newH": Double(newHeight),
+                             "y": Double(originalAttributes.frame.minY), "offset": Double(viewportTop),
+                             "viewportH": Double(cv.bounds.height), "width": Double(cv.bounds.width),
+                             "tracking": cv.isTracking ? 1 : 0, "decel": cv.isDecelerating ? 1 : 0,
+                             "deferred": deferSelfSizing ? 1 : 0])
+            }
+            #endif
+            // REENTRY-DIAG-END
             #if DEBUG
             let phase = cv.isDecelerating ? "decel" : (cv.isTracking ? "drag" : "idle")
             // [T-ios-scroll-metrics-ring] Record EVERY correction (no threshold)
