@@ -9,6 +9,28 @@ The rejected standalone Simulator draft is archived outside the repository at
 workspace `reports/openminis-ios15/retired-sim-harness/`; do not restore its
 settled-snapshot verdict or partial source extraction.
 
+## Current entry: private real-list replay
+
+The current App opens a local JSON picker, not the six-case quick driver. Import
+one original clean session export (or its messages array), at most2MB/500 raw rows.
+The file is read locally and never included in the source/IPA. Actual RawMessage
+conversion, consecutive-assistant folding, completed caches and V3 Coordinator
+own the displayed list. Missing exported media/tool results are recorded as limits.
+
+After browsing to a useful position and releasing your finger, tap **开始采集**,
+then **重入**, and physically flick up/down over the long replies. Release your
+finger before **结束分享**, within20seconds. Reentry ensures actual Coordinator
+configuration and fresh text measurements occur inside the capture window; a
+warm-list scroll without those witnesses is INCOMPLETE, not a reproduction.
+One window per launch; idle/warm-up is paused and the unchanged8000-event cap
+remains. No fake gesture flags, scalar height writes or per-frame FPS overlays.
+
+Use `python3 replay_report.py report.json --commit <40hex> --input-sha <64hex>`.
+CAPTURE_VALID means a usable physical-motion trace, **not** bug reproduction or a
+fix. INCOMPLETE and INVALID stay distinct. The old `device_report.py` and six-case
+code remain for historical reports; both actual fa407d1/5d84897 reports are still
+INCONCLUSIVE, and this new format must not be run through their validator.
+
 ## Build and isolation
 
 Workflow: `.github/workflows/ios15-provisional-height-device.yml`.
@@ -19,7 +41,7 @@ Workflow: `.github/workflows/ios15-provisional-height-device.yml`.
 3. Reuse the established full App device dependency path; do not try to link
    device-only dependencies into a Simulator target.
 4. Build from a disposable source copy. Only the application entry, the existing
-   Debug file and a collector read-only extension are overlaid. Exact inverse
+   Debug file and a collector UI-window/read bridge are overlaid. Exact inverse
    restoration to immutable `2f21e24` bytes is mandatory. Every complete
    rendering/measurement source remains byte-identical.
 5. Package a separate `com.openminis.layoutprobe` App named **Minis Layout Probe**.
@@ -30,11 +52,12 @@ Workflow: `.github/workflows/ios15-provisional-height-device.yml`.
 Build success means compilation/package verification only. The device tests
 are **NOT_RUN** until the separate App is actually launched on iOS15.
 
-## Device run
+## Historical six-case device runs (fa407d1 / 5d84897)
 
-The test App automatically runs neutral short-code, long-code and plain-text
-fixtures using the real `SelectableMarkdownView`. SHA256 includes the full raw
-Markdown/code content, not the attachment-replacement characters.
+Those earlier test Apps automatically ran neutral short-code, long-code and
+plain-text fixtures using the real `SelectableMarkdownView`. The code remains
+for historical reports, but is not the current replay App entry. SHA256 includes
+the full raw Markdown/code content, not attachment-replacement characters.
 
 - An independent production-rendered text view supplies a finite-width reference.
   Only the reference is explicitly measured.
@@ -59,14 +82,27 @@ The report folder is `Documents/provisional-height-probe/<actual trace run UUID>
 ## Local checks
 
 ```bash
-python3 scripts/ios15-provisional-height-probe/test_prepare_device_probe.py -v
-python3 scripts/ios15-provisional-height-probe/test_device_report.py -v
-python3 scripts/reentry-diagnostics/test_isolation.py -v
+python3 -m unittest discover -s scripts/ios15-provisional-height-probe -p 'test_*.py' -v
+python3 -m unittest discover -s scripts/reentry-diagnostics -p 'test_*.py' -v
+
+# macOS with the pinned Xcode only, not runnable on a Linux host:
+bash scripts/reentry-diagnostics/run_collector_tests.sh /tmp/minis-collector
+bash scripts/ios15-provisional-height-probe/run_capture_window_tests.sh /tmp/minis-collector
 ```
 
-These are tooling/report-algorithm checks, not native runtime acceptance.
+Python checks validate tooling/report algorithms, not native runtime acceptance.
+Do not invoke sibling-import unittest modules as repository-root module names;
+use discovery as above or execute each test script directly. The window runner
+requires Recorder.swift produced by the first macOS runner. It compiles the
+actual collector and extracted diagnostic marker callbacks (only pan state is
+substituted), then separately requires compiling no-op-pause and missing-ordinal
+mutations to fail assertions. These Foundation checks are not UIKit gestures.
 
-After receiving the JSON:
+The replay validator checks owner/VM links, real configure/text/viewport events,
+boundaries, ordinal/count consistency, visible rows, and unchanged viewport width
+and hashed model/text. None of these checks asserts a layout repair.
+
+For a **historical six-case JSON only**:
 
 ```bash
 python3 scripts/ios15-provisional-height-probe/device_report.py report.json --commit <probe-build-SHA>

@@ -13,6 +13,10 @@ on:
       - scripts/ios15-provisional-height-probe/device_report.py
       - scripts/ios15-provisional-height-probe/test_device_report.py
       - scripts/ios15-provisional-height-probe/Probe.entitlements
+      - scripts/ios15-provisional-height-probe/replay_report.py
+      - scripts/ios15-provisional-height-probe/test_replay_report.py
+      - scripts/ios15-provisional-height-probe/CaptureWindowTests.swift
+      - scripts/ios15-provisional-height-probe/run_capture_window_tests.sh
 
 permissions:
   contents: read
@@ -59,6 +63,7 @@ jobs:
           set -euo pipefail
           python3 scripts/reentry-diagnostics/test_isolation.py -v
           bash scripts/reentry-diagnostics/run_collector_tests.sh "$RUNNER_TEMP/reentry-collector"
+          bash scripts/ios15-provisional-height-probe/run_capture_window_tests.sh "$RUNNER_TEMP/reentry-collector"
           python3 scripts/reentry-diagnostics/test_trace.py -v
 
       - name: Tooling and report behavior tests
@@ -66,6 +71,7 @@ jobs:
           set -euo pipefail
           python3 scripts/ios15-provisional-height-probe/test_prepare_device_probe.py -v
           python3 scripts/ios15-provisional-height-probe/test_device_report.py -v
+          python3 scripts/ios15-provisional-height-probe/test_replay_report.py -v
           python3 scripts/test_ios15_build_log.py -v
           python3 scripts/test_package_ios15_ipa.py -v
           python3 scripts/test_ios15_compat_contract.py -v

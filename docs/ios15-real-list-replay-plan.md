@@ -1,0 +1,41 @@
+# Native iOS15 real-list replay capture
+
+## Locked baseline and finding
+
+- Delivered source `5d8489773731fb6d3a922e73dde61a293a759e77`; complete production components remain byte-identical to `2f21e242df71d63576682f8ac61c50a097f3a5ae` before the reversible DEBUG entry/collector bridge overlay.
+- Second device input SHA256 `4767ed7b089469a5c8181eece25f3d216a1cfa4d0ef2f41340b10e327c17dc13`, iOS15.1.1, 656 intact events, all six controls, distinct target cell/text identities. Verdict remains INCONCLUSIVE.
+- Target seq137/139 returns unset-width174.667; seq140/142 measures246; preference143 supersedes the temporary value before delivery145 and cell-return148. No shrink/recovery cache writes. Initial control briefly accepts174.667 but never returns it to layout.
+- The previous original-App record is different: row249 seq538 writes1865→1484 with actual decel=1/deferred=1; row253 seq1827 writes1521→1354 with tracking=1/decel=1/deferred=1, viewport801,255 items. Neither one-row probe recreates those conditions.
+
+## Ranked hypotheses and discriminators
+
+1. Completed-message cache and renderer-identity path differs. Real AssistantBlockView passes cachedAttributedString, messageId and blockId; the small probe did not. Compare through the real production Coordinator and its normal cache preparation, not a hand-written replacement. `fixedSize` is present on BOTH paths and is not an established difference.
+2. Tall mixed content and viewport context matter. Original targets are longer than the viewport and contain multiple code blocks (and one table); both small probe fixtures fit inside the703pt viewport. Use the already-supplied original export at runtime, privately, with the actual wrappers (16pt horizontal,2pt vertical), not guessed height constants or redacted glyph-metric claims.
+3. Real gesture/deceleration and Coordinator scheduling matter. A manually set layout flag is not a finger gesture and does not exercise the real delegate/VM/KVO/settle path. Use an interactive production CollectionViewMessageListV3; capture actual dragging/deceleration. Do not inject fake UIKit gesture states or use a scalar replay as native evidence.
+
+## Narrow implementation scope
+
+- Keep every production source unchanged. Add a test-only replay entry alongside the retained historical quick-probe code, using CollectionViewMessageListV3 inside a normal UIHostingController and AIChatViewModel.
+- Additional source inspection found SessionDataSimulator unsuitable for this export: it drops reasoning/media, expects dictionary tool input rather than this export's string, and does not merge consecutive assistant raw rows. The replay therefore uses the actual `RawMessage.toChatMessage` conversion and mirrors the loadSession consecutive-assistant fold. It does not call loadSession or write a session database.
+- Parse an explicitly selected local JSON file. Prepare completed text caches through `vm.cacheAttributedString(for:)`, just as real settled session loading does. The clean export omits media bytes and tool results: count the missing media, finalize unresolved tools as cancelled rather than invent success, and expose these limits in the report. Reasoning is enabled; bar inputs remain debug60/50. No driver LLM/tool execution, remote upload, or access to normal Minis AppGroup/Keychain.
+- Preserve message/VM identity across a real view unmount/remount. Let the actual Coordinator own registrations, datasource, precalc, height memo, self-sizing, delegate/KVO and settle behavior. Do not call `setPrecalcHeight`, fabricate heights, or manually flush sizing in the replay controller.
+- Match the available native navigation content viewport rather than reserving the small probe's large status panel. Controls live in navigation items; no per-frame status updates or FPS overlays during capture.
+- A test-only collector bridge may pause recording while the local file picker and warm-up UI are idle, then allow one bounded capture per launch and close it at finish. It must not reset the sequence/nonce or bypass the8000-record cap. Capture-window controls run only from UI actions, never from measurement callbacks. Unit/native collector tests cover pause/start/finish and cap behavior.
+- Raw report has a distinct `kind`, exact source/run/input SHA, initial/end passive snapshots, marker events and the original production trace. Visible text is hashed, never copied. No automatic bug-reproduced or fix-success label from the driver. Cap/incomplete capture is INVALID, not a negative result.
+- Original private input is sent back only through the current user's private channel as a separate local-import file. It must never be staged, committed, included in the IPA or sent to a third-party build service.
+
+## Success, failure and evidence
+
+- Build/source success: exact inverse restoration, untouched production component hashes, bounded import/collector protocol tests, real Apple compilation, matching source/artifact IDs, signature/MinOS/bundle isolation and ZIP/SHA verification.
+- Native capture success: source/run matches, contiguous uncapped trace, actual gesture/deceleration witness, actual production Coordinator configuration/viewport events, content unchanged between passive snapshots. This is a valid capture, not by itself proof of the original bug or of a fix.
+- Bug-red requires a correlated same-row/content owner→host delivery→cell acceptance/return→layout shrink/recovery at unchanged finite width, with an independent prior/settled finite-height witness. No production fix is chosen without that loop.
+- Independent failure signals: import rejected/oversize, missing legacy path or real Coordinator, backgrounding, trace cap/gaps, missing physical interaction, changes in content or width. The application must export an honest incomplete/invalid result rather than report success.
+- Reuse the existing pinned Xcode26.2/17C52, SDK26.2 device packaging path. Keep the old small-probe validator and its two INCONCLUSIVE reports intact; do not weaken its verdict to make the new data green.
+
+## Resume preflight and protocol regression gate
+
+- Baseline remains5d848977; all existing WIP preserved. Wrong-workdir and sibling-import collection errors were rerun with script-directory unittest discovery. Linux has neither xcrun nor swiftc; Foundation/native execution is exclusively a cloud gate, never claimed from grammar checks.
+- Deterministic collector failure: identical repeated pan states yield identical diagnostic key/values, so the second begin/end is deduplicated. Ordinals now make each action distinct. Native tests compile the actual collector plus the exact driver marker/pan callback bodies with a state-only recognizer substitute. Removing those ordinal fields must compile and then fail the6-event behavioral assertion. No UIKit/rendering acceptance is inferred from this test.
+- Validator red signal:27 protocol tests initially produced15 failures. False-positive cases included unrelated/out-of-window motion, missing config/text links, absent/changed model identity/content/width and duplicated action ordinals. These are capture protocol failures, not evidence about the original layout bug. Five additional boundary/CLI tests also failed before their fixes. Final33/33 cover two remounts and transient zero-size samples as well; CAPTURE_VALID stays distinct from reproduction/repair. CLI provenance pins are mandatory and are taken from verified artifacts/original local input, never from the report itself.
+- Begin/end and reentry snapshots add passive VM/Coordinator identity, hashed model content and visible-cell state. Input and rendered text never enter the report. Reentry waits at most30 real display frames for a visible production list, without forcing layout or waiting for a target height. It does not toggle a fake transition-suspend flag; stopping during remount is explicitly incomplete.
+- Success: repeat gestures survive real collector dedup; metadata and actual owner/config/text/motion witnesses agree; production hashes remain exact; compilation/package gates succeed. Independent failures: a mutation that compiles but is not rejected, an unlinked producer accepted as real motion, content/width drift, or original production bytes changed. Private source input remains outside git/CI; original fa407d1/5d84897 reports retain INCONCLUSIVE.

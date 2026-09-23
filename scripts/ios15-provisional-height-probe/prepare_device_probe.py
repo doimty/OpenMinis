@@ -27,6 +27,11 @@ RENDER_PATHS = (
     'src/ios/Agent/MessageList/MessageListInfrastructure.swift',
     'src/ios/Agent/MessageList/MessageListLayout.swift',
     'src/ios/Agent/MessageList/CollectionViewMessageListV3.swift',
+    'src/ios/Views/Chat/AssistantBlockView.swift',
+    'src/ios/Agent/Chat/AIChatViewModel.swift',
+    'src/ios/Agent/Chat/AIChatViewModel+Persistence.swift',
+    'src/ios/Agent/Chat/ChatStore.swift',
+    'src/ios/Agent/Chat/ChatModels.swift',
 )
 BASELINE_PATHS = (MAIN_PATH, DEBUG_PATH, LOGGER_PATH, *RENDER_PATHS)
 START = '\n// NATIVE-DEVICE-PROBE-OVERLAY-BEGIN\n'
@@ -37,6 +42,24 @@ NO_ENTRY = '\nstruct MinisApp: App {'
 READONLY_COLLECTOR = '''#if DEBUG
 extension ReentryDiagnostics {
     var nativeProbeRunID: String { runID }
+
+    /// UI-controlled one-shot window, never called from rendering callbacks.
+    /// Pausing does not reset identities, sequence, dedup state or the hard cap.
+    func nativeProbePauseCapture() {
+        lock.lock()
+        closed = true
+        lock.unlock()
+    }
+
+    func nativeProbeBeginCapture() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard enabledForInstance, sequence == 0 else {
+            throw NSError(domain: "NativeProbeCapture", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Capture is disabled or already consumed"])
+        }
+        closed = false
+    }
 
     /// Test report finalization only; never invoked by a rendering callback.
     func nativeProbeReadEvents() throws -> [[String: Any]] {
