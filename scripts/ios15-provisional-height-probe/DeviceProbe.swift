@@ -80,6 +80,7 @@ private final class NativeHeightProbeController: UIViewController {
     private let shareButton = UIButton(type: .system)
     private let list = MessageListViewController()
     private var dataSource: UICollectionViewDiffableDataSource<Int, Int>?
+    private var reuseIdentifier = "native-probe-row"
     private var fixture = NativeHeightFixture.code(lines: 3)
     private var cases: [[String: Any]] = []
     private var reportURL: URL?
@@ -103,10 +104,10 @@ private final class NativeHeightProbeController: UIViewController {
         list.didMove(toParent: self)
         list.collectionView.isUserInteractionEnabled = false
         list.collectionView.contentInsetAdjustmentBehavior = .never
-        list.collectionView.register(SelfSizingCell.self, forCellWithReuseIdentifier: "native-probe-row")
+        list.collectionView.register(SelfSizingCell.self, forCellWithReuseIdentifier: reuseIdentifier)
         dataSource = UICollectionViewDiffableDataSource<Int, Int>(collectionView: list.collectionView) { [weak self] cv, path, _ in
             guard let self else { return nil }
-            let cell = cv.dequeueReusableCell(withReuseIdentifier: "native-probe-row", for: path) as! SelfSizingCell
+            let cell = cv.dequeueReusableCell(withReuseIdentifier: self.reuseIdentifier, for: path) as! SelfSizingCell
             let currentFixture = self.fixture
             cell.contentKey = "native-probe-" + currentFixture.digest
             self.list.messageListLayout.setContentKey(cell.contentKey!, at: path.item)
@@ -204,6 +205,7 @@ private final class NativeHeightProbeController: UIViewController {
                 "inWindow": cell.window != nil && text.window != nil && !cell.isHidden && !text.isHidden
                     && cell.alpha > 0 && text.alpha > 0,
                 "cellID": ReentryDiagnostics.identity(cell),
+                "textID": ReentryDiagnostics.identity(text),
                 "configGeneration": cell.reentryDiagnosticGeneration,
                 "layoutCachedHeight": list.messageListLayout.cachedHeight(at: 0).map { Double($0) } as Any? ?? NSNull()]
     }
@@ -243,6 +245,13 @@ private final class NativeHeightProbeController: UIViewController {
             list.messageListLayout.deferSelfSizing = true
             await apply([])
             try await frames(3)
+            // The first device run kept the same already-measured UITextView
+            // in the original reuse pool, so it never exercised unset width
+            // during deferSelfSizing. Use a new UIKit reuse pool for THIS case
+            // only. The class, content, width, production sizing and caches are
+            // unchanged; UIKit constructs a genuinely new cell/host/text tree.
+            reuseIdentifier = "native-probe-fresh-" + UUID().uuidString
+            list.collectionView.register(SelfSizingCell.self, forCellWithReuseIdentifier: reuseIdentifier)
             list.messageListLayout.invalidateHeight(at: 0)
             list.messageListLayout.setPrecalcHeight(CGFloat(shortReference["height"] as! Double), at: 0)
             await apply([0])
@@ -310,7 +319,7 @@ private final class NativeHeightProbeController: UIViewController {
                 "sourceCommit": sourceCommit, "baselineCommit": baselineCommit,
                 "os": UIDevice.current.systemVersion,
                 "legacyPath": ProcessInfo.processInfo.operatingSystemVersion.majorVersion == 15,
-                "cases": cases, "trace": trace,
+                "cases": cases, "trace": trace, "requiresFreshReentry": true,
                 "limits": "Full production components, neutral input, policy-driven local re-entry; not real finger motion or original conversation acceptance. Validator decides verdict."
             ]
             if let captureError { report["captureError"] = captureError }

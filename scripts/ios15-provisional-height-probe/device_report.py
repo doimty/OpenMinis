@@ -343,6 +343,17 @@ def validate_report(data: dict[str, Any], expected_commit: str | None = None) ->
     if not isinstance(raw_cases, list) or [case.get("name") if isinstance(case, dict) else None for case in raw_cases] != list(CASES):
         raise _invalid("cases are missing, reordered, or duplicated")
     cases = {name: _validate_case_shape(case, name) for case, name in zip(raw_cases, CASES)}
+    requires_fresh = data.get("requiresFreshReentry", False)
+    if type(requires_fresh) is not bool:
+        raise _invalid("requiresFreshReentry must be a Boolean")
+    if requires_fresh:
+        initial = cases["initial"]["case"]["snapshot"]
+        reentry = cases["deferred-reentry"]["case"]["snapshot"]
+        for key in ("cellID", "textID"):
+            if not all(_id(s.get(key)) and s[key] not in NONE_IDS for s in (initial, reentry)):
+                raise _invalid(f"fresh reentry lacks {key} evidence")
+            if initial[key] == reentry[key]:
+                raise _invalid(f"fresh reentry reused the already measured {key}")
 
     trace = data.get("trace")
     if not isinstance(trace, list) or not trace:

@@ -271,6 +271,33 @@ class DeviceReportBehaviorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_report(report)
 
+    def test_fresh_reentry_contract_rejects_reused_measured_tree(self):
+        report = base_report()
+        report["requiresFreshReentry"] = True
+        report["cases"][0]["snapshot"].update(cellID="same-cell", textID="same-text")
+        report["cases"][1]["snapshot"].update(cellID="same-cell", textID="same-text")
+        with self.assertRaises(ValueError):
+            validate_report(report)
+
+    def test_fresh_reentry_contract_keeps_valid_new_tree(self):
+        report = base_report()
+        report["requiresFreshReentry"] = True
+        report["cases"][0]["snapshot"].update(cellID="initial-cell", textID="initial-text")
+        report["cases"][1]["snapshot"].update(cellID=CELL, textID="-text")
+        self.assertEqual(validate_report(report)["status"], "BASELINE_REPRODUCED")
+
+    def test_fresh_reentry_missing_identity_is_invalid(self):
+        report = base_report()
+        report["requiresFreshReentry"] = True
+        with self.assertRaises(ValueError):
+            validate_report(report)
+
+    def test_fresh_reentry_flag_must_be_boolean(self):
+        report = base_report()
+        report["requiresFreshReentry"] = "true"
+        with self.assertRaises(ValueError):
+            validate_report(report)
+
     def test_cli_exit_codes_and_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "report.json"

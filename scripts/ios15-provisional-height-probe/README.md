@@ -44,6 +44,13 @@ Markdown/code content, not the attachment-replacement characters.
   A final recovered snapshot cannot erase a 14ms transient from the verdict.
 - Deferred policy and remove/reinsert actions are test-driven, not real gestures
   or complete normal-App navigation. No original/private conversation is copied.
+- The first actual-device run completed all controls, but ordinary remove/reinsert
+  kept the same measured text view and produced no unset-width event in the target
+  phase. That report remains INCONCLUSIVE. The target phase now uses a fresh UIKit
+  reuse identifier, still with the same production cell class/content/width; this
+  creates an actually unmeasured cell/host/text tree. The report includes cell/text
+  identities and requires them to differ from the initial tree. Subsequent reuse
+  control keeps the regular same-pool behavior. No subject height is fabricated.
 - After completion, use **分享测试报告** to share the nonce-scoped JSON. The normal
   Minis App is separate and unaffected. Restart the test App for a fresh run.
 
