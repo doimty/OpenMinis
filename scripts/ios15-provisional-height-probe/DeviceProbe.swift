@@ -466,6 +466,16 @@ private final class NativeReplayImportController: UIViewController, UIDocumentPi
                 let message = raw.toChatMessage(mediaResolver: { _ in
                     FileManager.default.temporaryDirectory.appendingPathComponent("unavailable-export-media")
                 }, showThinking: true)
+                // The isolated probe bundle has no normal-Minis App Group. The
+                // exported session carries no media bytes, so attachment tiles
+                // cannot render here anyway; leaving the parsed attachment
+                // metadata in place made AsyncImageTile resolve a minis:// URL
+                // through the App Group and assert. This keeps the displayed
+                // text byte-identical (toChatMessage already strips the XML)
+                // and prevents any normal-Minis container access.
+                omittedMedia += message.attachments.count
+                message.attachments = []
+                message.inputAttachments = []
                 if raw.role == .assistant, let current = currentAssistant {
                     current.blocks.append(contentsOf: message.blocks)
                     if let usage = message.usage { current.usage = usage }
@@ -775,7 +785,7 @@ private final class NativeReplayController: UIViewController {
                 "textBlockCount": textBlocks, "gestureBegins": gestureBegins, "gestureEnds": gestureEnds,
                 "reentries": reentryCount, "finishReason": finishReason,
                 "startedAt": startedAt ?? 0, "snapshots": snapshots, "trace": trace,
-                "limits": "Actual production V3 coordinator, RawMessage.toChatMessage and completed caches; local merged export. Export omits media bytes and tool results (unresolved tools finalized cancelled). Reasoning enabled; bar inputs debug60/50. No normal Minis storage. Capture only, not a repair verdict."
+                "limits": "Actual production V3 coordinator, RawMessage.toChatMessage and completed caches; local merged export. Export omits media bytes, tool results (unresolved tools finalized cancelled) and attachment tiles (isolated probe has no normal-Minis App Group); reasoning enabled; bar inputs debug60/50. No normal Minis storage. Capture only, not a repair verdict."
             ]
             let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("real-list-replay", isDirectory: true)
