@@ -1,5 +1,14 @@
 import Foundation
 
+// The exact collector's shared declaration still references AppLogger. Like
+// CollectorTests.swift, this independent test binary supplies only the logging
+// adapter; each tested recorder uses an injected sink and the real file writer.
+// Do not link CollectorTests.swift here: it has a separate @main entrypoint.
+struct AppLogger {
+    init(category: String) {}
+    func info(_ message: String) {}
+}
+
 @main
 struct CaptureWindowTests {
     static func check(_ value: @autoclosure () -> Bool, _ name: String) {
