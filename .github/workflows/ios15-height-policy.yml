@@ -1,0 +1,52 @@
+name: ios15-height-policy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/ios15-provisional-height]
+    paths:
+      - .github/workflows/ios15-height-policy.yml
+      - scripts/ios15-height-policy/**
+      - src/ios/Agent/MessageList/MessageListLayout.swift
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios15-height-policy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  policy:
+    runs-on: macos-26
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Pin compiler
+        run: |
+          set -euo pipefail
+          xcodebuild -version | tee "$RUNNER_TEMP/xcode-version.txt"
+          grep -Fx 'Xcode 26.2' "$RUNNER_TEMP/xcode-version.txt"
+          grep -Fx 'Build version 17C52' "$RUNNER_TEMP/xcode-version.txt"
+      - name: Prove baseline bug-red before production implementation
+        run: |
+          set -euo pipefail
+          python3 scripts/ios15-height-policy/run_tests.py \
+            --output "$RUNNER_TEMP/height-policy/baseline" \
+            --source-rev b47cb87a33b4991c50396f727e39fb99387bfa60 \
+            --expect-failure precalc_shrink_is_deferred
+      - name: Upload policy evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: height-policy-evidence
+          path: |
+            ${{ runner.temp }}/height-policy/**
+            ${{ runner.temp }}/xcode-version.txt
+          if-no-files-found: error
+          retention-days: 14
