@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import platform
 import subprocess
 import sys
 
@@ -54,8 +55,12 @@ def prepare(output: Path, revision=None):
 
 def run(output, revision=None, expected=()):
     record = prepare(output, revision)
-    compiler = subprocess.check_output(['xcrun', '--find', 'swiftc'], text=True).strip()
-    command = [compiler, '-swift-version', '5', '-Onone',
+    compiler = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--find', 'swiftc'], text=True).strip()
+    sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip()
+    target = platform.machine() + '-apple-macosx13.0'
+    record.update(compiler=compiler, sdk=sdk, target=target)
+    command = [compiler, '-swift-version', '5', '-Onone', '-parse-as-library',
+               '-target', target, '-sdk', sdk,
                str(HERE / 'PolicyPlatform.swift'), str(output / 'MessageListItem.swift'),
                str(output / 'MessageListLayout.swift'), str(HERE / 'PolicyTests.swift'),
                '-o', str(output / 'policy-tests')]
