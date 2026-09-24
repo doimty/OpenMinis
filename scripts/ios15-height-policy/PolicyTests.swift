@@ -248,6 +248,64 @@ struct PolicyTests {
                 drainWidthCallback()
                 try require(layout.cachedHeight(at: 0) == nil, "previous-session width incorrectly suppressed a required purge")
             }),
+            ("post_insertion_invalidation_keeps_precalc", {
+                let layout = makeLayout()
+                layout.setPrecalcHeight(800, at: 0)
+                observe(layout, 1000)
+                layout.invalidateHeight(at: 0)
+                try require(height(layout) == 800, "post-insertion cleanup erased the new item's precalc seed")
+            }),
+            ("precalc_reseed_keeps_pending", {
+                let layout = makeLayout()
+                layout.setPrecalcHeight(1631, at: 0)
+                layout.deferSelfSizing = true
+                observe(layout, 1376)
+                layout.setPrecalcHeight(1631, at: 0)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1376, "repeated estimate incorrectly cancelled a legitimate observation")
+            }),
+            ("one_row_invalidation_preserves_other_pending", {
+                let layout = makeLayout()
+                observe(layout, 1000, row: 0)
+                observe(layout, 2000, row: 1)
+                layout.deferSelfSizing = true
+                observe(layout, 900, row: 0)
+                observe(layout, 1700, row: 1)
+                layout.invalidateHeight(at: 0)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout, row: 1) == 1700, "one row's invalidation discarded another row's legitimate pending value")
+            }),
+            ("inactive_and_zero_width_keep_pending", {
+                let layout = pendingLayout()
+                UIApplication.shared.applicationState = .inactive
+                defer { UIApplication.shared.applicationState = .active }
+                let other = CGRect(x: 0, y: 0, width: 390, height: 801)
+                try require(!layout.shouldInvalidateLayout(forBoundsChange: other), "background width guard changed")
+                UIApplication.shared.applicationState = .active
+                try require(!layout.shouldInvalidateLayout(forBoundsChange: .zero), "zero-width guard changed")
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1376, "invalid width notification discarded legitimate pending work")
+            }),
+            ("latest_width_target_purges", {
+                let layout = makeLayout()
+                observe(layout, 1000)
+                changeWidth(layout, to: 390)
+                changeWidth(layout, to: 400)
+                drainWidthCallback()
+                try require(layout.cachedHeight(at: 0) == nil, "final width transition never purged old measurements")
+            }),
+            ("invalid_precalc_is_not_a_protected_reference", {
+                for seed in [CGFloat.nan, CGFloat.infinity, CGFloat(-1)] {
+                    let layout = makeLayout()
+                    layout.setPrecalcHeight(seed, at: 0)
+                    layout.deferSelfSizing = true
+                    let accepted = layout.shouldInvalidateLayout(forPreferredLayoutAttributes: attributes(90),
+                                                                  withOriginalAttributes: attributes(100))
+                    try require(accepted, "invalid precalc blocked a valid first measurement")
+                }
+            }),
             ("genuine_shrink_applies_on_thaw", {
                 let layout = makeLayout()
                 observe(layout, 1631)

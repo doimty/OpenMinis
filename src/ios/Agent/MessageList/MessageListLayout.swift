@@ -331,9 +331,9 @@ final class MessageListLayout: UICollectionViewLayout {
     /// Number of pending deferred heights (for diagnostics).
     var deferredHeightCount: Int { deferredHeights.count }
 
-    /// Move deferred heights into the real cache.  Call after scrolling ends.
-    /// Only writes if the cache doesn't already have a value (GeometryReader
-    /// may have reported a more precise height while we were deferring).
+    /// Move current deferred heights into the real cache after scrolling ends.
+    /// Newer observations/writes and content/width/reset transitions withdraw
+    /// obsolete entries before this flush; a genuine shrink still applies.
     func applyDeferredHeights() {
         guard !deferredHeights.isEmpty else { return }
         // [SettleJitter] Evidence log: classify every deferred correction by
@@ -407,6 +407,12 @@ final class MessageListLayout: UICollectionViewLayout {
         // shrink below; otherwise an obsolete low value could undo recovery.
         deferredHeights.removeValue(forKey: index)
 
+        // A confirmed GeometryReader height owns this row. Check before the
+        // deferred branch so UIKit cannot queue a lower value over it either.
+        if geometryReaderConfirmed.contains(index) {
+            return false
+        }
+
         // Protect an established layout height while browsing, including a
         // finite precalculation that has not yet entered the measured cache.
         // A provisional first host report must not shrink that row mid-scroll.
@@ -430,15 +436,6 @@ final class MessageListLayout: UICollectionViewLayout {
             } else {
                 // Only a coarse/default estimate exists: allow first sizing.
             }
-        }
-
-        // If GeometryReader has confirmed this cell's height, completely
-        // ignore UIKit self-sizing.  GR is the source of truth — UIKit's
-        // systemLayoutSizeFitting often disagrees (e.g. invisible .sheet/
-        // .contextMenu modifiers inflate the measured height), causing an
-        // infinite oscillation loop.
-        if geometryReaderConfirmed.contains(index) {
-            return false
         }
 
         let delta = abs(preferred - original)
@@ -497,6 +494,9 @@ final class MessageListLayout: UICollectionViewLayout {
             : (precalcHeights[index] != nil ? "pre"
             : (estimatedHeights[index] != nil ? "est" : "def"))
 
+        // A committed write also supersedes pending work if this entrypoint
+        // was invoked without another shouldInvalidateLayout observation.
+        deferredHeights.removeValue(forKey: index)
         // Cache the new height. prepare() will use this to compute correct totalHeight.
         heightCache[index] = newHeight
 
@@ -719,6 +719,9 @@ final class MessageListLayout: UICollectionViewLayout {
         if UIApplication.shared.applicationState != .active { return false }
 
         if newBounds.width != cv.bounds.width && newBounds.width > 0 {
+            // A thaw can occur before the debounced purge. Do not let a
+            // pending height measured at the previous width survive until it.
+            deferredHeights.removeAll()
             // [T-ios-ipad-rotate-sidebar-scroll-jank] (issue #31) DO NOT clear
             // the height caches on every frame here. The detail column width
             // ANIMATES during a sidebar collapse (and rotation), so this fires
@@ -769,6 +772,7 @@ final class MessageListLayout: UICollectionViewLayout {
             // producing an incorrect contentSize that prevents scroll-to-bottom
             // from reaching the true end.
             self.heightCache.removeAll()
+            self.deferredHeights.removeAll()
             self.precalcHeights.removeAll()
             self.estimatedHeights.removeAll()
             self.geometryReaderConfirmed.removeAll()
@@ -792,18 +796,26 @@ final class MessageListLayout: UICollectionViewLayout {
         var newCache: [Int: CGFloat] = [:]
         var newEstimated: [Int: CGFloat] = [:]
         var newPrecalc: [Int: CGFloat] = [:]
+        var newDeferred: [Int: CGFloat] = [:]
+        var newContentKeys: [Int: String] = [:]
         var newConfirmed: Set<Int> = []
         for (newIndex, item) in newIds.enumerated() {
             if let oldIndex = oldIndexByItem[item] {
                 if let h = heightCache[oldIndex] { newCache[newIndex] = h }
                 if let h = precalcHeights[oldIndex] { newPrecalc[newIndex] = h }
                 if let h = estimatedHeights[oldIndex] { newEstimated[newIndex] = h }
+                if let h = deferredHeights[oldIndex] { newDeferred[newIndex] = h }
+                if let key = contentKeyByIndex[oldIndex] { newContentKeys[newIndex] = key }
                 if geometryReaderConfirmed.contains(oldIndex) { newConfirmed.insert(newIndex) }
             }
         }
         heightCache = newCache
         precalcHeights = newPrecalc
         estimatedHeights = newEstimated
+        // Remap pending values and their old content keys together. The next
+        // setContentKey can then distinguish an unchanged move from new text.
+        deferredHeights = newDeferred
+        contentKeyByIndex = newContentKeys
         geometryReaderConfirmed = newConfirmed
     }
 
@@ -811,6 +823,7 @@ final class MessageListLayout: UICollectionViewLayout {
     /// Use this for the actively streaming message whose height is changing.
     func invalidateHeight(at index: Int) {
         heightCache.removeValue(forKey: index)
+        deferredHeights.removeValue(forKey: index)
         geometryReaderConfirmed.remove(index)
         // [T-ios-scroll-decel-height-drift] Belt-and-suspenders: also drop the
         // content-keyed memo for this index. The content-versioned key already
@@ -827,6 +840,7 @@ final class MessageListLayout: UICollectionViewLayout {
     /// from what `preferredLayoutAttributesFitting` returned, bypassing
     /// the unreliable self-sizing cycle.
     func setCachedHeight(_ height: CGFloat, at index: Int) {
+        deferredHeights.removeValue(forKey: index)
         heightCache[index] = height
         geometryReaderConfirmed.insert(index)
     }
@@ -851,6 +865,11 @@ final class MessageListLayout: UICollectionViewLayout {
     /// snapshot. Called by the Coordinator while building estimates so a later
     /// `invalidationContext` can record the measured height under this key.
     func setContentKey(_ key: String, at index: Int) {
+        if contentKeyByIndex[index] != key {
+            deferredHeights.removeValue(forKey: index)
+        }
+        // Equal keys preserve pending work. Explicit invalidateHeight still
+        // handles same-key render changes (footer state, attachments, etc.).
         contentKeyByIndex[index] = key
     }
 
@@ -920,7 +939,12 @@ final class MessageListLayout: UICollectionViewLayout {
 
     /// Clear all cached heights (e.g., on session change).
     func clearHeightCache() {
+        // A callback scheduled by the old cache lifetime must not erase the
+        // new session/font state, even when its target width still matches.
+        widthPurgeToken &+= 1
+        lastSettledWidth = collectionView?.bounds.width ?? 0
         heightCache.removeAll()
+        deferredHeights.removeAll()
         precalcHeights.removeAll()
         estimatedHeights.removeAll()
         geometryReaderConfirmed.removeAll()

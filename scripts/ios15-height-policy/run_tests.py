@@ -30,13 +30,24 @@ def source(path, revision=None):
     return (ROOT / path).read_bytes()
 
 
-def prepare(output: Path, revision=None):
+def prepare(output: Path, revision=None, mutation=None):
     output.mkdir(parents=True, exist_ok=True)
     original = source(LAYOUT, revision)
-    assert original.count(b'import UIKit\n') == 1
+    compiled = original
+    if mutation == 'precalc-blind':
+        old = b'if hasCached || hasPrecalc {'
+        assert compiled.count(old) == 1
+        compiled = compiled.replace(old, b'if hasCached {')
+    elif mutation == 'keep-pending':
+        old = b'        deferredHeights.removeValue(forKey: index)\n\n        // A confirmed'
+        assert compiled.count(old) == 1
+        compiled = compiled.replace(old, b'        // A confirmed')
+    elif mutation is not None:
+        raise ValueError('unknown policy mutation')
+    assert compiled.count(b'import UIKit\n') == 1
     imports = b'import Foundation\nimport CoreGraphics\n'
-    adapted = original.replace(b'import UIKit\n', imports)
-    assert adapted.replace(imports, b'import UIKit\n', 1) == original
+    adapted = compiled.replace(b'import UIKit\n', imports)
+    assert adapted.replace(imports, b'import UIKit\n', 1) == compiled
     (output / 'MessageListLayout.swift').write_bytes(adapted)
     infrastructure = source(ITEMS, revision).decode()
     start = infrastructure.index('enum MessageListItem: Hashable {')
@@ -44,9 +55,10 @@ def prepare(output: Path, revision=None):
     item = infrastructure[start:end]
     assert item.count('enum MessageListItem:') == 1
     (output / 'MessageListItem.swift').write_text('import Foundation\n' + item + '\n')
-    record = {'layoutSourceSHA256': sha(original), 'adaptedLayoutSHA256': sha(adapted),
+    record = {'layoutSourceSHA256': sha(original), 'compiledSourceSHA256': sha(compiled),
+              'adaptedLayoutSHA256': sha(adapted), 'mutation': mutation,
               'itemSourceSHA256': sha(item.encode()), 'sourceRevision': revision or 'worktree',
-              'sourceTransformation': 'single import UIKit -> Foundation/CoreGraphics; complete class body unchanged',
+              'sourceTransformation': 'single UIKit import -> Foundation/CoreGraphics; complete class, only declared mutation allowed',
               'platformSHA256': sha((HERE / 'PolicyPlatform.swift').read_bytes()),
               'testsSHA256': sha((HERE / 'PolicyTests.swift').read_bytes()),
               'nativeExecution': 'NOT_RUN'}
@@ -54,8 +66,8 @@ def prepare(output: Path, revision=None):
     return record
 
 
-def run(output, revision=None, expected=()):
-    record = prepare(output, revision)
+def run(output, revision=None, expected=(), mutation=None):
+    record = prepare(output, revision, mutation)
     compiler = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--find', 'swiftc'], text=True).strip()
     sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip()
     target = platform.machine() + '-apple-macosx13.0'
@@ -65,6 +77,7 @@ def run(output, revision=None, expected=()):
                str(HERE / 'PolicyPlatform.swift'), str(output / 'MessageListItem.swift'),
                str(output / 'MessageListLayout.swift'), str(HERE / 'PolicyTests.swift'),
                '-o', str(output / 'policy-tests')]
+    record['compileCommand'] = command
     compile_result = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     (output / 'compile.log').write_text(compile_result.stdout)
     if compile_result.returncode:
@@ -92,6 +105,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--source-rev')
+    parser.add_argument('--mutation', choices=['precalc-blind', 'keep-pending'])
     parser.add_argument('--expect-failure', action='append', default=[])
     parser.add_argument('--expected-failures', type=Path)
     parser.add_argument('--prepare-only', action='store_true')
@@ -103,9 +117,9 @@ def main():
         expected += recorded
     assert len(expected) == len(set(expected)), 'repeated expected failure name'
     if args.prepare_only:
-        print(json.dumps(prepare(args.output, args.source_rev), indent=2))
+        print(json.dumps(prepare(args.output, args.source_rev, args.mutation), indent=2))
     else:
-        run(args.output.resolve(), args.source_rev, expected)
+        run(args.output.resolve(), args.source_rev, expected, args.mutation)
 
 
 if __name__ == '__main__':
