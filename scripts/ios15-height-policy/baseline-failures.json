@@ -1,0 +1,18 @@
+[
+  "precalc_shrink_is_deferred",
+  "stable_cancels_pending_shrink",
+  "post_thaw_stable_cancels_pending_shrink",
+  "growth_cancels_pending_shrink",
+  "deadband_growth_cancels_pending_shrink",
+  "reset_drops_pending",
+  "explicit_invalidation_drops_pending",
+  "accepted_write_drops_pending",
+  "authoritative_write_drops_pending",
+  "confirmed_height_rejects_pending",
+  "snapshot_swap_remaps_pending_and_keys",
+  "snapshot_removal_drops_pending",
+  "changed_content_key_drops_pending",
+  "width_transition_drops_pending_before_debounce",
+  "reset_cancels_old_width_purge",
+  "reset_rebases_width_tracking"
+]

@@ -43,6 +43,25 @@ func height(_ layout: MessageListLayout, row: Int = 0) -> CGFloat {
     return layout.layoutAttributesForItem(at: IndexPath(item: row, section: 0))!.size.height
 }
 
+func pendingLayout() -> MessageListLayout {
+    let layout = makeLayout()
+    observe(layout, 1631)
+    layout.deferSelfSizing = true
+    observe(layout, 1376)
+    layout.deferSelfSizing = false
+    return layout
+}
+
+func changeWidth(_ layout: MessageListLayout, to width: CGFloat) {
+    let bounds = CGRect(x: 0, y: 0, width: width, height: 801)
+    _ = layout.shouldInvalidateLayout(forBoundsChange: bounds)
+    layout.collectionView!.bounds = bounds
+}
+
+func drainWidthCallback() {
+    RunLoop.main.run(until: Date().addingTimeInterval(0.12))
+}
+
 @main
 struct PolicyTests {
     static func main() {
@@ -116,6 +135,118 @@ struct PolicyTests {
                 layout.deferSelfSizing = false
                 layout.applyDeferredHeights()
                 try require(height(layout) == 1000, "deadband observation failed to supersede obsolete shrink")
+            }),
+            ("reset_drops_pending", {
+                let layout = pendingLayout()
+                layout.clearHeightCache()
+                layout.applyDeferredHeights()
+                try require(layout.cachedHeight(at: 0) == nil, "old session height was resurrected after reset")
+            }),
+            ("explicit_invalidation_drops_pending", {
+                let layout = pendingLayout()
+                layout.invalidateHeight(at: 0)
+                layout.applyDeferredHeights()
+                try require(layout.cachedHeight(at: 0) == nil, "explicitly invalidated content regained its old pending height")
+            }),
+            ("accepted_write_drops_pending", {
+                let layout = pendingLayout()
+                _ = layout.invalidationContext(forPreferredLayoutAttributes: attributes(1865),
+                                               withOriginalAttributes: attributes(1631))
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1865, "direct accepted cache write was undone by pending shrink")
+            }),
+            ("authoritative_write_drops_pending", {
+                let layout = pendingLayout()
+                layout.setCachedHeight(1800, at: 0)
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1800, "authoritative GeometryReader height was overwritten")
+            }),
+            ("confirmed_height_rejects_pending", {
+                let layout = makeLayout()
+                layout.setCachedHeight(1631, at: 0)
+                layout.deferSelfSizing = true
+                observe(layout, 1376)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1631, "untrusted self-size was queued over a confirmed height")
+            }),
+            ("snapshot_swap_remaps_pending_and_keys", {
+                let layout = makeLayout()
+                let a = MessageListItem.wholeMessage(UUID())
+                let b = MessageListItem.wholeMessage(UUID())
+                layout.setContentKey("A:v1", at: 0)
+                layout.setContentKey("B:v1", at: 1)
+                observe(layout, 1000, row: 0)
+                observe(layout, 2000, row: 1)
+                layout.deferSelfSizing = true
+                observe(layout, 900, row: 0)
+                observe(layout, 1700, row: 1)
+                layout.updateCacheForSnapshot(oldIds: [a, b], newIds: [b, a])
+                layout.setContentKey("B:v1", at: 0)
+                layout.setContentKey("A:v1", at: 1)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout, row: 0) == 1700 && height(layout, row: 1) == 900,
+                            "pending heights were lost or applied to another item's index")
+            }),
+            ("snapshot_removal_drops_pending", {
+                let layout = pendingLayout()
+                let a = MessageListItem.wholeMessage(UUID())
+                let b = MessageListItem.wholeMessage(UUID())
+                layout.deferSelfSizing = false
+                observe(layout, 2000, row: 1)
+                layout.updateCacheForSnapshot(oldIds: [a, b], newIds: [b])
+                layout.collectionView!.itemCount = 1
+                layout.applyDeferredHeights()
+                try require(height(layout) == 2000, "removed item's pending height contaminated the surviving row")
+            }),
+            ("changed_content_key_drops_pending", {
+                let layout = makeLayout()
+                layout.setContentKey("A:v1", at: 0)
+                observe(layout, 1631)
+                layout.deferSelfSizing = true
+                observe(layout, 1376)
+                layout.setContentKey("A:v2", at: 0)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1631, "old-content pending value survived key replacement")
+            }),
+            ("same_content_key_keeps_pending", {
+                let layout = makeLayout()
+                layout.setContentKey("A:v1", at: 0)
+                observe(layout, 1631)
+                layout.deferSelfSizing = true
+                observe(layout, 1376)
+                layout.setContentKey("A:v1", at: 0)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1376, "unchanged key registration discarded a legitimate shrink")
+            }),
+            ("width_transition_drops_pending_before_debounce", {
+                let layout = pendingLayout()
+                changeWidth(layout, to: 390)
+                layout.applyDeferredHeights()
+                try require(layout.cachedHeight(at: 0) == 1631, "old-width shrink applied before debounced purge")
+            }),
+            ("reset_cancels_old_width_purge", {
+                let layout = pendingLayout()
+                changeWidth(layout, to: 390)
+                layout.clearHeightCache()
+                layout.deferSelfSizing = false
+                observe(layout, 700)
+                drainWidthCallback()
+                try require(layout.cachedHeight(at: 0) == 700, "old width-purge callback erased new session state")
+            }),
+            ("reset_rebases_width_tracking", {
+                let layout = makeLayout()
+                changeWidth(layout, to: 390)
+                drainWidthCallback()
+                layout.collectionView!.bounds.size.width = 428
+                layout.clearHeightCache()
+                observe(layout, 700)
+                changeWidth(layout, to: 390)
+                drainWidthCallback()
+                try require(layout.cachedHeight(at: 0) == nil, "previous-session width incorrectly suppressed a required purge")
             }),
             ("genuine_shrink_applies_on_thaw", {
                 let layout = makeLayout()

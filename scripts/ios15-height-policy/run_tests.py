@@ -93,12 +93,19 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--source-rev')
     parser.add_argument('--expect-failure', action='append', default=[])
+    parser.add_argument('--expected-failures', type=Path)
     parser.add_argument('--prepare-only', action='store_true')
     args = parser.parse_args()
+    expected = args.expect_failure
+    if args.expected_failures:
+        recorded = json.loads(args.expected_failures.read_text())
+        assert isinstance(recorded, list) and all(isinstance(name, str) for name in recorded)
+        expected += recorded
+    assert len(expected) == len(set(expected)), 'repeated expected failure name'
     if args.prepare_only:
         print(json.dumps(prepare(args.output, args.source_rev), indent=2))
     else:
-        run(args.output.resolve(), args.source_rev, args.expect_failure)
+        run(args.output.resolve(), args.source_rev, expected)
 
 
 if __name__ == '__main__':

@@ -401,6 +401,12 @@ final class MessageListLayout: UICollectionViewLayout {
         let preferred = preferredAttributes.size.height
         let original = originalAttributes.size.height
 
+        // Every newer observation supersedes the old pending value, including
+        // stable/deadband results that do not invalidate and corrections seen
+        // after thaw but before applyDeferredHeights. Requeue only a current
+        // shrink below; otherwise an obsolete low value could undo recovery.
+        deferredHeights.removeValue(forKey: index)
+
         // Protect an established layout height while browsing, including a
         // finite precalculation that has not yet entered the measured cache.
         // A provisional first host report must not shrink that row mid-scroll.

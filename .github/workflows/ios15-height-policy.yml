@@ -39,20 +39,23 @@ jobs:
           python3 scripts/ios15-height-policy/run_tests.py \
             --output "$RUNNER_TEMP/height-policy/baseline" \
             --source-rev b47cb87a33b4991c50396f727e39fb99387bfa60 \
-            --expect-failure precalc_shrink_is_deferred \
-            --expect-failure stable_cancels_pending_shrink \
-            --expect-failure post_thaw_stable_cancels_pending_shrink \
-            --expect-failure growth_cancels_pending_shrink \
-            --expect-failure deadband_growth_cancels_pending_shrink
-      - name: Admission slice green and cancellation slice bug-red
+            --expected-failures scripts/ios15-height-policy/baseline-failures.json
+      - name: Cancellation slice green and lifecycle slice bug-red
         run: |
           set -euo pipefail
           python3 scripts/ios15-height-policy/run_tests.py \
             --output "$RUNNER_TEMP/height-policy/candidate" \
-            --expect-failure stable_cancels_pending_shrink \
-            --expect-failure post_thaw_stable_cancels_pending_shrink \
-            --expect-failure growth_cancels_pending_shrink \
-            --expect-failure deadband_growth_cancels_pending_shrink
+            --expect-failure reset_drops_pending \
+            --expect-failure explicit_invalidation_drops_pending \
+            --expect-failure accepted_write_drops_pending \
+            --expect-failure authoritative_write_drops_pending \
+            --expect-failure confirmed_height_rejects_pending \
+            --expect-failure snapshot_swap_remaps_pending_and_keys \
+            --expect-failure snapshot_removal_drops_pending \
+            --expect-failure changed_content_key_drops_pending \
+            --expect-failure width_transition_drops_pending_before_debounce \
+            --expect-failure reset_cancels_old_width_purge \
+            --expect-failure reset_rebases_width_tracking
       - name: Upload policy evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
