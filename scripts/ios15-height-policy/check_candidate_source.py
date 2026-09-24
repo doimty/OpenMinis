@@ -12,6 +12,11 @@ ROOT = HERE.parents[1]
 BASELINE = '2f21e242df71d63576682f8ac61c50a097f3a5ae'
 LAYOUT = 'src/ios/Agent/MessageList/MessageListLayout.swift'
 ALLOWED = {LAYOUT}
+# The existing build copies this example into a generated file under src.
+# It is the only untracked path permitted into a candidate build, and only
+# when it byte-matches the committed example.
+GENERATED_XCCONFIG = 'src/ios/Configs/ProviderCustomization.xcconfig'
+EXAMPLE_XCCONFIG = GENERATED_XCCONFIG + '.example'
 
 
 def require(condition, reason):
@@ -21,6 +26,10 @@ def require(condition, reason):
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def git_show(repository, revision, path):
+    return subprocess.check_output(['git', '-C', str(repository), 'show', revision + ':' + path])
 
 
 def git_blob(data):
@@ -41,7 +50,7 @@ def tree(repository, revision):
     return result
 
 
-def check_tree(root, baseline_tree, baseline_allowed_hashes, profile):
+def check_tree(root, baseline_tree, baseline_allowed_hashes, profile, generated=None, untracked=None):
     root = Path(root)
     require(profile.get('schema') == 1 and profile.get('baselineCommit') == BASELINE,
             'candidate profile must name the immutable baseline')
@@ -63,15 +72,20 @@ def check_tree(root, baseline_tree, baseline_allowed_hashes, profile):
         if git_blob(data) != digest:
             changed.append(name)
     require(set(changed) == ALLOWED, 'actual production diff does not equal the approved allowlist')
-    # Generated xcconfig is expected by the existing build, but extra compiler
-    # sources are never allowed to evade the tracked-tree comparison.
-    source_suffixes = {'.swift', '.m', '.mm', '.c', '.cc', '.cpp', '.h', '.hpp', '.metal'}
-    extras = [str(p.relative_to(root)) for p in (root / 'src').rglob('*')
-              if p.is_file() and p.suffix in source_suffixes and str(p.relative_to(root)) not in baseline_tree]
-    require(not extras, 'untracked compiler sources: ' + ', '.join(extras))
+    # Every untracked path under src must be the single approved generated
+    # template copy, byte-identical to its committed example.
+    generated = generated or {}
+    for extra in (untracked or []):
+        require(extra in generated and (root / extra).read_bytes() == generated[extra],
+                'unapproved generated/untracked source: ' + extra)
     return {'kind': 'height-repair-functional-source-gate', 'baselineCommit': BASELINE,
             'productionPathsCompared': len(baseline_tree), 'approvedProductionChanges': changes,
             'otherProductionSourcesUnchanged': True, 'verified': True}
+
+
+def allowed_untracked(untracked):
+    for extra in untracked:
+        require(extra == GENERATED_XCCONFIG, 'untracked production file must not enter candidate build: ' + extra)
 
 
 def verify(root, repository, profile_path=None, revision='HEAD'):
@@ -83,14 +97,19 @@ def verify(root, repository, profile_path=None, revision='HEAD'):
     require(set(committed) == set(baseline), 'tracked production paths changed outside allowlist')
     require({name for name in baseline if baseline[name] != committed[name]} == ALLOWED,
             'committed production diff does not equal the approved allowlist')
-    untracked = subprocess.check_output(['git', '-C', str(repository), 'ls-files', '--others', '--exclude-standard', '--', 'src'], text=True)
-    require(not untracked.strip(), 'untracked production files must not enter candidate build')
-    hashes = {name: sha(subprocess.check_output(['git', '-C', str(repository), 'show', BASELINE + ':' + name]))
+    untracked = [line for line in subprocess.check_output(['git', '-C', str(repository), 'ls-files', '--others', '--exclude-standard', '--', 'src'], text=True).splitlines() if line]
+    allowed_untracked(untracked)
+    generated = {GENERATED_XCCONFIG: git_show(repository, revision, EXAMPLE_XCCONFIG)}
+    hashes = {name: sha(git_show(repository, BASELINE, name))
               for name in ALLOWED}
-    result = check_tree(root, baseline, hashes, json.loads(raw_profile))
+    result = check_tree(root, baseline, hashes, json.loads(raw_profile), generated, untracked)
+    if GENERATED_XCCONFIG in untracked:
+        require((Path(root) / GENERATED_XCCONFIG).read_bytes() == generated[GENERATED_XCCONFIG],
+                'generated xcconfig does not match its committed example')
     for name in ALLOWED:
         require(git_blob((Path(root) / name).read_bytes()) == committed[name],
                 'working source differs from the pinned commit: ' + name)
+    result['generatedXcconfigAllowed'] = GENERATED_XCCONFIG if GENERATED_XCCONFIG in untracked else None
     result['profileSHA256'] = sha(raw_profile)
     result['buildCommit'] = subprocess.check_output(['git', '-C', str(repository), 'rev-parse', revision], text=True).strip()
     return result

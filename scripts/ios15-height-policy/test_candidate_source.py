@@ -18,13 +18,15 @@ class CandidateSourceTests(unittest.TestCase):
         self.hashes = {gate.LAYOUT: gate.sha(self.old[gate.LAYOUT])}
         self.profile = {'schema': 1, 'baselineCommit': gate.BASELINE, 'productionChanges': {
             gate.LAYOUT: {'baselineSHA256': self.hashes[gate.LAYOUT], 'candidateSHA256': gate.sha(self.new)}}}
+        self.generated = {}
+        self.untracked = []
         for name, data in self.old.items():
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(self.new if name == gate.LAYOUT else data)
 
     def check(self):
-        return gate.check_tree(self.root, self.tree, self.hashes, self.profile)
+        return gate.check_tree(self.root, self.tree, self.hashes, self.profile, self.generated, self.untracked)
 
     def test_only_reviewed_production_bytes_are_accepted(self):
         result = self.check()
@@ -59,8 +61,27 @@ class CandidateSourceTests(unittest.TestCase):
 
     def test_new_compiler_source_is_rejected(self):
         (self.root / 'src/Injected.swift').write_text('new compiler input')
-        with self.assertRaisesRegex(ValueError, 'untracked compiler'):
+        self.untracked = ['src/Injected.swift']
+        with self.assertRaisesRegex(ValueError, 'unapproved generated/untracked'):
             self.check()
+
+    def test_expected_generated_xcconfig_is_allowed_only_as_exact_example_copy(self):
+        path = self.root / gate.GENERATED_XCCONFIG
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'template value')
+        self.untracked = [gate.GENERATED_XCCONFIG]
+        self.generated = {gate.GENERATED_XCCONFIG: b'template value'}
+        self.assertTrue(self.check()['verified'])
+        path.write_bytes(b'template value + change')
+        with self.assertRaisesRegex(ValueError, 'unapproved generated/untracked'):
+            self.check()
+
+    def test_only_the_generated_xcconfig_is_permitted_untracked(self):
+        self.assertEqual(gate.allowed_untracked([gate.GENERATED_XCCONFIG]), None)
+        with self.assertRaisesRegex(ValueError, 'must not enter candidate build'):
+            gate.allowed_untracked(['src/Injected.swift'])
+        with self.assertRaisesRegex(ValueError, 'must not enter candidate build'):
+            gate.allowed_untracked([gate.GENERATED_XCCONFIG, 'src/Injected.swift'])
 
     def test_missing_or_symlinked_source_is_rejected(self):
         other = self.root / 'src/Other.swift'
