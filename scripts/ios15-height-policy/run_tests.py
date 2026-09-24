@@ -34,8 +34,9 @@ def prepare(output: Path, revision=None):
     output.mkdir(parents=True, exist_ok=True)
     original = source(LAYOUT, revision)
     assert original.count(b'import UIKit\n') == 1
-    adapted = original.replace(b'import UIKit\n', b'import Foundation\n')
-    assert adapted.replace(b'import Foundation\n', b'import UIKit\n', 1) == original
+    imports = b'import Foundation\nimport CoreGraphics\n'
+    adapted = original.replace(b'import UIKit\n', imports)
+    assert adapted.replace(imports, b'import UIKit\n', 1) == original
     (output / 'MessageListLayout.swift').write_bytes(adapted)
     infrastructure = source(ITEMS, revision).decode()
     start = infrastructure.index('enum MessageListItem: Hashable {')
@@ -45,7 +46,7 @@ def prepare(output: Path, revision=None):
     (output / 'MessageListItem.swift').write_text('import Foundation\n' + item + '\n')
     record = {'layoutSourceSHA256': sha(original), 'adaptedLayoutSHA256': sha(adapted),
               'itemSourceSHA256': sha(item.encode()), 'sourceRevision': revision or 'worktree',
-              'sourceTransformation': 'single import UIKit -> Foundation; complete class body unchanged',
+              'sourceTransformation': 'single import UIKit -> Foundation/CoreGraphics; complete class body unchanged',
               'platformSHA256': sha((HERE / 'PolicyPlatform.swift').read_bytes()),
               'testsSHA256': sha((HERE / 'PolicyTests.swift').read_bytes()),
               'nativeExecution': 'NOT_RUN'}

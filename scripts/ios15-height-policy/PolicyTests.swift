@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 struct CheckFailure: Error, CustomStringConvertible {
     let description: String

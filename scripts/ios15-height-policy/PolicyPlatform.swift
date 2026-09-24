@@ -2,6 +2,7 @@
 // These do not emulate UIKit's sizing/layout scheduler. Tests explicitly call
 // production admission, cache and preparation APIs; real UIKit remains a device gate.
 import Foundation
+import CoreGraphics
 
 typealias CFTimeInterval = Double
 func CACurrentMediaTime() -> CFTimeInterval { ProcessInfo.processInfo.systemUptime }
