@@ -33,13 +33,26 @@ jobs:
           xcodebuild -version | tee "$RUNNER_TEMP/xcode-version.txt"
           grep -Fx 'Xcode 26.2' "$RUNNER_TEMP/xcode-version.txt"
           grep -Fx 'Build version 17C52' "$RUNNER_TEMP/xcode-version.txt"
-      - name: Prove baseline bug-red before production implementation
+      - name: Immutable baseline regression witnesses
         run: |
           set -euo pipefail
           python3 scripts/ios15-height-policy/run_tests.py \
             --output "$RUNNER_TEMP/height-policy/baseline" \
             --source-rev b47cb87a33b4991c50396f727e39fb99387bfa60 \
-            --expect-failure precalc_shrink_is_deferred
+            --expect-failure precalc_shrink_is_deferred \
+            --expect-failure stable_cancels_pending_shrink \
+            --expect-failure post_thaw_stable_cancels_pending_shrink \
+            --expect-failure growth_cancels_pending_shrink \
+            --expect-failure deadband_growth_cancels_pending_shrink
+      - name: Admission slice green and cancellation slice bug-red
+        run: |
+          set -euo pipefail
+          python3 scripts/ios15-height-policy/run_tests.py \
+            --output "$RUNNER_TEMP/height-policy/candidate" \
+            --expect-failure stable_cancels_pending_shrink \
+            --expect-failure post_thaw_stable_cancels_pending_shrink \
+            --expect-failure growth_cancels_pending_shrink \
+            --expect-failure deadband_growth_cancels_pending_shrink
       - name: Upload policy evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

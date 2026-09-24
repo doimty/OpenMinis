@@ -1,6 +1,6 @@
 # Provisional-height repair: restart from a verified baseline
 
-Status (2026-09-24): the full production-list device capture 5c8f2419 is CAPTURE_VALID and proves committed transient shrink/recovery. The scoped layout-policy candidate below is ready for implementation; neither a production repair nor candidate device acceptance is claimed.
+Status (2026-09-24): candidate implementation is in progress. The full production-list capture 5c8f2419 proves committed transient shrink/recovery; native Swift policy run35943633165 independently reproduced the precalc-only admission bug before the first production edit. Candidate device acceptance is not claimed.
 
 ## Baseline and scope
 
@@ -84,3 +84,9 @@ The supported target is the committed transient height regression. A1482ms origi
 - First vertical slice asserts the captured precalc-only 1631→1376 admission is rejected while deferring, with unknown-first-size, growth and idle-shrink controls. Pinned Xcode26.2 must compile the baseline and show the exact expected behavioral failure before the production gate is changed. A compiler/process failure is INVALID, not bug-red.
 - Subsequent slices cover cancellation and lifecycle, then a separate candidate source/build profile. The original observation-only validator and baseline overlay stay intact. A reviewed production allowlist/hash manifest will compare the candidate to immutable2f21e24; the baseline must never be silently changed to HEAD.
 - Review uses the existing independent evidence-review session because new-subagent spawning is currently blocked by the exposed `streamTo` schema. Do not describe the reused reviewer as fresh context.
+
+### Native policy cycle 1
+
+- Actual RED: run`35943633165`, test/tool commit`7f5a01d5fb545c35fc08354999459f6ecc51d0df`, Xcode26.2. The complete immutable layout compiled, `precalc_shrink_is_deferred` failed because1376 was admitted, and three independent unknown/growth/idle controls passed. Source layout SHA256`40d56ba4a3f369aeae3fec0028a00dfa36999bc483a20cefd5618afbba56a18a`.
+- The earlier runs35943279634/35943460436 were test-platform setup failures, not behavioral red: missing explicit macOS SDK/target, then missing native CoreGraphics import. Both are preserved in the workspace evidence folder. The runner rejects compiler failure as INVALID and now mirrors the established collector's pinned SDK/target invocation.
+- First production slice only extends the existing admission predicate to finite nonnegative precalc heights. The next native cycle must show that assertion green and independently demonstrate stale-pending cancellation failures before their implementation. Normal source/rendering paths are otherwise untouched.

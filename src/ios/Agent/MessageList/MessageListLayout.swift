@@ -401,15 +401,15 @@ final class MessageListLayout: UICollectionViewLayout {
         let preferred = preferredAttributes.size.height
         let original = originalAttributes.size.height
 
-        // While the user is browsing (scrollMode == .userBrowsing), defer
-        // self-sizing for cells that already have a cached height — prevents
-        // content jumps from height changes in off-screen cells.
-        // BUT allow first-time measurement (no cached height) so newly
-        // scrolled-into-view cells render at correct size immediately
-        // instead of being truncated to the estimated height.
+        // Protect an established layout height while browsing, including a
+        // finite precalculation that has not yet entered the measured cache.
+        // A provisional first host report must not shrink that row mid-scroll.
+        // Coarse estimates remain unprotected so genuinely unmeasured rows can
+        // acquire their first size; growth must still pass to avoid clipping.
         if deferSelfSizing {
             let hasCached = heightCache[index] != nil
-            if hasCached {
+            let hasPrecalc = precalcHeights[index].map { $0.isFinite && $0 >= 0 } ?? false
+            if hasCached || hasPrecalc {
                 // Cell is growing (streaming text) — allow it through so the
                 // content doesn't overflow the frozen cell frame and overlap
                 // adjacent cells. Only defer shrinking or stable cells.
@@ -420,10 +420,9 @@ final class MessageListLayout: UICollectionViewLayout {
                     }
                     return false
                 }
-                // Growing while deferred + has cache — allow through
+                // Growing from an established height — allow through.
             } else {
-                // First measurement (no cached height) — allow it through
-                // so the cell isn't truncated when scrolled into view.
+                // Only a coarse/default estimate exists: allow first sizing.
             }
         }
 

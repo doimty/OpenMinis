@@ -76,6 +76,65 @@ struct PolicyTests {
                 try require(observe(layout, 1376), "nondeferred legitimate shrink stopped working")
                 try require(height(layout) == 1376, "idle shrink was not committed")
             }),
+            ("stable_cancels_pending_shrink", {
+                let layout = makeLayout()
+                observe(layout, 1631)
+                layout.deferSelfSizing = true
+                observe(layout, 1376)
+                try require(layout.deferredHeightCount == 1, "test did not queue its shrink")
+                observe(layout, 1631)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1631, "restored height was overwritten by obsolete pending shrink")
+            }),
+            ("post_thaw_stable_cancels_pending_shrink", {
+                let layout = makeLayout()
+                observe(layout, 1631)
+                layout.deferSelfSizing = true
+                observe(layout, 1376)
+                layout.deferSelfSizing = false
+                observe(layout, 1631)
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1631, "fresh correction after thaw did not cancel old pending value")
+            }),
+            ("growth_cancels_pending_shrink", {
+                let layout = makeLayout()
+                observe(layout, 1631)
+                layout.deferSelfSizing = true
+                observe(layout, 1376)
+                try require(observe(layout, 1865), "valid growth was rejected")
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1865, "accepted growth was undone by an older pending shrink")
+            }),
+            ("deadband_growth_cancels_pending_shrink", {
+                let layout = makeLayout()
+                observe(layout, 1000)
+                layout.deferSelfSizing = true
+                observe(layout, 900)
+                try require(!observe(layout, 1001), "existing two-point measured-cache deadband changed")
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1000, "deadband observation failed to supersede obsolete shrink")
+            }),
+            ("genuine_shrink_applies_on_thaw", {
+                let layout = makeLayout()
+                observe(layout, 1631)
+                layout.deferSelfSizing = true
+                observe(layout, 1376)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 1376, "legitimate shrink was lost on thaw")
+            }),
+            ("zero_height_footer_can_shrink", {
+                let layout = makeLayout()
+                observe(layout, 32)
+                layout.deferSelfSizing = true
+                observe(layout, 0)
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(height(layout) == 0, "legitimate empty footer remained tall")
+            }),
         ]
         var failures: [String] = []
         for (name, test) in tests {
