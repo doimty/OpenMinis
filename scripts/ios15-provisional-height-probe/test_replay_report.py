@@ -54,6 +54,15 @@ def fixture():
                 ])
 
 
+def with_collapsed_nontext_row():
+    report = fixture()
+    for shot in report['snapshots']:
+        shot['visibleRows'].append(dict(
+            index=19, cellID='collapsed-row', generation=1,
+            frame=[0, 5000, 428, 0], cache=0, inWindow=True))
+    return report
+
+
 def renumber(report):
     for seq, entry in enumerate(report['trace'], 1):
         entry['seq'] = seq
@@ -211,6 +220,57 @@ class CaptureTests(unittest.TestCase):
         report['reentries'] = 2
         self.assertEqual(validate(report)['status'], 'CAPTURE_VALID')
         report['trace'][-2]['values']['count'] = 1
+        with self.assertRaises(ValueError): validate(report)
+
+    def test_collapsed_nontext_row_does_not_invalidate_visible_text(self):
+        self.assertEqual(validate(with_collapsed_nontext_row())['status'], 'CAPTURE_VALID')
+
+    def test_collapsed_nontext_row_keeps_foreground_stop_incomplete(self):
+        report = with_collapsed_nontext_row()
+        report['finishReason'] = 'left-foreground'
+        self.assertEqual(validate(report), {'status': 'INCOMPLETE', 'reason': 'left-foreground'})
+
+    def test_only_collapsed_rows_remain_invalid(self):
+        report = with_collapsed_nontext_row()
+        for shot in report['snapshots']:
+            shot['visibleRows'] = [shot['visibleRows'][-1]]
+        with self.assertRaises(ValueError): validate(report)
+
+    def test_zero_height_text_row_is_not_a_collapsed_decoration(self):
+        report = fixture()
+        report['snapshots'][0]['visibleRows'][0]['frame'][3] = 0
+        report['snapshots'][0]['visibleRows'][0]['cache'] = 0
+        with self.assertRaises(ValueError): validate(report)
+        for key, value in (('textID', 'text'), ('textLength', 100),
+                           ('textBounds', [0, 0, 396, 498]), ('markdownSHA256', 'c' * 64)):
+            with self.subTest(key=key):
+                report = with_collapsed_nontext_row()
+                report['snapshots'][0]['visibleRows'][-1][key] = value
+                with self.assertRaises(ValueError): validate(report)
+
+    def test_collapsed_nontext_row_requires_explicit_numeric_zero_cache(self):
+        for value in (None, False, 4, -1, float('nan')):
+            with self.subTest(cache=value):
+                report = with_collapsed_nontext_row()
+                report['snapshots'][0]['visibleRows'][-1]['cache'] = value
+                with self.assertRaises(ValueError): validate(report)
+        report = with_collapsed_nontext_row()
+        del report['snapshots'][0]['visibleRows'][-1]['cache']
+        with self.assertRaises(ValueError): validate(report)
+
+    def test_collapsed_nontext_row_does_not_allow_bad_geometry(self):
+        for width, height in ((0, 0), (-1, 0), (428, -1)):
+            with self.subTest(width=width, height=height):
+                report = with_collapsed_nontext_row()
+                report['snapshots'][0]['visibleRows'][-1]['frame'][2:] = [width, height]
+                with self.assertRaises(ValueError): validate(report)
+
+    def test_collapsed_nontext_row_does_not_hide_cap_or_hidden_content(self):
+        report = with_collapsed_nontext_row()
+        report['trace'][-1]['kind'] = 'limit'
+        with self.assertRaises(ValueError): validate(report)
+        report = with_collapsed_nontext_row()
+        report['snapshots'][0]['visibleRows'][0]['inWindow'] = False
         with self.assertRaises(ValueError): validate(report)
 
     def test_zero_size_text_is_not_a_usable_capture(self):

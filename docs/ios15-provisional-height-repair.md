@@ -1,10 +1,10 @@
 # Provisional-height repair: restart from a verified baseline
 
-Status (2026-09-24): candidate implementation is in progress. The full production-list capture 5c8f2419 proves committed transient shrink/recovery; native Swift policy run35943633165 independently reproduced the precalc-only admission bug before the first production edit. Candidate device acceptance is not claimed.
+Status (2026-09-24): the scoped production policy is implemented and its28 native Swift policy assertions pass (run35944868393), with compiled admission/cancellation ablations failing as expected. Full App candidate build/package and settled-device acceptance are still separate gates. The full production-list capture5c8f2419 remains the immutable transient-regression baseline.
 
 ## Baseline and scope
 
-- Active branch: `fix/ios15-provisional-height`.
+- Active functional-candidate branch: `fix/ios15-height-policy-candidate` (native TDD commits were first recorded on `fix/ios15-provisional-height`).
 - Worktree: workspace `worktrees/openminis-provisional-height-fix`.
 - Source baseline: `2f21e242df71d63576682f8ac61c50a097f3a5ae`, whose full device build and diagnostic IPA were verified.
 - Rejected candidate `272656b9ed103ce601ebaeaca39267652bbaee7f` remains intact in the prior diagnostic branch/worktree. It is not the new implementation baseline.
@@ -102,3 +102,11 @@ The supported target is the committed transient height regression. A1482ms origi
 - Run`35944349484`, commit`8a07c0866b959c6ff676d7c8ddb7b6f07fdd4cf5`: all admission/cancellation and existing valid-growth/shrink controls are GREEN; eleven lifecycle assertions are genuinely RED, after native compilation (22 total,11 passed/11 expected failed). The immutable baseline independently produces the declared16 failures.
 - Lifecycle edits are limited to the actual owning layout: pending values are cleared by accepted/direct writes and explicit invalidation/reset; authority is checked before queuing; pending values and old content keys are remapped together; changed keys cancel old work but equal keys/repeated estimates do not; a valid width change clears pending immediately and at purge; reset advances the width token and establishes its current-width reference.
 - The next suite adds regression controls for retained post-insertion precalc, repeated estimates, row-local invalidation, background/zero-width guards, latest width target and invalid precalc references. Candidate behavior and two separately compiled admission/cancellation ablations must all meet their exact expected verdicts. Native UIKit and final settled-phone acceptance remain outstanding.
+
+### Native policy cycle 4: green plus ablations
+
+- Run`35944868393`, commit`9ef2b99f3a40a9285187132b7c0062d29618913e`: candidate **28/28**; immutable baseline exact16 expected failures; compiled precalc-blind mutation fails its admission assertion; compiled keep-pending mutation fails the stable/post-thaw-stable/deadband assertions. Neither mutation is accepted on compiler failure. The same suite/real enum/platform adapters are used for all four runs.
+- Candidate layout SHA256 is`25e39203f13489df3c685edef4ff5c23ba0ed804ae5bb9ae14eb30804514a1a2`; only this production file differs (51insertions/22deletions). Other1480 production paths remain byte-identical to2f21e24. Renderer, legacy host/cell, Coordinator and replay driver are not changed.
+- Added a separate explicit functional source/overlay profile and full-device build workflow. Packaging uses new branch`fix/ios15-height-policy-candidate` so the unchanged old observation-only workflow is not accidentally triggered against functional source. No default/upstream branch is used. Original source-isolation checks run on a detached immutableb47cb87 worktree, while the candidate gate compares its one reviewed hash against immutable2f21e24.
+- Local source/profile/overlay tests passed15/15; existing replay/device-report/package/compatibility checks also passed. These are tooling evidence, not phone execution.
+- Independent implementation review reports no production-code blocker at the frozen25e39203 layout hash. Its one non-blockingP2 was test coverage of a new pending observation between width-transition start and actual purge. Added that29th policy case and a third compiled `keep-purge-pending` ablation; no production edit is needed. The expanded29-case/17-baseline-failure suite must now pass in the final candidate workflow before delivery. The new source/profile/overlay tooling is separately reviewed and tested, not covered by the production-only review.

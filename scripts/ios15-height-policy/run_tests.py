@@ -42,6 +42,10 @@ def prepare(output: Path, revision=None, mutation=None):
         old = b'        deferredHeights.removeValue(forKey: index)\n\n        // A confirmed'
         assert compiled.count(old) == 1
         compiled = compiled.replace(old, b'        // A confirmed')
+    elif mutation == 'keep-purge-pending':
+        old = b'            self.deferredHeights.removeAll()\n'
+        assert compiled.count(old) == 1
+        compiled = compiled.replace(old, b'')
     elif mutation is not None:
         raise ValueError('unknown policy mutation')
     assert compiled.count(b'import UIKit\n') == 1
@@ -105,7 +109,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--source-rev')
-    parser.add_argument('--mutation', choices=['precalc-blind', 'keep-pending'])
+    parser.add_argument('--mutation', choices=['precalc-blind', 'keep-pending', 'keep-purge-pending'])
     parser.add_argument('--expect-failure', action='append', default=[])
     parser.add_argument('--expected-failures', type=Path)
     parser.add_argument('--prepare-only', action='store_true')

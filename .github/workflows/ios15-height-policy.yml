@@ -3,7 +3,7 @@ name: ios15-height-policy
 on:
   workflow_dispatch:
   push:
-    branches: [fix/ios15-provisional-height]
+    branches: [fix/ios15-provisional-height, fix/ios15-height-policy-candidate]
     paths:
       - .github/workflows/ios15-height-policy.yml
       - scripts/ios15-height-policy/**
@@ -60,6 +60,12 @@ jobs:
             --expect-failure stable_cancels_pending_shrink \
             --expect-failure post_thaw_stable_cancels_pending_shrink \
             --expect-failure deadband_growth_cancels_pending_shrink
+      - name: Compiled purge-time cancellation ablation
+        run: |
+          set -euo pipefail
+          python3 scripts/ios15-height-policy/run_tests.py \
+            --output "$RUNNER_TEMP/height-policy/keep-purge-pending" \
+            --mutation keep-purge-pending --expect-failure width_purge_drops_new_intermediate_pending
       - name: Source and runner tooling tests
         run: |
           set -euo pipefail

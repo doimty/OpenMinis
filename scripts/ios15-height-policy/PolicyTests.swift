@@ -28,6 +28,7 @@ func observe(_ layout: MessageListLayout, _ height: CGFloat, row: Int = 0) -> Bo
     layout.prepare()
     let original = layout.layoutAttributesForItem(at: IndexPath(item: row, section: 0))!
     let preferred = attributes(height, row: row)
+    preferred.size.width = original.size.width
     let admitted = layout.shouldInvalidateLayout(forPreferredLayoutAttributes: preferred,
                                                  withOriginalAttributes: original)
     if admitted {
@@ -227,6 +228,20 @@ struct PolicyTests {
                 changeWidth(layout, to: 390)
                 layout.applyDeferredHeights()
                 try require(layout.cachedHeight(at: 0) == 1631, "old-width shrink applied before debounced purge")
+            }),
+            ("width_purge_drops_new_intermediate_pending", {
+                let layout = makeLayout()
+                observe(layout, 1631)
+                layout.deferSelfSizing = true
+                changeWidth(layout, to: 390)
+                observe(layout, 1376)
+                try require(layout.deferredHeightCount == 1, "test did not queue a post-transition observation")
+                drainWidthCallback()
+                layout.deferSelfSizing = false
+                layout.applyDeferredHeights()
+                try require(layout.cachedHeight(at: 0) == nil, "intermediate-width pending value resurrected purged state")
+                observe(layout, 700)
+                try require(height(layout) == 700, "fresh measurement after purge did not work")
             }),
             ("reset_cancels_old_width_purge", {
                 let layout = pendingLayout()

@@ -74,19 +74,25 @@ def check_tree(root, baseline_tree, baseline_allowed_hashes, profile):
             'otherProductionSourcesUnchanged': True, 'verified': True}
 
 
-def verify(root, repository, profile_path=None):
+def verify(root, repository, profile_path=None, revision='HEAD'):
     repository = Path(repository)
     profile_path = Path(profile_path or HERE / 'candidate-source.json')
     raw_profile = profile_path.read_bytes()
     baseline = tree(repository, BASELINE)
-    require(set(tree(repository, 'HEAD')) == set(baseline), 'tracked production paths changed outside allowlist')
+    committed = tree(repository, revision)
+    require(set(committed) == set(baseline), 'tracked production paths changed outside allowlist')
+    require({name for name in baseline if baseline[name] != committed[name]} == ALLOWED,
+            'committed production diff does not equal the approved allowlist')
     untracked = subprocess.check_output(['git', '-C', str(repository), 'ls-files', '--others', '--exclude-standard', '--', 'src'], text=True)
     require(not untracked.strip(), 'untracked production files must not enter candidate build')
     hashes = {name: sha(subprocess.check_output(['git', '-C', str(repository), 'show', BASELINE + ':' + name]))
               for name in ALLOWED}
     result = check_tree(root, baseline, hashes, json.loads(raw_profile))
+    for name in ALLOWED:
+        require(git_blob((Path(root) / name).read_bytes()) == committed[name],
+                'working source differs from the pinned commit: ' + name)
     result['profileSHA256'] = sha(raw_profile)
-    result['buildCommit'] = subprocess.check_output(['git', '-C', str(repository), 'rev-parse', 'HEAD'], text=True).strip()
+    result['buildCommit'] = subprocess.check_output(['git', '-C', str(repository), 'rev-parse', revision], text=True).strip()
     return result
 
 
@@ -95,9 +101,10 @@ def main():
     parser.add_argument('--root', type=Path, default=ROOT)
     parser.add_argument('--repository', type=Path, default=ROOT)
     parser.add_argument('--profile', type=Path)
+    parser.add_argument('--commit', default='HEAD')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
-    result = verify(args.root, args.repository, args.profile)
+    result = verify(args.root, args.repository, args.profile, args.commit)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2) + '\n')

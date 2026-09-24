@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "baselineCommit": "2f21e242df71d63576682f8ac61c50a097f3a5ae",
+  "productionChanges": {
+    "src/ios/Agent/MessageList/MessageListLayout.swift": {
+      "baselineSHA256": "40d56ba4a3f369aeae3fec0028a00dfa36999bc483a20cefd5618afbba56a18a",
+      "candidateSHA256": "25e39203f13489df3c685edef4ff5c23ba0ed804ae5bb9ae14eb30804514a1a2"
+    }
+  },
+  "scope": "Layout-owned height admission, pending cancellation and content/width lifetime. Device acceptance is still required."
+}

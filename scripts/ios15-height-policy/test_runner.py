@@ -34,6 +34,16 @@ class RunnerSourceTests(unittest.TestCase):
             self.assertNotEqual(result['layoutSourceSHA256'], result['compiledSourceSHA256'])
             self.assertEqual(result['mutation'], 'keep-pending')
 
+    def test_purge_ablation_changes_only_pending_cleanup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = runner.prepare(root, mutation='keep-purge-pending')
+            actual = (root / 'MessageListLayout.swift').read_bytes().replace(
+                b'import Foundation\nimport CoreGraphics\n', b'import UIKit\n', 1)
+            expected = runner.source(runner.LAYOUT).replace(b'            self.deferredHeights.removeAll()\n', b'')
+            self.assertEqual(actual, expected)
+            self.assertNotEqual(result['layoutSourceSHA256'], result['compiledSourceSHA256'])
+
     def test_mutation_refuses_a_source_without_its_target(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(AssertionError):

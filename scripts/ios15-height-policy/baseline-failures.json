@@ -13,6 +13,7 @@
   "snapshot_removal_drops_pending",
   "changed_content_key_drops_pending",
   "width_transition_drops_pending_before_debounce",
+  "width_purge_drops_new_intermediate_pending",
   "reset_cancels_old_width_purge",
   "reset_rebases_width_tracking"
 ]

@@ -95,6 +95,7 @@ def validate(data, commit=None, input_sha=None):
         if not isinstance(rows, list) or not rows:
             raise ValueError('visible rows missing')
         seen = set()
+        positive_rows = 0
         for row in rows:
             if not isinstance(row, dict) or not _nonnegative_int(row.get('index')) or row['index'] >= shot['items'] or row['index'] in seen:
                 raise ValueError('invalid/duplicate visible row')
@@ -102,8 +103,16 @@ def validate(data, commit=None, input_sha=None):
             if not identity(row.get('cellID')) or not _nonnegative_int(row.get('generation')) or row.get('inWindow') is not True:
                 raise ValueError('hidden/unidentified visible row')
             frame = _frame(row.get('frame'), 'cell frame')
-            if frame[2] <= 0 or frame[3] <= 0:
+            # UIKit may list a collapsed non-text row among visible index paths.
+            # The production quiet assistantFooter intentionally measures zero.
+            # Preserve it as data, but never count it as visible content or allow
+            # a zero-height Markdown row through this exception. This does not
+            # identify its row type or certify that its layout is correct.
+            collapsed_nontext = (frame[3] == 0 and _finite(row.get('cache')) and row['cache'] == 0
+                                 and not any(k in row for k in ('textBounds', 'textID', 'textLength', 'markdownSHA256')))
+            if frame[2] <= 0 or frame[3] < 0 or (frame[3] == 0 and not collapsed_nontext):
                 raise ValueError('empty visible row')
+            positive_rows += frame[3] > 0
             if row.get('cache') is not None and (not _finite(row['cache']) or row['cache'] < 0):
                 raise ValueError('invalid cache snapshot')
             if 'textBounds' in row:
@@ -115,6 +124,8 @@ def validate(data, commit=None, input_sha=None):
                 if row['index'] in row_hashes and row_hashes[row['index']] != current:
                     raise ValueError('rendered row content changed')
                 row_hashes[row['index']] = current
+        if not positive_rows:
+            raise ValueError('no positive-area visible content')
     if shots[-1]['t'] < end['t'] or start['owner'] != shots[0]['collectionID'] or end['owner'] != shots[-1]['collectionID']:
         raise ValueError('snapshot/marker boundary mismatch')
     if any(m['owner'] not in owners or m['subject'] != start['subject'] or not m['main'] for m in marks):
