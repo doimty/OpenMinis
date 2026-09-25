@@ -55,6 +55,13 @@ final class MessageListLayout: UICollectionViewLayout {
     /// lift and deceleration start) that let height changes slip through.
     var deferSelfSizing: Bool = false
 
+    /// Shrinks queued while scrolling must not be admitted again by the
+    /// layout pass that runs the moment scrolling ends. Cleared on the
+    /// second `prepare()` after the thaw, so a later idle measurement can
+    /// still shrink a row.
+    private var suppressProvisionalShrinks = false
+    private var provisionalShrinkPrepareCount = 0
+
     /// When true, `invalidationContext` will NOT set `contentOffsetAdjustment`.
     /// Used during capture-restore layout flushes where the caller handles
     /// offset preservation manually.
@@ -189,6 +196,14 @@ final class MessageListLayout: UICollectionViewLayout {
         guard width > 0 else {
             AppLogger(category: "ScrollDiag").info("[ScrollDiag][prepare] SKIP width=0 bounds=\(cv.bounds) itemCount=\(itemCount)")
             return
+        }
+
+        if suppressProvisionalShrinks {
+            provisionalShrinkPrepareCount += 1
+            if provisionalShrinkPrepareCount >= 2 {
+                suppressProvisionalShrinks = false
+                provisionalShrinkPrepareCount = 0
+            }
         }
 
         itemAttributes.removeAll(keepingCapacity: true)
@@ -331,11 +346,15 @@ final class MessageListLayout: UICollectionViewLayout {
     /// Number of pending deferred heights (for diagnostics).
     var deferredHeightCount: Int { deferredHeights.count }
 
-    /// Move current deferred heights into the real cache after scrolling ends.
-    /// Newer observations/writes and content/width/reset transitions withdraw
-    /// obsolete entries before this flush; a genuine shrink still applies.
+    /// Drop scroll-time shrinks instead of writing them into the cache.
+    /// Device logs showed the queued low values landing at finger-up and
+    /// pulling contentSize down (34408 to 34098) while the text view's own
+    /// first measurement was still unrelated. A later idle measurement,
+    /// after the thaw guard's second prepare, can still commit a real shrink.
     func applyDeferredHeights() {
         guard !deferredHeights.isEmpty else { return }
+        suppressProvisionalShrinks = true
+        provisionalShrinkPrepareCount = 0
         // [SettleJitter] Evidence log: classify every deferred correction by
         // where it sits relative to the viewport and how big the delta is.
         // Corrections ABOVE the viewport are the H1 suspect — after the settle
@@ -347,23 +366,13 @@ final class MessageListLayout: UICollectionViewLayout {
         var detail: [String] = []
         for (idx, h) in deferredHeights {
             let old = heightCache[idx] ?? precalcHeights[idx] ?? estimatedHeights[idx] ?? estimatedItemHeight
-            // [T-ios-deferred-shrink-dropped] Apply the deferred height even when
-            // a cached one already exists.
-            //
-            // The two ends of this mechanism used to contradict each other.
-            // `shouldInvalidateLayout` only DEFERS a height when
-            // `heightCache[index] != nil` (a cell with no cache is allowed
-            // straight through), yet this loop only APPLIED one when
-            // `heightCache[idx] == nil`. Those conditions are mutually
-            // exclusive, so every deferred entry was counted as `dropped` and
-            // discarded — a cell that shrank while the user was browsing kept
-            // its taller frame until something else happened to invalidate it.
-            //
-            // Applying on thaw is the safe moment by construction: this runs
-            // after scrolling ends, which is precisely the point the deferral
-            // was waiting for. The GeometryReader concern the old guard cites is
-            // moot — `setCachedHeight` (its only writer) has no callers, so
-            // `geometryReaderConfirmed` is always empty.
+            // The queued value is a shrink observed while deferSelfSizing was
+            // on. Writing it here is the finger-up jump. Leave the established
+            // height in place.
+            if h + 0.5 < old {
+                dropped += 1
+                continue
+            }
             if heightCache[idx] == nil || abs((heightCache[idx] ?? 0) - h) > 0.5 {
                 heightCache[idx] = h
                 let delta = h - old
@@ -436,6 +445,13 @@ final class MessageListLayout: UICollectionViewLayout {
             } else {
                 // Only a coarse/default estimate exists: allow first sizing.
             }
+        }
+
+        // The settle pass turns deferral off and immediately invalidates.
+        // Without this, the same provisional shrink that was just discarded
+        // is admitted as an ordinary idle shrink in that same pass.
+        if suppressProvisionalShrinks && preferred + 0.5 < original {
+            return false
         }
 
         let delta = abs(preferred - original)
@@ -776,6 +792,8 @@ final class MessageListLayout: UICollectionViewLayout {
             self.precalcHeights.removeAll()
             self.estimatedHeights.removeAll()
             self.geometryReaderConfirmed.removeAll()
+            self.suppressProvisionalShrinks = false
+            self.provisionalShrinkPrepareCount = 0
             self.lastSettledWidth = cv.bounds.width
             self.invalidateLayout()
         }
@@ -948,6 +966,8 @@ final class MessageListLayout: UICollectionViewLayout {
         precalcHeights.removeAll()
         estimatedHeights.removeAll()
         geometryReaderConfirmed.removeAll()
+        suppressProvisionalShrinks = false
+        provisionalShrinkPrepareCount = 0
         measuredHeightByContentKey.removeAll()
         contentKeyByIndex.removeAll()
         footerHugByIndex.removeAll()

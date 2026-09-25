@@ -187,8 +187,8 @@ struct PolicyTests {
                 layout.setContentKey("A:v1", at: 1)
                 layout.deferSelfSizing = false
                 layout.applyDeferredHeights()
-                try require(height(layout, row: 0) == 1700 && height(layout, row: 1) == 900,
-                            "pending heights were lost or applied to another item's index")
+                try require(height(layout, row: 0) == 2000 && height(layout, row: 1) == 1000,
+                            "scroll-time shrinks were written onto the swapped rows")
             }),
             ("snapshot_removal_drops_pending", {
                 let layout = pendingLayout()
@@ -220,8 +220,9 @@ struct PolicyTests {
                 observe(layout, 1376)
                 layout.setContentKey("A:v1", at: 0)
                 layout.deferSelfSizing = false
+                try require(layout.deferredHeightCount == 1, "unchanged key registration discarded the queued shrink")
                 layout.applyDeferredHeights()
-                try require(height(layout) == 1376, "unchanged key registration discarded a legitimate shrink")
+                try require(height(layout) == 1631, "scroll-time shrink was written at thaw")
             }),
             ("width_transition_drops_pending_before_debounce", {
                 let layout = pendingLayout()
@@ -278,7 +279,7 @@ struct PolicyTests {
                 layout.setPrecalcHeight(1631, at: 0)
                 layout.deferSelfSizing = false
                 layout.applyDeferredHeights()
-                try require(height(layout) == 1376, "repeated estimate incorrectly cancelled a legitimate observation")
+                try require(height(layout) == 1631, "scroll-time shrink replaced the precalculated height at thaw")
             }),
             ("one_row_invalidation_preserves_other_pending", {
                 let layout = makeLayout()
@@ -289,8 +290,9 @@ struct PolicyTests {
                 observe(layout, 1700, row: 1)
                 layout.invalidateHeight(at: 0)
                 layout.deferSelfSizing = false
+                try require(layout.deferredHeightCount == 1, "one row's invalidation discarded another row's queued shrink")
                 layout.applyDeferredHeights()
-                try require(height(layout, row: 1) == 1700, "one row's invalidation discarded another row's legitimate pending value")
+                try require(height(layout, row: 1) == 2000, "the other row's scroll-time shrink was written at thaw")
             }),
             ("inactive_and_zero_width_keep_pending", {
                 let layout = pendingLayout()
@@ -300,8 +302,9 @@ struct PolicyTests {
                 try require(!layout.shouldInvalidateLayout(forBoundsChange: other), "background width guard changed")
                 UIApplication.shared.applicationState = .active
                 try require(!layout.shouldInvalidateLayout(forBoundsChange: .zero), "zero-width guard changed")
+                try require(layout.deferredHeightCount == 1, "invalid width notification discarded the queued shrink")
                 layout.applyDeferredHeights()
-                try require(height(layout) == 1376, "invalid width notification discarded legitimate pending work")
+                try require(height(layout) == 1631, "scroll-time shrink was written at thaw")
             }),
             ("latest_width_target_purges", {
                 let layout = makeLayout()
@@ -321,14 +324,16 @@ struct PolicyTests {
                     try require(accepted, "invalid precalc blocked a valid first measurement")
                 }
             }),
-            ("genuine_shrink_applies_on_thaw", {
+            ("scroll_shrink_is_not_applied_on_thaw", {
                 let layout = makeLayout()
                 observe(layout, 1631)
                 layout.deferSelfSizing = true
                 observe(layout, 1376)
                 layout.deferSelfSizing = false
                 layout.applyDeferredHeights()
-                try require(height(layout) == 1376, "legitimate shrink was lost on thaw")
+                try require(height(layout) == 1631, "scroll-time shrink was written at thaw")
+                try require(observe(layout, 1376), "later idle shrink was rejected")
+                try require(height(layout) == 1376, "later idle shrink was not committed")
             }),
             ("zero_height_footer_can_shrink", {
                 let layout = makeLayout()
@@ -337,6 +342,8 @@ struct PolicyTests {
                 observe(layout, 0)
                 layout.deferSelfSizing = false
                 layout.applyDeferredHeights()
+                try require(height(layout) == 32, "scroll-time footer shrink was written at thaw")
+                try require(observe(layout, 0), "later idle footer shrink was rejected")
                 try require(height(layout) == 0, "legitimate empty footer remained tall")
             }),
         ]

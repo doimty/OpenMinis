@@ -4,8 +4,8 @@
   "productionChanges": {
     "src/ios/Agent/MessageList/MessageListLayout.swift": {
       "baselineSHA256": "40d56ba4a3f369aeae3fec0028a00dfa36999bc483a20cefd5618afbba56a18a",
-      "candidateSHA256": "25e39203f13489df3c685edef4ff5c23ba0ed804ae5bb9ae14eb30804514a1a2"
+      "candidateSHA256": "62f78a2a3943daf7952cee33ceaabc787da30f0a16a3a68b4160d910a385d484"
     }
   },
-  "scope": "Layout-owned height admission, pending cancellation and content/width lifetime. Device acceptance is still required."
+  "scope": "Layout-owned height admission. Scroll-time shrinks are discarded at thaw instead of written into the cache. Device acceptance is still required."
 }

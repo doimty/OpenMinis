@@ -12,8 +12,14 @@
   "snapshot_swap_remaps_pending_and_keys",
   "snapshot_removal_drops_pending",
   "changed_content_key_drops_pending",
+  "same_content_key_keeps_pending",
   "width_transition_drops_pending_before_debounce",
   "width_purge_drops_new_intermediate_pending",
   "reset_cancels_old_width_purge",
-  "reset_rebases_width_tracking"
+  "reset_rebases_width_tracking",
+  "precalc_reseed_keeps_pending",
+  "one_row_invalidation_preserves_other_pending",
+  "inactive_and_zero_width_keep_pending",
+  "scroll_shrink_is_not_applied_on_thaw",
+  "zero_height_footer_can_shrink"
 ]
