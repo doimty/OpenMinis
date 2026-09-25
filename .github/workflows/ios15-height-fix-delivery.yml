@@ -85,7 +85,8 @@ jobs:
             --output "$RUNNER_TEMP/height-policy/candidate"
           python3 scripts/ios15-height-policy/run_tests.py \
             --output "$RUNNER_TEMP/height-policy/precalc-blind" \
-            --mutation precalc-blind --expect-failure precalc_shrink_is_deferred
+            --mutation precalc-blind --expect-failure precalc_shrink_is_deferred \
+            --expect-failure precalc_reseed_keeps_pending
           python3 scripts/ios15-height-policy/run_tests.py \
             --output "$RUNNER_TEMP/height-policy/keep-pending" \
             --mutation keep-pending \

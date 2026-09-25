@@ -50,7 +50,8 @@ jobs:
           set -euo pipefail
           python3 scripts/ios15-height-policy/run_tests.py \
             --output "$RUNNER_TEMP/height-policy/precalc-blind" \
-            --mutation precalc-blind --expect-failure precalc_shrink_is_deferred
+            --mutation precalc-blind --expect-failure precalc_shrink_is_deferred \
+            --expect-failure precalc_reseed_keeps_pending
       - name: Compiled cancellation ablation
         run: |
           set -euo pipefail
