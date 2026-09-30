@@ -358,7 +358,7 @@ struct MinisApp: App {
                     // Register notification delegate for shortcut task tap-to-open
                     ShortcutNotificationDelegate.shared.register()
                     // Register App Shortcuts with the system so Siri and Spotlight discover them
-                    if #available(iOS 17.0, *) {
+                    if #available(iOS 16.0, *) {
                         MinisShortcutsProvider.updateAppShortcutParameters()
                     }
                     // Start logging if previously enabled
