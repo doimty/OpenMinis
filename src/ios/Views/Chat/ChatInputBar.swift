@@ -559,7 +559,7 @@ struct PastedTextChipRow: View {
             .padding(.trailing, 4)
         }
         .sheet(item: $previewEntry) { entry in
-            NavigationStack {
+            CompatNavigationStack {
                 ScrollView {
                     // Read-only by construction: selectable text (copyable),
                     // deliberately NOT a TextEditor.
@@ -578,7 +578,7 @@ struct PastedTextChipRow: View {
                 .navigationTitle("Pasted#\(entry.id) · " + String(format: AppLocalized("%d chars"), entry.charCount))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItem(placement: .navigationBarTrailing) {
                         Button(AppLocalized("Done")) { previewEntry = nil }
                     }
                 }

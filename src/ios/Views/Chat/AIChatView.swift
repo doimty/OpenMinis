@@ -3894,7 +3894,7 @@ struct AIChatView: View {
                     // [T-ios-geometry-observer-crash] traced an async-renderer
                     // SIGTRAP to that scaffold, and this file already
                     // standardised on the observer for exactly that reason.
-                    .onGeometryChange(for: CGFloat.self) { proxy in
+                    .compatOnGeometryChange(for: CGFloat.self) { proxy in
                         proxy.size.width
                     } action: { w in
                         guard w > 0, abs(w - inputBottomRowWidth) > 0.5 else { return }
@@ -5364,7 +5364,7 @@ struct NavBarStyleModifier: ViewModifier {
                         // before, and the action's initial fire covers the old
                         // onAppear seed.
                         Color.clear
-                            .onGeometryChange(for: CGFloat.self) { proxy in
+                            .compatOnGeometryChange(for: CGFloat.self) { proxy in
                                 proxy.safeAreaInsets.top
                             } action: { topSafeAreaInset = $0 }
                             .ignoresSafeArea()
