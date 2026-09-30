@@ -7683,8 +7683,18 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
                 return found
             }()
             let isLargeGrowth = delta > 30
-            if cellHasGrowableMediaAttachment && isLargeGrowth {
-                cellSizeLogger.info("[AttachHang][CellSize] ALLOW through defer — media attachment placeholder→loaded growth prev=\(String(format: "%.1f", previousHeight))→new=\(String(format: "%.1f", newHeight)) delta=\(String(format: "%+.1f", delta))")
+            // [T-ios-defer-debt-attachment-jump] A correction this large must
+            // never be PARKED. Device log (2026-10-01): an attachment row owed
+            // `delta=+1076.0` while deferSelfSizing was open, then paid it in one
+            // shot at settle — the list shifted by more than a screen, which is
+            // the reported "attachment messages jump off screen". Streaming text
+            // grows by a line at a time; a delta this big is a placeholder
+            // resolving (or a mis-measure), and both are better applied NOW than
+            // held for later. The media-attachment test stays for the smaller
+            // (31–400pt) placeholder→loaded corrections.
+            let isRunawayGrowth = delta > 400
+            if (cellHasGrowableMediaAttachment || isRunawayGrowth) && isLargeGrowth {
+                cellSizeLogger.info("[AttachHang][CellSize] ALLOW through defer — media=\(cellHasGrowableMediaAttachment) runaway=\(isRunawayGrowth) growth prev=\(String(format: "%.1f", previousHeight))→new=\(String(format: "%.1f", newHeight)) delta=\(String(format: "%+.1f", delta))")
                 // Fall through to the normal invalidate path below.
             } else {
                 // [T-ios-lastcell-clip-defer-lost] Return WITHOUT touching the
