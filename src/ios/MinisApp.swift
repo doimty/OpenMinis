@@ -819,7 +819,7 @@ struct MinisApp: App {
         // that has demonstrably failed to boot the appex several launches in a
         // row, scoped to this executable generation. See FileProviderBootHealth
         // for the full rationale and the self-healing properties.
-        if FileProviderBootHealth.shouldWithholdRegistration() {
+        if #available(iOS 16.0, *), FileProviderBootHealth.shouldWithholdRegistration() {
             lifecycleLog.warning("[FileProvider] withholding domain registration — appex failed to boot \(FileProviderBootHealth.tripThreshold)x in a row on this build (\(FileProviderBootHealth.describe())); removing any existing domain so fileproviderd stops relaunching it")
             NSFileProviderManager.getDomainsWithCompletionHandler { domains, _ in
                 guard !domains.isEmpty else { return }
