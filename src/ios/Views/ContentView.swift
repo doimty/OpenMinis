@@ -4186,6 +4186,7 @@ struct ContentView: View {
         withTransaction(tx) {
             navigationPath = newPath
         }
+        shareLog.info("🔄SESSION commitNavigationPath count=\(newPath.count) last=\(newPath.last.map { String($0.prefix(8)) } ?? "-")")
     }
 
     /// Apply a navigation change that was held back while backgrounded.

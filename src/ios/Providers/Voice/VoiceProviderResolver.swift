@@ -341,7 +341,17 @@ struct CapsuleProtectedFrame: ViewModifier {
                             if Self.isSane(f) { SpeechCapsulePlacement.shared.setRectDebounced(key, f) }
                         }
                         .onChange(of: geo.frame(in: .global)) { f in
-                            if Self.isSane(f) { SpeechCapsulePlacement.shared.setRectDebounced(key, f) }
+                            if Self.isSane(f) {
+                                SpeechCapsulePlacement.shared.setRectDebounced(key, f)
+                            } else {
+                                // [T-capsule-protected-rect-measures-button] A
+                                // branch-empty button measures 0×0 (or a transient
+                                // garbage frame mid-transition). Drop its
+                                // protection instead of keeping the last sane rect
+                                // forever — a stale rect keeps lifting the capsule
+                                // for a button that is no longer on screen.
+                                SpeechCapsulePlacement.shared.setRectDebounced(key, nil)
+                            }
                         }
                 }
             )

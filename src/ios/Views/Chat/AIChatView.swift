@@ -2865,6 +2865,11 @@ struct AIChatView: View {
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
+                // [T-capsule-protected-rect-measures-button] Same fix as the
+                // download button below: measure the buttons themselves, not the
+                // padded full-width wrapper, so the capsule only avoids the
+                // actual 36pt buttons instead of the whole bottom band.
+                .capsuleProtectedFrame("scrollButtons")
                 .padding(.trailing, 4)
                 .frame(maxWidth: maxContentWidth ?? .infinity, alignment: .trailing)
                 .padding(.horizontal, 12)
@@ -2872,8 +2877,6 @@ struct AIChatView: View {
                 .animation(.easeInOut(duration: 0.2), value: vm.isNearBottom)
                 .animation(.easeInOut(duration: 0.2), value: vm.isAtFirstTurn)
                 .animation(.easeInOut(duration: 0.2), value: hasFloatingPreview)
-                // The capsule must not cover these floating scroll-jump buttons.
-                .capsuleProtectedFrame("scrollButtons")
             }
         }
         // [T-browser-download-ux-v2] Floating download button — same visual
@@ -2885,12 +2888,20 @@ struct AIChatView: View {
             BrowserDownloadFloatingButton(sessionId: vm.sessionId ?? "") {
                 showDownloadsPanel = true
             }
+            // [T-capsule-protected-rect-measures-button] Measure the BUTTON, not
+            // the padded container. This modifier used to sit AFTER the padding
+            // chain below, so `.global` reported the whole padded wrapper: a
+            // full-width 428pt × ~285pt rect covering the entire bottom band —
+            // and it reported that even with no downloads at all, when the button
+            // body renders nothing. The speech capsule then always "overlapped"
+            // it and lifted ~280pt off its resting spot (device log:
+            // `setRect downloadButton y=607…892 x=0…428`, `APPLY lift 0 → 280`).
+            .capsuleProtectedFrame("downloadButton")
             .padding(.trailing, 4)
             .frame(maxWidth: maxContentWidth ?? .infinity, alignment: .trailing)
             .padding(.horizontal, 12)
             .padding(.bottom, inputBarHeight + (hasFloatingPreview ? 80 : 12) + 92)
             .animation(.easeInOut(duration: 0.2), value: hasFloatingPreview)
-            .capsuleProtectedFrame("downloadButton")
         }
     }
 

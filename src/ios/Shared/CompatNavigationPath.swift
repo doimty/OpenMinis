@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// [T-ios15-nav-truncate-diag] Log channel for the legacy navigation levels.
+private let legacyNavLog = AppLogger(category: "LegacyNav")
+
 /// Typed route storage exists on iOS 15 and avoids putting NavigationPath in
 /// a View's stored properties. Native iOS 16+ retains NavigationStack routing.
 struct CompatPathNavigationStack<Element: Hashable, Root: View, Destination: View>: View {
@@ -72,6 +75,12 @@ private struct LegacyNavigationLevel<Element: Hashable>: View {
                         // replacement route [B] or a newer foreground intent.
                         guard appeared, !active, path.count > depth,
                               path.starts(with: expectedPrefix) else { return }
+                        // [T-ios15-nav-truncate-diag] Name the writer: a
+                        // spuriously-fired isActive=false is indistinguishable
+                        // from a user pop in the UI, and the resulting
+                        // pop→push loop shows up only as the chat sliding
+                        // offscreen every ~2s.
+                        legacyNavLog.info("[LegacyNav][truncate] depth=\(depth) before=\(path.count) after=\(depth)")
                         path = Array(path.prefix(depth))
                     }
                 )) {
