@@ -804,44 +804,6 @@ struct MinisApp: App {
     private static func registerFileProviderDomain() {
         logAppUpdateMarkerForFPTrace()
 
-        // [T-ios-fp-mac-bootcrash] Circuit breaker, NOT a blanket disable.
-        //
-        // On Macs running the iPhone build the appex can die pre-main (SIGILL
-        // at DYLD-STUB$$NSExtensionMain, nothing of ours executing) and
-        // fileproviderd relaunches it in a tight loop. A registered domain is
-        // the only reason it tries, so the only possible defence lives here.
-        //
-        // The blunt version of this — never register on Mac — shipped as
-        // c4669fca4 and was reverted (90803ceb3) for a good reason: Finder
-        // browsing works between bursts, so the extension boots most of the
-        // time and withholding the domain outright would disable a working
-        // feature to silence a crash report. So withhold only for a machine
-        // that has demonstrably failed to boot the appex several launches in a
-        // row, scoped to this executable generation. See FileProviderBootHealth
-        // for the full rationale and the self-healing properties.
-        if #available(iOS 16.0, *), FileProviderBootHealth.shouldWithholdRegistration() {
-            lifecycleLog.warning("[FileProvider] withholding domain registration — appex failed to boot \(FileProviderBootHealth.tripThreshold)x in a row on this build (\(FileProviderBootHealth.describe())); removing any existing domain so fileproviderd stops relaunching it")
-            NSFileProviderManager.getDomainsWithCompletionHandler { domains, _ in
-                guard !domains.isEmpty else { return }
-                for d in domains {
-                    // Plain remove(_:) unregisters only — it does not touch the
-                    // App Group data the user's files actually live in.
-                    NSFileProviderManager.remove(d) { err in
-                        if let err {
-                            lifecycleLog.warning("[FileProvider] breaker deregister of \(d.identifier.rawValue) failed: \(err.localizedDescription)")
-                        }
-                    }
-                }
-            }
-            return
-        }
-        // Count this attempt. The appex clears it the moment it boots, so this
-        // only accumulates while launches are actually failing.
-        let pending = FileProviderBootHealth.noteRegistrationAttempt()
-        if pending > 1 {
-            lifecycleLog.warning("[FileProvider] appex has not reported a successful boot since \(pending) registration(s) on this build")
-        }
-
         let root = AIChatViewModel.minisAppGroupRoot
         let fm = FileManager.default
         // Ensure all three subdirectories exist.
@@ -865,6 +827,44 @@ struct MinisApp: App {
         // Core App Group/Soul setup above also belongs to the iOS 15 edition.
         // Only the replicated Files-app integration below requires iOS 16.
         guard #available(iOS 16.0, *) else { return }
+
+        // [T-ios-fp-mac-bootcrash] Circuit breaker, NOT a blanket disable.
+        //
+        // On Macs running the iPhone build the appex can die pre-main (SIGILL
+        // at DYLD-STUB$$NSExtensionMain, nothing of ours executing) and
+        // fileproviderd relaunches it in a tight loop. A registered domain is
+        // the only reason it tries, so the only possible defence lives here.
+        //
+        // The blunt version of this — never register on Mac — shipped as
+        // c4669fca4 and was reverted (90803ceb3) for a good reason: Finder
+        // browsing works between bursts, so the extension boots most of the
+        // time and withholding the domain outright would disable a working
+        // feature to silence a crash report. So withhold only for a machine
+        // that has demonstrably failed to boot the appex several launches in a
+        // row, scoped to this executable generation. See FileProviderBootHealth
+        // for the full rationale and the self-healing properties.
+        if FileProviderBootHealth.shouldWithholdRegistration() {
+            lifecycleLog.warning("[FileProvider] withholding domain registration — appex failed to boot \(FileProviderBootHealth.tripThreshold)x in a row on this build (\(FileProviderBootHealth.describe())); removing any existing domain so fileproviderd stops relaunching it")
+            NSFileProviderManager.getDomainsWithCompletionHandler { domains, _ in
+                guard !domains.isEmpty else { return }
+                for d in domains {
+                    // Plain remove(_:) unregisters only — it does not touch the
+                    // App Group data the user's files actually live in.
+                    NSFileProviderManager.remove(d) { err in
+                        if let err {
+                            lifecycleLog.warning("[FileProvider] breaker deregister of \(d.identifier.rawValue) failed: \(err.localizedDescription)")
+                        }
+                    }
+                }
+            }
+            return
+        }
+        // Count this attempt. The appex clears it the moment it boots, so this
+        // only accumulates while launches are actually failing.
+        let pending = FileProviderBootHealth.noteRegistrationAttempt()
+        if pending > 1 {
+            lifecycleLog.warning("[FileProvider] appex has not reported a successful boot since \(pending) registration(s) on this build")
+        }
 
         // Clean up stale directory created by a bug where workingSet identifier
         // was passed through as a subdirectory name.
