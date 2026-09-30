@@ -31,16 +31,35 @@ object ContextOffload {
     const val OFFLOADED_PREFIX = "[CONTEXT OFFLOADED]"
 
     /**
-     * [GH#352] Text this large must leave the prompt even if it sits in the
-     * protected last-4-messages window. Token-threshold offload never sees
-     * the latest tool result (that's the protected tail), and the char/3.5
-     * estimator under-counts base64 by ~2.5x, so a 1MB PNG-as-text (~960k
-     * real tokens) was sent raw and 400'd the session forever.
+     * [GH#352] Text this large must leave the prompt even inside the protected
+     * recent-message tail. Token-threshold offload does not inspect that tail,
+     * and the char/3.5 estimator under-counts base64 by roughly 2.5x.
      */
     const val HARD_OFFLOAD_CHARS = 32_768
 
+    /** Do not force-offload a stub or a file-read result already tied to offload storage. */
     fun isForceOffloadContent(content: String): Boolean =
         content.length >= HARD_OFFLOAD_CHARS && !isOffloadReadback(content)
+
+    /**
+     * [T-offload-stub-system-reminder] (GH#374) Tag carried by the current stub
+     * format. The pruned-argument notice is wrapped in a `<system-reminder>`
+     * envelope so the model reads it as a meta-instruction about a REMOVED
+     * argument instead of as content it may copy into its next call. The legacy
+     * plain-text form read like content ("Content (~N tokens…) saved to: …"),
+     * which is exactly why a model re-issuing its own earlier `file_write`
+     * pasted the placeholder back in. Mirrors iOS `offloadedStubNoticeTag`.
+     */
+    const val SYSTEM_NOTICE_TAG = "[Minis System Notice]"
+
+    /**
+     * Envelope opener for the current stub format. Kept separate from
+     * [SYSTEM_NOTICE_TAG] so detection can require BOTH — a bare
+     * `<system-reminder>` is legitimately emitted by other subsystems (the
+     * persona reminder), and must not be mistaken for an offload stub.
+     * Mirrors iOS `offloadedStubEnvelope`.
+     */
+    const val SYSTEM_REMINDER_OPEN = "<system-reminder>"
 
     /**
      * Host-side persistent dir for [sessionId]'s tool offloads. Lazily
@@ -137,26 +156,105 @@ object ContextOffload {
             "Use file_read tool to retrieve if needed."
 
     /**
-     * [GH#343] True when [content] is an offload stub that has come back into the
-     * history — either raw, or wrapped in the "[<path> | <n> bytes | <m> lines |
-     * showing a-b of c]" header that FileReadTool prepends to every result.
+     * [T-offload-stub-system-reminder] (GH#374) The notice handed to the model in
+     * place of a `file_write` / `file_edit` payload moved to disk. Byte-identical
+     * to iOS `offloadedStubNotice` so a session opened on either platform reads
+     * the same text.
      *
-     * The wrapper is exactly why a plain `content.startsWith(OFFLOADED_PREFIX)`
-     * check is not enough: reading an offloaded file back yields
-     * "[/var/minis/offloads/tools/x.txt | 12345 bytes | …]\n[CONTEXT OFFLOADED] …",
-     * so the candidate scan saw a brand-new large result every turn and offloaded
-     * the stub again — relocating the same context to a new file forever.
+     * Used for a pruned tool ARGUMENT specifically. [stub] still covers tool
+     * RESULTS and image parts, which the model reads as observations rather than
+     * as arguments it might resend.
      */
-    fun isOffloadReadback(content: String): Boolean {
-        val markerAt = content.indexOf(OFFLOADED_PREFIX)
-        if (markerAt < 0) return false
-        if (markerAt == 0) return true
-        if (markerAt > READBACK_HEADER_MAX) return false
-        return content.substring(0, markerAt).contains(LINUX_OFFLOADS_DIR)
+    fun prunedArgumentNotice(approxTokens: Int, byteCount: Int, linuxPath: String): String =
+        "$SYSTEM_REMINDER_OPEN\n" +
+            "$SYSTEM_NOTICE_TAG The original content (~$approxTokens tokens, " +
+            "$byteCount bytes) of this tool argument has been pruned to save context " +
+            "and offloaded to: $linuxPath\n\n" +
+            "CRITICAL: This is a placeholder notice, NOT actual file content. NEVER pass " +
+            "this placeholder or reuse it in subsequent file_write or file_edit calls. " +
+            "If you need the original content, call file_read on the offloaded path first.\n" +
+            "</system-reminder>"
+
+    /**
+     * [T-offload-placeholder-write-guard] (GH#374) True when [value] is an
+     * offload placeholder rather than real content.
+     *
+     * The offload pass rewrites a historical `file_write`'s `content` argument
+     * to [stub] to reclaim its tokens, and that rewritten call is what the model
+     * sees from then on. A call re-issued from it — a retry, a resumed pending
+     * call, the model copying its own earlier call — therefore carries this
+     * ~130-character reference where the file body used to be, and the write
+     * tools cannot tell the difference: the arguments are complete and
+     * well-formed, so the placeholder lands on disk over the user's real file
+     * and is reported as a success whose byte count matches the placeholder.
+     *
+     * Leading whitespace is trimmed so a payload a provider prefixed with a
+     * newline is still caught, and the test is a PREFIX so genuine content that
+     * merely mentions the marker mid-body still writes.
+     */
+    fun isOffloadPlaceholder(value: String): Boolean {
+        val trimmed = value.trimStart()
+        // Current format: the <system-reminder> envelope AND the notice tag.
+        if (trimmed.startsWith(SYSTEM_REMINDER_OPEN) && trimmed.contains(SYSTEM_NOTICE_TAG)) {
+            return true
+        }
+        // Legacy format. NOT transitional: it is still present in every session
+        // persisted before this change, and in history synced from a peer on an
+        // older build, so these keep arriving for as long as such histories do.
+        return trimmed.startsWith(OFFLOADED_PREFIX)
     }
 
-    /** Longest "[<path> | <n> bytes | <m> lines | showing a-b of c]" header we tolerate. */
-    private const val READBACK_HEADER_MAX = 512
+    /**
+     * The model-facing refusal for [isOffloadPlaceholder]. [field] names the
+     * argument at fault so the model knows which one to re-send.
+     */
+    fun placeholderWriteRefusal(field: String, path: String): String =
+        "Error: '$field' is an offload placeholder, not real " +
+            "content — the original text was moved out of context to free tokens and only " +
+            "this reference remains in the conversation. Nothing was written to $path; the " +
+            "file is unchanged. Use file_read on the path named inside the placeholder to " +
+            "recover the real content, then re-issue this write with it."
+
+    /**
+     * [T-android-offload-readback] (GH#343) If [content] is a `file_read` of a
+     * file we previously offloaded, return that file's path; else null.
+     *
+     * The problem this solves: the offload scan skips a part that already
+     * `startsWith(OFFLOADED_PREFIX)`, but when the agent reads the offloaded
+     * file back, `FileReadTool` prepends its own header —
+     * `[<path> | <n> bytes | <m> lines | showing a-b of c]` — so the result
+     * starts with `[/var/minis/offloads/…`, the prefix check misses, and the
+     * content is offloaded AGAIN into a second file holding identical bytes.
+     *
+     * Note the loop is bounded, contrary to the original report: the stub that
+     * replaces it is ~130 chars, well under the scan's 500-char floor, so the
+     * copy is not itself re-offloaded. The cost is a redundant file per
+     * readback, not unbounded growth.
+     *
+     * Returning the PATH rather than a boolean is what lets the caller re-stub
+     * against the file that already exists instead of writing a duplicate —
+     * and, unlike "skip anything read from the offloads dir", it keeps the
+     * content compressible, so deliberately re-reading a big offloaded file to
+     * analyse it in pieces does not pin those bytes in context for the rest of
+     * the session.
+     *
+     * Only the caller can say whether this came from `file_read`; that is
+     * checked there via [AgentContentPart.ToolResult.name], which is already
+     * populated on both the live and the rehydrated path.
+     */
+    fun offloadReadbackPath(content: String): String? {
+        if (!content.startsWith("[")) return null
+        val close = content.indexOf(']')
+        if (close <= 1) return null
+        val header = content.substring(1, close)
+        // Header shape is `<path> | <n> bytes | …`; the path is the first field.
+        val path = header.substringBefore('|').trim()
+        if (path.isEmpty()) return null
+        // Anchor on the directory boundary so a sibling like
+        // `/var/minis/offloads-backup/x` cannot match.
+        if (path != LINUX_OFFLOADS_DIR && !path.startsWith("$LINUX_OFFLOADS_DIR/")) return null
+        return path
+    }
 
     private const val TAG = "ContextOffload"
 }

@@ -15,19 +15,22 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * [GH OpenMinis#361] Cerebras' Chat Completions message schema rejects the
- * non-standard `messages[].assistant.reasoning_content` property:
+ * [T-android-cerebras-reasoning-400] GH OpenMinis#361.
  *
- *   HTTP 400 `messages.2.assistant.reasoning_content: property ... is unsupported`
- *   (code `wrong_api_format`)
+ * Cerebras' assistant message is a CLOSED schema, exactly like Mistral's
+ * ([MistralReasoningFieldTest], #87). Any prior assistant turn carrying
+ * `reasoning_content` is rejected with
+ * `400 … property 'messages.N.assistant.reasoning_content' is unsupported`,
+ * which is why the reporter saw turn 1 succeed and turn 2 fail every time —
+ * turn 1 has no assistant history to echo.
  *
- * The FIRST turn succeeds; every later turn fails because the history echoes the
- * reasoning captured from the previous answer. This is a schema constraint, not
- * a capability one, so it cannot be inferred from model metadata — the vendor is
- * identified by base URL, the same mechanism as the Mistral guard.
+ * The gate cannot be capability-driven, for the same reason as Mistral's:
+ * MiMo/DeepSeek REQUIRE the field's presence on multi-turn history while
+ * Cerebras FORBIDS it, and neither advertises the difference via /v1/models.
+ * Hence the base-URL vendor flag under test.
  *
- * `isCerebras` is `basePath.contains("cerebras")`, so pointing MockWebServer at
- * a path containing that literal exercises the real production predicate
+ * `isCerebras` is `basePath.contains("cerebras.ai")`, so pointing MockWebServer
+ * at a path containing that literal exercises the real production predicate
  * without needing a Cerebras key or network access.
  */
 class CerebrasReasoningFieldTest {
@@ -45,11 +48,15 @@ class CerebrasReasoningFieldTest {
         server.shutdown()
     }
 
-    /** A reasoning-capable model, so the echo gate would otherwise be ON. */
+    /**
+     * One of the two models the issue names, and one the bundled models-dev
+     * catalog lists under the `cerebras` provider. Reasoning-capable, so the
+     * echo gate would otherwise be ON.
+     */
     private val reasoningModel = LLMModel(
-        id = "gpt-oss-120b",
-        displayName = "GPT-OSS 120B",
-        provider = "CPA",
+        id = "qwen-3.8-27b",
+        displayName = "Qwen 3.8 27B",
+        provider = "Cerebras",
         supportsReasoning = true,
     )
 
@@ -63,7 +70,7 @@ class CerebrasReasoningFieldTest {
         LLMMessage(LLMMessage.Role.USER, "second question"),
     )
 
-    private fun capture(basePath: String): JSONObject {
+    private fun capture(basePath: String, model: LLMModel = reasoningModel): JSONObject {
         // Enqueue several identical responses: the provider may retry, and a
         // drained queue surfaces as a confusing "empty response" TransientError
         // rather than the assertion we actually care about. We only ever read
@@ -78,20 +85,22 @@ class CerebrasReasoningFieldTest {
         }
         val provider = OpenAIProvider(
             apiKey = "test-key",
-            model = reasoningModel,
+            model = model,
             basePath = basePath,
         )
-        runCatching { runBlocking {
-            provider.sendMessageClamped(
-                messages = historyWithReasoning(),
-                systemPrompt = null,
-                maxTokens = 1024,
-                temperature = null,
-                imageParts = emptyList(),
-                tools = emptyList(),
-                thinkingLevel = ThinkingLevel.MEDIUM,
-            )
-        } }
+        runCatching {
+            runBlocking {
+                provider.sendMessageClamped(
+                    messages = historyWithReasoning(),
+                    systemPrompt = null,
+                    maxTokens = 1024,
+                    temperature = null,
+                    imageParts = emptyList(),
+                    tools = emptyList(),
+                    thinkingLevel = ThinkingLevel.MEDIUM,
+                )
+            }
+        }
         return JSONObject(server.takeRequest().body.readUtf8())
     }
 
@@ -105,21 +114,44 @@ class CerebrasReasoningFieldTest {
 
     @Test
     fun `cerebras endpoint never sends reasoning_content`() {
-        val body = capture(server.url("/cerebras/v1").toString().trimEnd('/'))
+        val body = capture(server.url("/cerebras.ai/v1").toString().trimEnd('/'))
         assertFalse(
-            "reasoning_content must not be sent to Cerebras (400 is unsupported): $body",
+            "reasoning_content must not be sent to Cerebras (400 unsupported): $body",
             anyMessageHasReasoning(body),
         )
     }
 
     @Test
     fun `cerebras detection is case-insensitive`() {
-        // Hosts are case-insensitive and the predicate lowercases before the
+        // Hosts are case-insensitive and iOS lowercases before the same
         // contains() test; an uppercased URL must not slip past the guard.
         val body = capture(server.url("/API.CEREBRAS.AI/v1").toString().trimEnd('/'))
         assertFalse(
-            "uppercase cerebras host must still suppress reasoning_content: $body",
+            "uppercase cerebras.ai must still suppress reasoning_content: $body",
             anyMessageHasReasoning(body),
+        )
+    }
+
+    @Test
+    fun `cerebras hosted qwen does not receive enable_thinking`() {
+        // The cross case (cerebras x qwen). `qwen-3.8-27b` matches the `*qwen*`
+        // model-name rule, which emits Qwen's native enable_thinking — a field
+        // Cerebras does not accept. The endpoint rule is registered ABOVE that
+        // one, and stage A stops at the first scope match, so position is the
+        // behaviour. Cerebras' documented control is root reasoning_effort,
+        // which is exactly what the bundled catalog declares for this model.
+        val body = capture(server.url("/cerebras.ai/v1").toString().trimEnd('/'))
+        assertFalse(
+            "enable_thinking must not be sent to Cerebras: $body",
+            body.has("enable_thinking"),
+        )
+        assertFalse(
+            "thinking_budget must not be sent to Cerebras: $body",
+            body.has("thinking_budget"),
+        )
+        assertFalse(
+            "the DashScope extra_body envelope must not be sent to Cerebras: $body",
+            body.has("extra_body"),
         )
     }
 
@@ -132,6 +164,20 @@ class CerebrasReasoningFieldTest {
         assertTrue(
             "reasoning_content should still be echoed for non-Cerebras vendors: $body",
             anyMessageHasReasoning(body),
+        )
+    }
+
+    @Test
+    fun `non-cerebras qwen keeps its native thinking mechanism`() {
+        // The other half of the negative control: a qwen-named model on some
+        // other endpoint must keep matching the `*qwen*` rule. If the endpoint
+        // rule were registered unscoped, this would silently lose its thinking
+        // mechanism — the exact class of regression the resolver's
+        // "ORDER IS LOAD-BEARING" note records.
+        val body = capture(server.url("/v1").toString().trimEnd('/'))
+        assertTrue(
+            "a non-Cerebras qwen should still get its native thinking field: $body",
+            body.has("enable_thinking") || body.has("extra_body"),
         )
     }
 }

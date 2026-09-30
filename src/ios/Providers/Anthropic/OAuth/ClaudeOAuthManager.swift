@@ -14,12 +14,11 @@ final class ClaudeOAuthManager: NSObject, ObservableObject {
     // MARK: - OAuth Config
 
     private let authURL = "https://claude.ai/oauth/authorize"
-    // https://github.com/anthropics/anthropic-sdk-swift/issues/243 reports
-    // that tokens issued against console.anthropic.com get silently
-    // demoted to pay-per-use pricing; claude.ai is the canonical endpoint.
-    // Also: `claude.ai` is the route that proxies through Cloudflare so
-    // that session state (device bindings / IP allowlists) stays in-sync
-    // with the web UI. Keep in lockstep with sub2api FullClaudeCodeMimicry.
+    // [T-oauth-cloudflare-403 issue #360] `claude.ai`, not the legacy
+    // `console.anthropic.com`. The console host is the endpoint the CLI moved
+    // off; requests to it are fronted by a Cloudflare policy that answers a
+    // client failing the bot check with 403 + an HTML "Just a moment…" challenge
+    // rather than JSON, so token exchange and silent refresh both dead-ended.
     private let tokenURL = "https://claude.ai/v1/oauth/token"
     private let clientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     private let callbackPort: UInt16 = 54545
@@ -249,7 +248,7 @@ final class ClaudeOAuthManager: NSObject, ObservableObject {
             error: error,
             isFatal: isFatal,
             loadCurrent: { ProviderKeychainHelper.loadOAuthToken(instanceId: instanceId, as: ClaudeTokenStorage.self) },
-            deleteCredentials: { ProviderKeychainHelper.deleteOAuthToken(instanceId: instanceId) },
+            markNeedsReauth: { ProviderKeychainHelper.markOAuthNeedsReauth(instanceId: instanceId) },
             log: { logger.info($0) }
         )
     }
@@ -353,11 +352,17 @@ final class ClaudeOAuthManager: NSObject, ObservableObject {
         var request = URLRequest(url: URL(string: tokenURL)!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Match the OAuthClient mimickry headers so the Anthropic OAuth
-        // backend sees the same fingerprint as a real claude-cli request.
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue(ClaudeCodeMimicry.betaHeaderValue(existing: nil), forHTTPHeaderField: "anthropic-beta")
-        request.setValue(ClaudeCodeMimicry.userAgent, forHTTPHeaderField: "User-Agent")
+        // [T-oauth-cloudflare-403 issue #360] The token path sent NO mimicry
+        // headers, while the chat path has sent them since the OAuth transport
+        // was written. Cloudflare Bot Management decides from exactly this set
+        // whether the caller looks like the official CLI, so on a network it
+        // scores as suspicious the asymmetry read to the user as "chat works but
+        // I can't log in" — a 403 challenge page where JSON was expected.
+        //
+        // Shared with the chat path (OAuthHTTPClient.swift) rather than copied,
+        // so the two cannot drift apart again. `anthropic-beta` is deliberately
+        // absent: it negotiates message-API features and has no meaning here.
+        ClaudeCLIMimicry.apply(to: &request)
 
         let jsonData = try JSONSerialization.data(withJSONObject: body)
         request.httpBody = jsonData
