@@ -244,16 +244,16 @@ struct UsageStatsView: View {
                 // [T-p2-helper-usage] Helpers — only once there is something to show.
                 if let h = vm.helperStats, h.delegateCalls > 0 || h.childSessions > 0 {
                     Section(AppLocalized("Agents")) {
-                        LabeledContent(AppLocalized("Delegations"), value: "\(h.delegateCalls)")
-                        LabeledContent(AppLocalized("Primary / Sub tier"), value: "\(h.primaryRuns) / \(h.subRuns)")
+                        CompatLabeledContent(AppLocalized("Delegations"), value: "\(h.delegateCalls)")
+                        CompatLabeledContent(AppLocalized("Primary / Sub tier"), value: "\(h.primaryRuns) / \(h.subRuns)")
                         if h.escalations > 0 {
-                            LabeledContent(AppLocalized("Escalation requests"), value: "\(h.escalations)")
+                            CompatLabeledContent(AppLocalized("Escalation requests"), value: "\(h.escalations)")
                         }
                         if h.cancelledOrFailed > 0 {
-                            LabeledContent(AppLocalized("Stopped or failed"), value: "\(h.cancelledOrFailed)")
+                            CompatLabeledContent(AppLocalized("Stopped or failed"), value: "\(h.cancelledOrFailed)")
                         }
-                        LabeledContent(AppLocalized("Agent input tokens"), value: formatCount(h.helperInputTokens))
-                        LabeledContent(AppLocalized("Agent output tokens"), value: formatCount(h.helperOutputTokens))
+                        CompatLabeledContent(AppLocalized("Agent input tokens"), value: formatCount(h.helperInputTokens))
+                        CompatLabeledContent(AppLocalized("Agent output tokens"), value: formatCount(h.helperOutputTokens))
                     }
                 }
 
