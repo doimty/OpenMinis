@@ -2253,26 +2253,33 @@ final class DebugJSONRPC: @unchecked Sendable {
             footprintMB = Double(info.phys_footprint) / (1024 * 1024)
         }
 
-        let decided = full &+ single
-        return [
-            "clusterCalls": calls,
-            "clusterFull": full,
-            "clusterSingle": single,
-            "clusterHitRatePct": decided > 0 ? Double(full) * 100.0 / Double(decided) : 0,
-            "missWhyNeighbourMapped": whyMapped,
-            "missWhySameFlagsRefused": whyFlags,
-            "missWhyHostPageEqualsGuest": whyNoCluster,
-            "missWhyClusterMmapFailed": whyEnomem,
-            "clusterPagesCommitted": pagesCommitted,
-            "avgPagesPerClusterCall": decided > 0 ? Double(pagesCommitted) / Double(decided) : 0,
-            "anonMmapCalls": anonMmaps,
-            "anonPagesMapped": anonPages,
-            "anonGuestMB": Double(guestBytes) / (1024 * 1024),
-            "anonHostMBUpperBound": Double(hostBytes) / (1024 * 1024),
-            "avgPagesPerAnonMmap": anonMmaps > 0 ? Double(anonPages) / Double(anonMmaps) : 0,
-            "hostPageSize": hostPage,
-            "appFootprintMB": footprintMB,
-        ]
+        let decided: UInt64 = full &+ single
+        let hitRate: Double = decided > 0 ? Double(full) * 100.0 / Double(decided) : 0.0
+        let pagesPerCluster: Double = decided > 0 ? Double(pagesCommitted) / Double(decided) : 0.0
+        let pagesPerMmap: Double = anonMmaps > 0 ? Double(anonPages) / Double(anonMmaps) : 0.0
+        let guestMB: Double = Double(guestBytes) / (1024.0 * 1024.0)
+        let hostMB: Double = Double(hostBytes) / (1024.0 * 1024.0)
+        // Do not make the constraint solver infer a single numeric value type
+        // for this heterogeneous UInt64/Double JSON payload.
+        var stats: [String: Any] = [:]
+        stats["clusterCalls"] = calls
+        stats["clusterFull"] = full
+        stats["clusterSingle"] = single
+        stats["clusterHitRatePct"] = hitRate
+        stats["missWhyNeighbourMapped"] = whyMapped
+        stats["missWhySameFlagsRefused"] = whyFlags
+        stats["missWhyHostPageEqualsGuest"] = whyNoCluster
+        stats["missWhyClusterMmapFailed"] = whyEnomem
+        stats["clusterPagesCommitted"] = pagesCommitted
+        stats["avgPagesPerClusterCall"] = pagesPerCluster
+        stats["anonMmapCalls"] = anonMmaps
+        stats["anonPagesMapped"] = anonPages
+        stats["anonGuestMB"] = guestMB
+        stats["anonHostMBUpperBound"] = hostMB
+        stats["avgPagesPerAnonMmap"] = pagesPerMmap
+        stats["hostPageSize"] = hostPage
+        stats["appFootprintMB"] = footprintMB
+        return stats
     }
 
     private func handleAppInfo(params: [String: Any] = [:]) -> Any {
