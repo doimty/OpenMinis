@@ -1004,6 +1004,22 @@ extension AIChatViewModel {
         return "Summary: tools \(tools) · turns \(stats.loopCount) · tokens \(tokens)"
     }
 
+    /// iOS 15-safe copy of the response extraction used by AppIntents. The
+    /// intent type itself is iOS 16-only, but delegate progress reporting runs
+    /// in the main app and must compile for the deployment target.
+    @MainActor
+    private static func progressResponseText(from vm: AIChatViewModel) -> String {
+        guard let lastAssistant = vm.messages.last(where: {
+            $0.role == .assistant && !$0.isInternalBridge
+        }) else { return "No response." }
+        let text = lastAssistant.blocks
+            .filter { $0.kind == .text }
+            .map { $0.content }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? "Task completed." : text
+    }
+
     // MARK: - Progress reports (T-p2-progress-report)
 
     static let progressIntervalFrequent: TimeInterval = 15
@@ -1032,7 +1048,7 @@ extension AIChatViewModel {
                 guard !Task.isCancelled, let self, child.isProcessing,
                       job.state == .running else { return }
                 let info = SessionActivityTracker.shared.sessionToolInfo[childId]
-                let lastMessage = SendPromptIntent.extractResponseText(from: child)
+                let lastMessage = Self.progressResponseText(from: child)
                 let signature = "\(info?.toolName ?? "")|\(info?.toolStatus ?? "")|\(info?.loopIteration ?? 0)|\(lastMessage.prefix(200))"
                 if onlyOnChange, signature == job.lastProgressSignature {
                     logger.info("[delegate_task] progress \(job.id.prefix(8)) unchanged — skipped")
