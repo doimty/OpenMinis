@@ -79,13 +79,25 @@ struct ProviderInstanceDetailView: View {
         }
         .sheet(isPresented: $showCopilotLogin) {
             if let instance = instance {
-                // [T-copilot-provider] Device-code sheet, same post-sign-in
-                // model reconcile as Kimi — the catalog is empty until the
-                // server has been asked, so this refresh is what populates it.
-                CopilotDeviceLoginSheet(instanceId: instance.id) { success in
-                    oauthRefreshTrigger.toggle()
-                    if success, instance.providerType.oauthSupportsModelDiscovery {
-                        Task { await store.refreshModels(for: instance) }
+                if #available(iOS 16.0, *) {
+                    // [T-copilot-provider] Device-code sheet, same post-sign-in
+                    // model reconcile as Kimi. The implementation is iOS16-only.
+                    CopilotDeviceLoginSheet(instanceId: instance.id) { success in
+                        oauthRefreshTrigger.toggle()
+                        if success, instance.providerType.oauthSupportsModelDiscovery {
+                            Task { await store.refreshModels(for: instance) }
+                        }
+                    }
+                } else {
+                    CompatNavigationStack {
+                        VStack(spacing: 16) {
+                            Image(systemName: "info.circle")
+                                .font(.title2)
+                            Text("Copilot sign-in requires iOS 16 or later.")
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             }
