@@ -192,7 +192,7 @@ jobs:
             --configuration Debug \
             --output-dir "$RUNNER_TEMP/ipa" \
             --entitlements scripts/ios15-trollstore.entitlements \
-            --ipa-name "Minis-1.13-ios15-height-fix.ipa"
+            --ipa-name "Minis-1.14-ios15-height-fix.ipa"
           python3 - <<'PY'
           import json, os
           from pathlib import Path
