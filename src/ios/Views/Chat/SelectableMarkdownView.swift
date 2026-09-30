@@ -7684,17 +7684,18 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
             }()
             let isLargeGrowth = delta > 30
             // [T-ios-defer-debt-attachment-jump] A correction this large must
-            // never be PARKED. Device log (2026-10-01): an attachment row owed
-            // `delta=+1076.0` while deferSelfSizing was open, then paid it in one
-            // shot at settle — the list shifted by more than a screen, which is
-            // the reported "attachment messages jump off screen". Streaming text
-            // grows by a line at a time; a delta this big is a placeholder
-            // resolving (or a mis-measure), and both are better applied NOW than
-            // held for later. The media-attachment test stays for the smaller
-            // (31–400pt) placeholder→loaded corrections.
-            let isRunawayGrowth = delta > 400
-            if (cellHasGrowableMediaAttachment || isRunawayGrowth) && isLargeGrowth {
-                cellSizeLogger.info("[AttachHang][CellSize] ALLOW through defer — media=\(cellHasGrowableMediaAttachment) runaway=\(isRunawayGrowth) growth prev=\(String(format: "%.1f", previousHeight))→new=\(String(format: "%.1f", newHeight)) delta=\(String(format: "%+.1f", delta))")
+            // never be PARKED … (see commit) …
+            // [T-ios-defer-debt-first-measure] `previousHeight <= 0` means this
+            // view has never been measured — the value is the row being BORN,
+            // not a correction to an existing height. Parking it leaves a brand
+            // new attachment row sitting at placeholder height until the next
+            // settle. Device log 2026-10-01: `growth prev=0.0→new=1076.0` was
+            // owed, and 200–350pt first measures were parked too.
+            let isRunawayGrowth = delta > 150
+            let isFirstMeasure = previousHeight <= 0
+            let allowsNow = cellHasGrowableMediaAttachment || isRunawayGrowth || isFirstMeasure
+            if allowsNow && isLargeGrowth {
+                cellSizeLogger.info("[AttachHang][CellSize] ALLOW through defer — media=\(cellHasGrowableMediaAttachment) runaway=\(isRunawayGrowth) first=\(isFirstMeasure) growth prev=\(String(format: "%.1f", previousHeight))→new=\(String(format: "%.1f", newHeight)) delta=\(String(format: "%+.1f", delta))")
                 // Fall through to the normal invalidate path below.
             } else {
                 // [T-ios-lastcell-clip-defer-lost] Return WITHOUT touching the
@@ -7718,7 +7719,7 @@ final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate 
                 // outstanding), which is the signature of a long drag over
                 // async-rendering content.
                 let wasPending = deferredCorrectionPending
-                cellSizeLogger.info("[DeferDebt] OWED delta=\(String(format: "%+.1f", delta)) attached=\(self.window != nil) reOwed=\(wasPending)")
+                cellSizeLogger.info("[DeferDebt] OWED delta=\(String(format: "%+.1f", delta)) prev=\(String(format: "%.1f", previousHeight))→new=\(String(format: "%.1f", newHeight)) attached=\(self.window != nil) reOwed=\(wasPending)")
                 deferredCorrectionPending = true
                 armDeferredRemeasureBackstop()
                 return
