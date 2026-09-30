@@ -9,14 +9,9 @@ enum ThinkingLevelCatalog {
         // special-cased — same .max ceiling as gpt-5.6-sol/terra, the wire
         // mapping (.max/.ultra → "max") is shared and unchanged.
         ({ $0.hasPrefix("gpt-6-astra") }, .max),
-        // [T-gpt6-sol-luna] gpt-6-sol / gpt-6-luna: same .max ceiling, same
-        // reasoning as astra above. Sol's registry entry drops "ultra" from its
-        // declared levels (the backend rejects that tier, exactly as for
-        // gpt-5.6-sol) — and a `.max` ceiling is precisely how that is
-        // expressed here: `selectableThinkingLevels` stops at .max, so .ultra is
-        // never offered, and the wire mapping folds .max/.ultra to "max" anyway.
-        // No separate ultra-exclusion is needed or wanted.
-        ({ $0.hasPrefix("gpt-6-sol") || $0.hasPrefix("gpt-6-luna") }, .max),
+        // GPT-6 Sol and GPT-6.1 Sol expose the same Codex reasoning ladder;
+        // the UI must reach Max and the wire value is `reasoning_effort: max`.
+        ({ $0.hasPrefix("gpt-6-sol") || $0.hasPrefix("gpt-6.1-sol") || $0.hasPrefix("gpt-6-luna") }, .max),
         ({ $0.hasPrefix("gpt-5.6-sol") || $0.hasPrefix("gpt-5.6-terra") }, .max),
         ({ $0.hasPrefix("gpt-5.6-luna") }, .max),
         ({ $0.hasPrefix("gpt-5.5") }, .xhigh),

@@ -139,6 +139,7 @@ check("usage hidden when either side is unknown", vm.contains("(used > 0 && wind
 check("publishContextUsage is called where usage is written", vm.components(separatedBy: "publishContextUsage()").count - 1 >= 4)
 check("source warning threshold is 0.7 (critical 0.8)", models.contains("static let warningFraction: Double = 0.7") && models.contains("static let criticalFraction: Double = 0.8"))
 check("localization key present", xc.contains("\"Context %@ used · %@\" : {"))
+check("source uses the localization template key before formatting", models.contains("String(format: AppLocalized(\"Context %@ used · %@\")"))
 check("zh-Hans translation present", xc.contains("上下文已用 %1$@ · %2$@"))
 check("no Android file touched by this feature", !FileManager.default.fileExists(atPath: root + "../android/CONTEXT_USAGE_MARKER"))
 

@@ -280,10 +280,10 @@ struct ContextUsageHint: Equatable {
     static func make(usage: ContextUsage, generation: Int) -> ContextUsageHint {
         let pct = "\(usage.percent)%"
         let size = "\(TokenCountFormatter.short(usage.usedTokens)) / \(TokenCountFormatter.short(usage.windowTokens))"
-        // Interpolations extract as `%@`, so the key is "Context %@ used · %@"
-        // — one translatable entry, and translations may reorder with
-        // `%1$@` / `%2$@`.
-        let text = AppLocalized("Context \(pct) used · \(size)")
+        // Look up the format-template key before inserting dynamic values.
+        // Looking up the fully interpolated English sentence would miss the
+        // `Context %@ used · %@` catalog entry and silently fall back to English.
+        let text = String(format: AppLocalized("Context %@ used · %@"), pct, size)
         return ContextUsageHint(generation: generation, text: text, highlights: [pct, size], tier: usage.tier)
     }
 }

@@ -301,9 +301,7 @@ enum ThinkingRuleResolver {
         // dimension; the cross-product rows (qwen×unified, gpt5×dashscope, mimo×unified)
         // were added alongside this fix.
 
-        // OpenAI native o-series / GPT-5.x / GPT-4.x — root reasoning_effort. Ahead of
-        // the gateway rule because the old chain checked these prefixes first and never
-        // consulted `unifiedReasoningEffort` on this path.
+        // OpenAI native o-series / GPT-6.x / GPT-5.x / GPT-4.x — root reasoning_effort.
         rules.append(ThinkingRule(
             kind: .officialVendor,
             scope: .modelPattern("o1*"),
@@ -313,6 +311,8 @@ enum ThinkingRuleResolver {
         rules.append(ThinkingRule(kind: .officialVendor, scope: .modelPattern("o3*"),
                                   wireFormat: .reasoningEffort(offValue: ctx.offEffort), label: "openai-native"))
         rules.append(ThinkingRule(kind: .officialVendor, scope: .modelPattern("o4*"),
+                                  wireFormat: .reasoningEffort(offValue: ctx.offEffort), label: "openai-native"))
+        rules.append(ThinkingRule(kind: .officialVendor, scope: .modelPattern("gpt-6*"),
                                   wireFormat: .reasoningEffort(offValue: ctx.offEffort), label: "openai-native"))
         rules.append(ThinkingRule(kind: .officialVendor, scope: .modelPattern("gpt-5*"),
                                   wireFormat: .reasoningEffort(offValue: ctx.offEffort), label: "openai-native"))
@@ -590,7 +590,7 @@ enum ThinkingRuleResolver {
             //    NOT clamped onto the declared set.
             //  • everything else goes through the generic fallback, which IS clamped.
             let isOpenAINative = lid.hasPrefix("o1") || lid.hasPrefix("o3") || lid.hasPrefix("o4")
-                || lid.hasPrefix("gpt-5") || lid.hasPrefix("gpt-4")
+                || lid.hasPrefix("gpt-6") || lid.hasPrefix("gpt-5") || lid.hasPrefix("gpt-4")
             if isOpenAINative {
                 if let effort = OpenAIAgentProvider.reasoningEffort(for: modelShim(ctx), level: ctx.level) {
                     body["reasoning_effort"] = effort

@@ -333,6 +333,17 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
         supportsReasoning: true
     )
 
+    /// GPT-6.1 Sol is the newer Sol model identifier exposed by Codex OAuth.
+    /// Keep reasoning explicit because it is not guaranteed to be present in
+    /// the bundled models.dev snapshot; otherwise the request path falls back
+    /// to the low-effort default.
+    static let gpt61Sol = LLMModel(
+        id: "gpt-6.1-sol",
+        displayName: "GPT 6.1 Sol",
+        provider: "OpenAI",
+        supportsReasoning: true
+    )
+
     static let gpt6Luna = LLMModel(
         id: "gpt-6-luna",
         displayName: "GPT-6 Luna",
@@ -566,7 +577,7 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
     /// to be tier-gated it will present as the empty-assistant-turn symptom
     /// described above; remove it rather than assuming the picker is broken.
     static let allOpenAICodexOAuth: [LLMModel] = [
-        .gpt6Astra, .gpt6Sol, .gpt6Luna,
+        .gpt6Astra, .gpt6Sol, .gpt61Sol, .gpt6Luna,
         .gpt56Sol, .gpt56Terra, .gpt56Luna,
         .gpt55, .gpt54, .gpt54Mini,
         // gptImage2 is kept: it is an image endpoint, not a Codex chat model,

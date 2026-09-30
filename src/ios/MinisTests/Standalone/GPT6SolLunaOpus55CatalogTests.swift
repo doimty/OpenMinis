@@ -88,6 +88,8 @@ do {
           } ?? false)
     check("gpt-6-sol is defined",
           types.contains("static let gpt6Sol = LLMModel(") && types.contains("id: \"gpt-6-sol\""))
+    check("gpt-6.1-sol is defined",
+          types.contains("static let gpt61Sol = LLMModel(") && types.contains("id: \"gpt-6.1-sol\""))
     check("gpt-6-luna is defined",
           types.contains("static let gpt6Luna = LLMModel(") && types.contains("id: \"gpt-6-luna\""))
 }
@@ -108,6 +110,7 @@ do {
     check("allAnthropic carries claudeOpus55", anthropicList.contains(".claudeOpus55"))
     check("the Codex list was located", !codexList.isEmpty)
     check("allOpenAICodexOAuth carries gpt6Sol", codexList.contains(".gpt6Sol"))
+    check("allOpenAICodexOAuth carries gpt61Sol", codexList.contains(".gpt61Sol"))
     check("allOpenAICodexOAuth carries gpt6Luna", codexList.contains(".gpt6Luna"))
     // GPT6AstraReasoningTests asserts astra is FIRST; keep that true.
     check("gpt6Astra is still the first entry",
@@ -124,14 +127,16 @@ do {
     }
     check("gpt6Sol declares supportsReasoning: true",
           body("static let gpt6Sol = LLMModel(").contains("supportsReasoning: true"))
+    check("gpt61Sol declares supportsReasoning: true",
+          body("static let gpt61Sol = LLMModel(").contains("supportsReasoning: true"))
     check("gpt6Luna declares supportsReasoning: true",
           body("static let gpt6Luna = LLMModel(").contains("supportsReasoning: true"))
 }
 
 print("\n▶️  4. thinking ceilings")
 do {
-    check("a rule covers gpt-6-sol and gpt-6-luna",
-          catalog.contains("{ $0.hasPrefix(\"gpt-6-sol\") || $0.hasPrefix(\"gpt-6-luna\") }, .max)"))
+    check("a rule covers gpt-6-sol, gpt-6.1-sol and gpt-6-luna",
+          catalog.contains("{ $0.hasPrefix(\"gpt-6-sol\") || $0.hasPrefix(\"gpt-6.1-sol\") || $0.hasPrefix(\"gpt-6-luna\") }, .max)"))
     // Sol's "no ultra" IS the .max ceiling — the picker stops there, and the
     // shared wire clamp folds .max/.ultra to "max" anyway.
     check("the ceiling is .max, not .ultra",
