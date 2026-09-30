@@ -1,20 +1,11 @@
-# Normal Minis delivery carrying the approved height-policy repair.
-# No probe overlay, no diagnostic activation, no device-capture entrypoint.
-name: ios15-height-fix-delivery
+# Upstream 1.14 integration IPA delivery, following the proven historical workflow.
+# Keep native dependency construction, cache keys, packaging, and evidence unchanged.
+name: sync-upstream-1.14-ipa
 
 on:
   workflow_dispatch:
   push:
-    branches: [fix/ios15-height-policy-candidate]
-    paths:
-      - .github/workflows/ios15-height-fix-delivery.yml
-      - src/ios/Agent/MessageList/MessageListLayout.swift
-      - scripts/ios15-height-policy/**
-      - scripts/reentry-diagnostics/**
-      - scripts/package_ios15_ipa.py
-      - scripts/test_package_ios15_ipa.py
-      - scripts/ios15_build_log.py
-      - scripts/test_ios15_build_log.py
+    branches: [sync/upstream-1.14-20260930]
 
 permissions:
   contents: read
@@ -28,7 +19,7 @@ env:
   EXPECTED_XCODE: "Xcode 26.2"
   EXPECTED_XCODE_BUILD: "Build version 17C52"
   EXPECTED_IOS_SDK: "26.2"
-  EXPECTED_ISH: "3f6384c70eefd1a370f121d3492a5f21f7767df9"
+  EXPECTED_ISH: "e6521d9cfe9cd48f19917fc3b23aea622ba358b4"
   NATIVE_CXX_SHA: 1648fc13a04a90521a2ef3887885ef2506208605
   ONNX_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/onnxruntime.xcframework.zip
   ONNX_SHA256: 498ba860229e0ce45e6983ce44478a836b0c0763451ed37a8b1f8e74a8a0dc1f
@@ -68,11 +59,18 @@ jobs:
             python3 scripts/reentry-diagnostics/test_trace.py -v
           )
 
-      - name: Verify the explicit functional-candidate source profile
+      - name: Verify archived functional-candidate source profile
         run: |
           set -euo pipefail
-          python3 scripts/ios15-height-policy/check_candidate_source.py \
-            --output "$RUNNER_TEMP/candidate-source.json"
+          # Historical source-isolation checks describe the fixed 1.13 repair,
+          # not an upstream migration. Preserve them unchanged on that commit.
+          git worktree add --detach "$RUNNER_TEMP/approved-height-source" 57f54c403c089449d5e8a2453663b8f95f75c0ac
+          (
+            cd "$RUNNER_TEMP/approved-height-source"
+            python3 scripts/ios15-height-policy/check_candidate_source.py \
+              --output "$RUNNER_TEMP/candidate-source.json"
+            python3 -m unittest discover -s scripts/ios15-height-policy -p 'test_*.py' -v
+          )
 
       - name: Native policy baseline, candidate and compiled ablations
         run: |
@@ -99,7 +97,6 @@ jobs:
       - name: Package, build-log and compatibility tooling tests
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s scripts/ios15-height-policy -p 'test_*.py' -v
           python3 scripts/test_package_ios15_ipa.py -v
           python3 scripts/test_ios15_build_log.py -v
           python3 scripts/test_ios15_compat_contract.py -v

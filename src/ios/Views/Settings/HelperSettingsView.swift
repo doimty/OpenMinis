@@ -186,7 +186,7 @@ struct SubAgentEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 // [T-sub-agents-v1] The built-in's name and description are
                 // fixed. They are what the delegating model reads to decide
@@ -216,8 +216,7 @@ struct SubAgentEditorView: View {
                     if isBuiltIn {
                         Text(existing?.displayDescription ?? descriptionText).foregroundStyle(.secondary)
                     } else {
-                        TextField(AppLocalized("Description"), text: $descriptionText, axis: .vertical)
-                            .lineLimit(2...4)
+                        CompatMultilineTextField(AppLocalized("Description"), text: $descriptionText, lineLimit: 2...4)
                         counter(descriptionText.count, SubAgentLimits.descriptionMaxLength)
                     }
                 } header: {
@@ -229,8 +228,7 @@ struct SubAgentEditorView: View {
                 }
 
                 Section {
-                    TextField(AppLocalized("Instructions"), text: $instructions, axis: .vertical)
-                        .lineLimit(4...12)
+                    CompatMultilineTextField(AppLocalized("Instructions"), text: $instructions, lineLimit: 4...12)
                     counter(instructions.count, SubAgentLimits.instructionsMaxLength)
                 } header: {
                     Text(AppLocalized("Instructions"))

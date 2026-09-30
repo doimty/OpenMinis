@@ -50,6 +50,18 @@ struct HelperSheetTarget: Identifiable, Equatable {
 /// Three detents so the height is adjustable, opening at `.medium` so the
 /// opener stays visible behind it.
 struct HelperTranscriptSheetStyle: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 16.0, *) {
+            content.modifier(NativeHelperTranscriptSheetStyle())
+        } else {
+            content.interactiveDismissDisabled()
+        }
+    }
+}
+
+@available(iOS 16.0, *)
+private struct NativeHelperTranscriptSheetStyle: ViewModifier {
     @State private var detent: PresentationDetent = .medium
 
     static let detents: Set<PresentationDetent> = [.fraction(0.35), .medium, .large]
@@ -107,7 +119,7 @@ struct HelperTranscriptPage: View {
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             // [T-agent-transcript-navbar-lost] The ZStack is load-bearing, not
             // cosmetic: everything below — the nav bar style and, critically,
             // the `.background` toolbar host — must attach to a node whose
@@ -147,7 +159,7 @@ struct HelperTranscriptPage: View {
             // the nested tool-sheet host re-bridges an EMPTY state to this same
             // navigation controller when its sheet dismisses, and the bar is
             // hidden with animated:false and never restored.
-            .toolbar(.visible, for: .navigationBar)
+            .compatNavigationBarHidden(false)
             .toolbar {
                 // [T-agent-transcript-navbar-lost] Declared INLINE, not from a
                 // `.background` host.
@@ -178,7 +190,7 @@ struct HelperTranscriptPage: View {
                     }
                     .equatable()
                 }
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         dismiss()
                     } label: {
@@ -187,7 +199,7 @@ struct HelperTranscriptPage: View {
                     }
                     .accessibilityLabel(AppLocalized("Close"))
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     if isRunning {
                         Button {
                             childVM?.cancel()

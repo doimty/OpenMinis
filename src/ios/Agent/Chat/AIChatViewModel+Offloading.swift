@@ -479,8 +479,8 @@ extension AIChatViewModel {
         let hasBomb = agentHistory.contains { msg in
             msg.parts.contains { part in
                 switch part {
-                case .toolResult(_, _, let content, _, _, _, _, _):
-                    return isForceOffloadContent(content)
+                case .toolResult(_, _, let content, _, _, _, _, _, let isReadback):
+                    return !isReadback && isForceOffloadContent(content)
                 case .text(let t):
                     return isForceOffloadContent(t)
                 default:
@@ -699,7 +699,7 @@ extension AIChatViewModel {
             let part = agentHistory[candidate.msgIdx].parts[candidate.partIdx]
             let isBomb: Bool = {
                 switch part {
-                case .toolResult(_, _, let content, _, _, _, _, _): return isForceOffloadContent(content)
+                case .toolResult(_, _, let content, _, _, _, _, _, let isReadback): return !isReadback && isForceOffloadContent(content)
                 case .text(let t): return isForceOffloadContent(t)
                 default: return false
                 }
@@ -1181,13 +1181,18 @@ extension AIChatViewModel {
             newParts.reserveCapacity(agentHistory[mi].parts.count)
             for part in agentHistory[mi].parts {
                 switch part {
-                case .toolResult(let id, let name, let content, let isError, let imgData, let imgMime, let pageURL, let imgPath):
+                case .toolResult(let id, let name, let content, let isError, let imgData, let imgMime, let pageURL, let imgPath, let isReadback):
+                    // Keep the upstream readback marker and original result.
+                    if isReadback {
+                        newParts.append(part)
+                        continue
+                    }
                     let rewritten = materializeToolResult(
                         id: id, name: name, content: content, isError: isError,
                         imageData: imgData, imageMimeType: imgMime, pageURL: pageURL,
                         imageLinuxPath: imgPath, attachImage: attach
                     )
-                    if case .toolResult(_, _, let newContent, _, _, _, _, _) = rewritten, newContent != content {
+                    if case .toolResult(_, _, let newContent, _, _, _, _, _, _) = rewritten, newContent != content {
                         changed = true
                     }
                     newParts.append(rewritten)
