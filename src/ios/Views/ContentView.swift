@@ -3259,10 +3259,12 @@ struct ContentView: View {
                     }
                 }
             }
-            .background(
-                NavigationLink(value: session.id) { EmptyView() }
-                    .opacity(0)
-            )
+            .background(Group {
+                if #available(iOS 16.0, *) {
+                    NavigationLink(value: session.id) { EmptyView() }
+                        .opacity(0)
+                }
+            })
             .compatLegacyNavigationTap { navigationPath.append(session.id) }
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
@@ -4618,7 +4620,7 @@ struct ContentView: View {
             // the Restore tab. Not auto-dismissed on success — the result
             // report is worth reading; the steps above refresh on their own
             // (restore reloads ProviderConfigStore and the session list).
-            NavigationStack {
+            CompatNavigationStack {
                 BackupAndRestoreView(initialTab: .restore)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
@@ -8452,58 +8454,6 @@ private struct SettingsSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .navigationDestination(for: SettingsDestination.self) { dest in
-                switch dest {
-                case .providers:
-                    ProviderInstancesView()
-                case .providerDetail(let id):
-                    ProviderInstanceDetailView(instanceId: id)
-                case .modelGroups:
-                    ModelGroupsView()
-                case .modelGroupDetail(let id):
-                    ModelGroupDetailView(groupId: id)
-                case .usage:
-                    UsageStatsView()
-                case .skills:
-                    SkillsManagementView()
-                case .soul:
-                    SoulSettingsView()
-                case .tools:
-                    ToolsSettingsView()
-                case .memory:
-                    MemoryManagementView()
-                case .storage:
-                    StorageManagementView()
-                case .mountedFolders:
-                    MountedFoldersSettingsView()
-                case .sharedFolders:
-                    SharedFoldersSettingsView()
-                case .logs:
-                    // Pull a one-shot tab hint from the deep link router
-                    // (e.g. `?tab=config-audit`). LogManagementView clears
-                    // its local state independently; the published value
-                    // here is consumed once and reset to nil.
-                    LogManagementView(initialTab: deepLink.pendingLogsTab ?? "logs")
-                        .onAppear { deepLink.pendingLogsTab = nil }
-                case .appearance:
-                    AppearanceSettingsView()
-                case .background:
-                    EnhancedBackgroundSettingsView()
-                case .about:
-                    AboutView()
-                case .environments:
-                    EnvironmentVariablesView()
-                case .permissions:
-                    OffloadPermissionSettingsView()
-                // [T-mcp-oauth-deeplink] Detail = the list view told to open
-                // the server's edit sheet on appear; a deleted/unknown server
-                // just lands on the list (no crash, sensible fallback).
-                case .mcpIntegrations:
-                    MCPIntegrationsView()
-                case .mcpServerDetail(let serverId):
-                    MCPIntegrationsView(initialEditServerId: serverId)
-                }
-            }
             .onAppear {
                 applyPendingDeepLink()
                 // Legacy flags — kept so older call sites keep working.
@@ -8557,6 +8507,8 @@ private struct SettingsSheet: View {
             SkillsManagementView()
         case .soul:
             SoulSettingsView()
+        case .tools:
+            ToolsSettingsView()
         case .memory:
             MemoryManagementView()
         case .storage:
