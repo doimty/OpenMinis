@@ -353,14 +353,25 @@ struct AddProviderView: View {
             }
         }
         .sheet(isPresented: $showCopilotLogin) {
-            // [T-copilot-provider] Device-code login, gated behind the risk
-            // notice inside the sheet.
-            CopilotDeviceLoginSheet(instanceId: pendingInstanceId) { success in
-                if success {
-                    oauthAuthTime = Date()
-                    oauthMaskedToken = loadMaskedToken(type: .githubCopilot)
-                    pendingOAuthDone = true
+            if #available(iOS 16.0, *) {
+                // [T-copilot-provider] Device-code login, gated behind the risk
+                // notice inside the sheet.
+                CopilotDeviceLoginSheet(instanceId: pendingInstanceId) { success in
+                    if success {
+                        oauthAuthTime = Date()
+                        oauthMaskedToken = loadMaskedToken(type: .githubCopilot)
+                        pendingOAuthDone = true
+                    }
                 }
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "info.circle")
+                        .font(.title2)
+                    Text("Copilot sign-in requires iOS 16 or later.")
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .fileImporter(isPresented: $showImportFile, allowedContentTypes: [.json]) { result in
