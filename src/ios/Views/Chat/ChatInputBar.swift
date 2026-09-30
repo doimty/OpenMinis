@@ -726,23 +726,25 @@ struct UserAttachmentList: View {
     }
 
     var body: some View {
-        FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
-            ForEach(attachments) { meta in
-                if meta.isImage {
-                    AsyncImageTile(meta: meta, tileSize: tileSize) {
-                        openGallery(startingAt: meta)
+        if #available(iOS 16.0, *) {
+            FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
+                ForEach(attachments) { meta in
+                    if meta.pastedId != nil {
+                        pastedTile(meta)
+                    } else {
+                        tile(meta)
                     }
-                } else if meta.isVideo {
-                    AsyncVideoTile(meta: meta, tileSize: tileSize)
-                } else if meta.pastedId != nil {
-                    pastedTile(meta)
-                } else {
-                    fileTile(meta)
                 }
             }
         } else {
             LegacyFlowLayout(items: attachments.map { meta in
-                LegacyFlowItem(id: meta.id) { tile(meta) }
+                LegacyFlowItem(id: meta.id) {
+                    if meta.pastedId != nil {
+                        pastedTile(meta)
+                    } else {
+                        tile(meta)
+                    }
+                }
             }, hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap,
                alignment: .trailing)
         }

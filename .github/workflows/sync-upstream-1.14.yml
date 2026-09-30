@@ -225,11 +225,19 @@ jobs:
             python3 scripts/reentry-diagnostics/test_trace.py -v
           )
 
-      - name: Verify the explicit functional-candidate source profile
+      - name: Verify archived 1.13 functional-candidate source isolation
         run: |
           set -euo pipefail
-          python3 scripts/ios15-height-policy/check_candidate_source.py \
-            --output "$RUNNER_TEMP/candidate-source.json"
+          # The source-only contract intentionally admits exactly one layout
+          # change against the immutable 1.13 baseline. Keep that check intact
+          # there; it cannot describe an upstream version migration. The next
+          # step tests the COMPLETE current 1.14 layout and its compiled ablations.
+          git worktree add --detach "$RUNNER_TEMP/approved-height-source" 57f54c403c089449d5e8a2453663b8f95f75c0ac
+          (
+            cd "$RUNNER_TEMP/approved-height-source"
+            python3 scripts/ios15-height-policy/check_candidate_source.py \
+              --output "$RUNNER_TEMP/candidate-source.json"
+          )
 
       - name: Native policy baseline, candidate and compiled ablations
         run: |
@@ -288,6 +296,8 @@ jobs:
           java-version: '21'
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Kotlin compile and unit tests
         working-directory: src/android
         run: |
