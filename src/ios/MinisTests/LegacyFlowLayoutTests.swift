@@ -16,6 +16,15 @@ final class LegacyFlowLayoutTests: XCTestCase {
         XCTAssertEqual(result.height, 134)
     }
 
+    func testSingleAttachmentTrailingPositionStaysInsideExplicitContentColumn() {
+        let result = LegacyFlowArrangement.pack(
+            sizes: [CGSize(width: 64, height: 64)],
+            width: 308, hSpacing: 6, vSpacing: 6, trailing: true)
+        XCTAssertEqual(result.positions, [CGPoint(x: 244, y: 0)])
+        XCTAssertLessThanOrEqual(result.positions[0].x + 64, 308)
+        XCTAssertEqual(result.height, 64)
+    }
+
     func testRowHeightUsesTallestItem() {
         let result = LegacyFlowArrangement.pack(
             sizes: [CGSize(width: 40, height: 10), CGSize(width: 40, height: 30), CGSize(width: 40, height: 20)],
