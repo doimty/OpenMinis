@@ -1280,21 +1280,29 @@ class PastableUITextView: UITextView, UIDropInteractionDelegate {
     /// Text height used to grow and shrink a content-sized composer.
     ///
     /// `sizeThatFits` cannot be read directly. With scrolling enabled it
-    /// reports the current frame, and the top-align inset below stores the
-    /// surplus of a still-tall frame. Either value is the height BEFORE the
-    /// user deleted the text, so a cut or a clear would leave the box open
-    /// until the chat view was rebuilt. The glyph rect excludes both, and
-    /// reading it does not toggle scrolling (that would reset the caret's
-    /// scroll offset on every layout pass).
+    /// reports the current frame, and the top-align inset stores the surplus
+    /// of a still-tall frame. Either value is the height BEFORE the user
+    /// deleted the text. The live text container cannot be left resized
+    /// either: writing its size turns off width tracking, so later keystrokes
+    /// stop wrapping and the composer stays locked at one line.
     func contentHeightForSizing(width: CGFloat) -> CGFloat {
         let line = ceil(font?.lineHeight ?? 20)
-        guard width > 0 else { return line }
-        if abs(textContainer.size.width - width) > 0.5 {
-            textContainer.size = CGSize(width: width, height: .greatestFiniteMagnitude)
+        guard width > 0, width.isFinite else { return line }
+        let container = textContainer
+        let savedSize = container.size
+        let tracksWidth = container.widthTracksTextView
+        let tracksHeight = container.heightTracksTextView
+        defer {
+            container.size = savedSize
+            container.widthTracksTextView = tracksWidth
+            container.heightTracksTextView = tracksHeight
         }
-        layoutManager.ensureLayout(for: textContainer)
-        let glyphs = ceil(layoutManager.usedRect(for: textContainer).height)
-        let textH = text.isEmpty || glyphs < 1 ? line : glyphs
+        container.widthTracksTextView = false
+        container.heightTracksTextView = false
+        container.size = CGSize(width: width, height: .greatestFiniteMagnitude)
+        layoutManager.ensureLayout(for: container)
+        let glyphs = ceil(layoutManager.usedRect(for: container).height)
+        let textH = text.isEmpty ? line : max(glyphs, line)
         return textH + textContainerInset.top
     }
 
