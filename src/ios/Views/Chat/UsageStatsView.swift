@@ -227,17 +227,17 @@ struct UsageStatsView: View {
                 // Grand totals
                 Section("Total Usage") {
                     let grandTotalAllInput = vm.grandTotalInput + vm.grandTotalCacheRead + vm.grandTotalCacheCreation
-                    CompatLabeledContent("Total Input (incl. Cache)", value: formatCount(grandTotalAllInput))
-                    CompatLabeledContent("Output Tokens", value: formatCount(vm.grandTotalOutput))
+                    CompatLabeledContent(AppLocalized("Total Input (incl. Cache)"), value: formatCount(grandTotalAllInput))
+                    CompatLabeledContent(AppLocalized("Output Tokens"), value: formatCount(vm.grandTotalOutput))
                     if vm.grandTotalCacheRead > 0 {
-                        CompatLabeledContent("Cache Read", value: formatCount(vm.grandTotalCacheRead))
+                        CompatLabeledContent(AppLocalized("Cache Read"), value: formatCount(vm.grandTotalCacheRead))
                     }
                     if vm.grandTotalCacheCreation > 0 {
-                        CompatLabeledContent("Cache Creation", value: formatCount(vm.grandTotalCacheCreation))
+                        CompatLabeledContent(AppLocalized("Cache Creation"), value: formatCount(vm.grandTotalCacheCreation))
                     }
                     if grandTotalAllInput > 0 && vm.grandTotalCacheRead > 0 {
                         let grandHitRate = Double(vm.grandTotalCacheRead) / Double(grandTotalAllInput) * 100
-                        CompatLabeledContent("Cache Hit Rate", value: String(format: "%.1f%%", grandHitRate))
+                        CompatLabeledContent(AppLocalized("Cache Hit Rate"), value: String(format: "%.1f%%", grandHitRate))
                     }
                 }
 
@@ -300,23 +300,23 @@ struct UsageStatsView: View {
     @ViewBuilder
     private func modelDetailRows(_ model: UsageStatsViewModel.ModelStats) -> some View {
         Group {
-            CompatLabeledContent("Input", value: formatCount(model.inputTokens))
-            CompatLabeledContent("Output", value: formatCount(model.outputTokens))
+            CompatLabeledContent(AppLocalized("Input"), value: formatCount(model.inputTokens))
+            CompatLabeledContent(AppLocalized("Output"), value: formatCount(model.outputTokens))
             if model.cacheReadTokens > 0 {
-                CompatLabeledContent("Cache Read", value: formatCount(model.cacheReadTokens))
+                CompatLabeledContent(AppLocalized("Cache Read"), value: formatCount(model.cacheReadTokens))
             }
             if model.cacheCreationTokens > 0 {
-                CompatLabeledContent("Cache Creation", value: formatCount(model.cacheCreationTokens))
+                CompatLabeledContent(AppLocalized("Cache Creation"), value: formatCount(model.cacheCreationTokens))
             }
             let totalInputForRate = model.inputTokens + model.cacheReadTokens + model.cacheCreationTokens
             if totalInputForRate > 0 && model.cacheReadTokens > 0 {
                 let hitRate = Double(model.cacheReadTokens) / Double(totalInputForRate) * 100
-                CompatLabeledContent("Cache Hit Rate", value: String(format: "%.1f%%", hitRate))
+                CompatLabeledContent(AppLocalized("Cache Hit Rate"), value: String(format: "%.1f%%", hitRate))
             }
-            CompatLabeledContent("Daily Avg", value: formatCount(model.dailyAvgTokens))
-            CompatLabeledContent("Per-Session Avg", value: formatCount(model.sessionAvgTokens))
-            CompatLabeledContent("Sessions", value: "\(model.distinctSessions.count)")
-            CompatLabeledContent("Active Days", value: "\(model.distinctDays.count)")
+            CompatLabeledContent(AppLocalized("Daily Avg"), value: formatCount(model.dailyAvgTokens))
+            CompatLabeledContent(AppLocalized("Per-Session Avg"), value: formatCount(model.sessionAvgTokens))
+            CompatLabeledContent(AppLocalized("Sessions"), value: "\(model.distinctSessions.count)")
+            CompatLabeledContent(AppLocalized("Active Days"), value: "\(model.distinctDays.count)")
         }
         .font(.subheadline)
     }

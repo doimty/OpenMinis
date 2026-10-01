@@ -714,6 +714,7 @@ enum UserAttachmentTileMetrics {
 
 struct UserAttachmentList: View {
     let attachments: [AttachmentMeta]
+    var availableWidth: CGFloat? = nil
     @Environment(\.openURL) private var openURL
     @Environment(\.openImageGallery) private var openImageGallery
 
@@ -726,28 +727,31 @@ struct UserAttachmentList: View {
     }
 
     var body: some View {
-        if #available(iOS 16.0, *) {
-            FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
-                ForEach(attachments) { meta in
-                    if meta.pastedId != nil {
-                        pastedTile(meta)
-                    } else {
-                        tile(meta)
+        Group {
+            if #available(iOS 16.0, *) {
+                FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
+                    ForEach(attachments) { meta in
+                        if meta.pastedId != nil {
+                            pastedTile(meta)
+                        } else {
+                            tile(meta)
+                        }
                     }
                 }
+            } else {
+                LegacyFlowLayout(items: attachments.map { meta in
+                    LegacyFlowItem(id: meta.id, expectedSize: CGSize(width: tileSize, height: tileSize)) {
+                        if meta.pastedId != nil {
+                            pastedTile(meta)
+                        } else {
+                            tile(meta)
+                        }
+                    }
+                }, hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap,
+                   alignment: .trailing, widthOverride: availableWidth)
             }
-        } else {
-            LegacyFlowLayout(items: attachments.map { meta in
-                LegacyFlowItem(id: meta.id) {
-                    if meta.pastedId != nil {
-                        pastedTile(meta)
-                    } else {
-                        tile(meta)
-                    }
-                }
-            }, hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap,
-               alignment: .trailing)
         }
+        .frame(width: availableWidth, alignment: .trailing)
     }
 
     @ViewBuilder
@@ -920,20 +924,25 @@ private struct WebAppAddToHomeMenuModifier: ViewModifier {
 /// Async image tile — loads and decodes off the main thread, caches via NativeMediaImageCache.
 struct QueuedAttachmentPreview: View {
     let attachments: [InputAttachment]
+    var availableWidth: CGFloat? = nil
 
     private let tileSize: CGFloat = UserAttachmentTileMetrics.tile
 
     var body: some View {
-        if #available(iOS 16.0, *) {
-            FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
-                ForEach(attachments) { attachment in tile(attachment) }
+        Group {
+            if #available(iOS 16.0, *) {
+                FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
+                    ForEach(attachments) { attachment in tile(attachment) }
+                }
+            } else {
+                LegacyFlowLayout(items: attachments.map { attachment in
+                    LegacyFlowItem(id: attachment.id,
+                                   expectedSize: CGSize(width: tileSize, height: tileSize)) { tile(attachment) }
+                }, hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap,
+                   alignment: .trailing, widthOverride: availableWidth)
             }
-        } else {
-            LegacyFlowLayout(items: attachments.map { attachment in
-                LegacyFlowItem(id: attachment.id) { tile(attachment) }
-            }, hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap,
-               alignment: .trailing)
         }
+        .frame(width: availableWidth, alignment: .trailing)
     }
 
     @ViewBuilder

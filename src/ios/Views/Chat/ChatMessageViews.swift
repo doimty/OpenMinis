@@ -193,6 +193,17 @@ private struct PreviewContentSizeKey: PreferenceKey {
     }
 }
 
+/// Width of the user-message content row before its outer 16pt padding.
+/// iOS 15's legacy flow must receive this explicit column width; measuring
+/// inside the flow can see the whole window instead of the trailing message
+/// column.
+private struct UserRowWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 // MARK: - Chat Message Row
 
 struct ChatMessageRow: View {
@@ -233,6 +244,14 @@ struct ChatMessageRow: View {
     @State private var usageContentVisible = false
     /// Row frame in window coordinates — used to gate token-usage tap to bottom zone.
     @State private var rowFrameInWindow: CGRect = .zero
+    /// Explicit trailing content width for legacy attachment flow.
+    /// Measured on the parent VStack, not inside the legacy flow itself, because
+    /// the inner iOS 15 GeometryReader can see the whole window.
+    @State private var userRowWidth: CGFloat = 0
+    private var userAttachmentWidth: CGFloat? {
+        guard userRowWidth > 1 else { return nil }
+        return userRowWidth
+    }
     private let usageTapLogger = AppLogger(category: "UsageTap")
     /// ID of the block currently highlighted after a copy action.
     @State private var highlightedBlockId: UUID?
@@ -408,10 +427,12 @@ struct ChatMessageRow: View {
             VStack(alignment: .trailing, spacing: 6) {
                 // User-attached files above the text bubble
                 if !message.attachments.isEmpty {
-                    UserAttachmentList(attachments: message.attachments)
+                    UserAttachmentList(attachments: message.attachments,
+                                       availableWidth: userAttachmentWidth)
                 } else if !message.inputAttachments.isEmpty {
                     // Queued message: show previews from cache before queue drain
-                    QueuedAttachmentPreview(attachments: message.inputAttachments)
+                    QueuedAttachmentPreview(attachments: message.inputAttachments,
+                                             availableWidth: userAttachmentWidth)
                 }
 
                 if !userDisplayText.isEmpty {
@@ -436,6 +457,16 @@ struct ChatMessageRow: View {
                         }
                     }
                 }
+            }
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: UserRowWidthKey.self, value: proxy.size.width)
+                }
+            )
+            .onPreferenceChange(UserRowWidthKey.self) { width in
+                guard width.isFinite, width > 0,
+                      abs(userRowWidth - width) > 0.5 else { return }
+                userRowWidth = width
             }
             .modifier(MinisOpenURLHandler())
             .contentShape(Rectangle())

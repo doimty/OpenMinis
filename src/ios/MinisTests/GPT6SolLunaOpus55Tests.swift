@@ -19,6 +19,8 @@ final class GPT6SolLunaOpus55Tests: XCTestCase {
     func testStaticEntriesDeclareReasoning() {
         XCTAssertEqual(LLMModel.gpt6Sol.supportsReasoning, true)
         XCTAssertEqual(LLMModel.gpt6Luna.supportsReasoning, true)
+        XCTAssertEqual(LLMModel.gpt6Sol.contextWindow, 1_050_000)
+        XCTAssertEqual(LLMModel.gpt61Sol.contextWindow, 1_050_000)
         XCTAssertEqual(LLMModel.gpt6Sol.id, "gpt-6-sol")
         XCTAssertEqual(LLMModel.gpt6Luna.id, "gpt-6-luna")
     }

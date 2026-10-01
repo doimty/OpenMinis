@@ -131,6 +131,10 @@ do {
           body("static let gpt61Sol = LLMModel(").contains("supportsReasoning: true"))
     check("gpt6Luna declares supportsReasoning: true",
           body("static let gpt6Luna = LLMModel(").contains("supportsReasoning: true"))
+    check("gpt6Sol declares official 1.05M context",
+          body("static let gpt6Sol = LLMModel(").contains("contextWindow: 1_050_000"))
+    check("gpt61Sol carries the same official 1.05M context",
+          body("static let gpt61Sol = LLMModel(").contains("contextWindow: 1_050_000"))
 }
 
 print("\n▶️  4. thinking ceilings")

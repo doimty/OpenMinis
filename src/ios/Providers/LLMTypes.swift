@@ -320,6 +320,11 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
     /// so `enrichModels()` leaves the flag nil and every thinking level collapses
     /// to the Codex-OAuth fallback `reasoning.effort: "low"`.
     ///
+    /// `contextWindow` mirrors the bundled models.dev metadata: GPT-6 Sol has
+    /// a 1,050,000-token context window. Keep this on the static entry so an
+    /// offline Codex OAuth discovery does not fall back to the generic 128K
+    /// heuristic. GPT-6.1 Sol uses the same window.
+    ///
     /// Both need Codex client >= 0.155.0 (`minimal_client_version` in OpenAI's
     /// codex_client_models.json); see `OpenAIProvider.codexClientVersion`.
     ///
@@ -330,17 +335,19 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
         id: "gpt-6-sol",
         displayName: "GPT-6 Sol",
         provider: "OpenAI",
+        contextWindow: 1_050_000,
         supportsReasoning: true
     )
 
     /// GPT-6.1 Sol is the newer Sol model identifier exposed by Codex OAuth.
-    /// Keep reasoning explicit because it is not guaranteed to be present in
-    /// the bundled models.dev snapshot; otherwise the request path falls back
-    /// to the low-effort default.
+    /// Keep the same official 1,050,000-token context as GPT-6 Sol, plus the
+    /// explicit reasoning flag because it is not guaranteed to be present in
+    /// the bundled models.dev snapshot.
     static let gpt61Sol = LLMModel(
         id: "gpt-6.1-sol",
         displayName: "GPT 6.1 Sol",
         provider: "OpenAI",
+        contextWindow: 1_050_000,
         supportsReasoning: true
     )
 

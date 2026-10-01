@@ -5,9 +5,12 @@ import SwiftUI
 struct LegacyFlowItem: Identifiable {
     let id: AnyHashable
     let view: AnyView
+    let expectedSize: CGSize
 
-    init<ID: Hashable, Content: View>(id: ID, @ViewBuilder content: () -> Content) {
+    init<ID: Hashable, Content: View>(id: ID, expectedSize: CGSize = .zero,
+                                      @ViewBuilder content: () -> Content) {
         self.id = AnyHashable(id)
+        self.expectedSize = expectedSize
         self.view = AnyView(content())
     }
 }
@@ -64,12 +67,38 @@ struct LegacyFlowLayout: View {
     var hSpacing: CGFloat = 8
     var vSpacing: CGFloat = 8
     var alignment: HorizontalAlignment = .leading
+    /// Explicit content-column width for legacy message attachments. When nil,
+    /// retain the measured parent width used by the composer and other callers.
+    var widthOverride: CGFloat? = nil
     @State private var sizes: [AnyHashable: CGSize] = [:]
     @State private var availableWidth: CGFloat = 0
 
     var body: some View {
-        let layoutWidth = max(availableWidth, 1)
-        let itemSizes = items.map { sizes[$0.id] ?? .zero }
+        // [T-ios15-attachment-right-overflow] A preference can report the
+        // parent proposal (for example 428) instead of the trailing content
+        // column that actually contains this flow. Do not let that stale
+        // number drive positions or alignment. The declared tile sizes are
+        // authoritative; measurements only override them once they look like
+        // individual tiles rather than the whole parent.
+        let itemSizes = items.map { item in
+            let measured = sizes[item.id] ?? .zero
+            let declared = item.expectedSize
+            guard declared.width > 0, declared.height > 0 else { return measured }
+            guard measured.width > 0, measured.height > 0,
+                  measured.width <= declared.width * 1.5,
+                  measured.height <= declared.height * 1.5 else {
+                return declared
+            }
+            return measured
+        }
+        let contentWidth = items.isEmpty ? CGFloat(0) : itemSizes.reduce(CGFloat(0)) { partial, size in
+            max(partial, size.width)
+        }
+        let measuredWidth = max(availableWidth, 1)
+        // Message attachments pass their parent VStack's width explicitly;
+        // never replace that with the legacy inner GeometryReader's window-wide
+        // proposal. Other callers keep the original measured-width behavior.
+        let layoutWidth = max(widthOverride ?? measuredWidth, contentWidth)
         let arrangement = LegacyFlowArrangement.pack(
             sizes: itemSizes, width: layoutWidth, hSpacing: hSpacing,
             vSpacing: vSpacing, trailing: alignment == .trailing)
@@ -89,22 +118,31 @@ struct LegacyFlowLayout: View {
                        height: items.isEmpty ? 0 : arrangement.height)
 
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                item.view
-                    .fixedSize()
-                    // [T-ios15-legacyflow-measure] overlay, not background:
-                    // a background GeometryReader sits BEHIND the hosted view
-                    // and on some legacy layout passes reports the parent's
-                    // proposal instead of the child's fixedSize ideal size.
-                    .overlay(
-                        GeometryReader { geometry in
-                            Color.clear.preference(key: LegacyFlowSizesKey.self,
-                                                   value: [item.id: geometry.size])
-                        }
-                    )
-                    .offset(x: arrangement.positions[index].x, y: arrangement.positions[index].y)
+                Group {
+                    if itemSizes[index].width > 0, itemSizes[index].height > 0 {
+                        item.view
+                            .frame(width: itemSizes[index].width, height: itemSizes[index].height)
+                            .fixedSize()
+                    } else {
+                        // Unknown-size callers must keep their intrinsic child
+                        // alive for the measurement pass; never force 0×0.
+                        item.view.fixedSize()
+                    }
+                }
+                // [T-ios15-legacyflow-measure] overlay, not background:
+                // a background GeometryReader sits BEHIND the hosted view
+                // and on some legacy layout passes reports the parent's
+                // proposal instead of the child's fixedSize ideal size.
+                .overlay(
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: LegacyFlowSizesKey.self,
+                                               value: [item.id: geometry.size])
+                    }
+                )
+                .offset(x: arrangement.positions[index].x, y: arrangement.positions[index].y)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(width: layoutWidth, height: items.isEmpty ? 0 : arrangement.height, alignment: .topLeading)
         .overlay(
             GeometryReader { proxy in
                 Color.clear.preference(key: LegacyFlowWidthKey.self, value: proxy.size.width)
