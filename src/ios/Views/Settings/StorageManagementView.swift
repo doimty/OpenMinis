@@ -282,34 +282,34 @@ struct StorageManagementView: View {
     var body: some View {
         List {
             Section {
-                storageRow(icon: "terminal", color: .gray, label: "Shell Container", value: vm.format(vm.shellContainerSize))
-                storageRow(icon: "cylinder", color: .blue, label: "Chat Database", value: vm.format(vm.chatDatabaseSize))
-                storageRow(icon: "doc", color: .indigo, label: "Session Files", value: vm.format(vm.totalSessionSize))
-                storageRow(icon: "doc.text", color: .orange, label: "Logs & Caches", value: vm.format(vm.logsAndCachesSize))
-                storageRow(icon: "clock", color: .teal, label: "Temporary Files", value: vm.format(vm.temporarySize))
+                storageRow(icon: "terminal", color: .gray, label: AppLocalized("Shell Container"), value: vm.format(vm.shellContainerSize))
+                storageRow(icon: "cylinder", color: .blue, label: AppLocalized("Chat Database"), value: vm.format(vm.chatDatabaseSize))
+                storageRow(icon: "doc", color: .indigo, label: AppLocalized("Session Files"), value: vm.format(vm.totalSessionSize))
+                storageRow(icon: "doc.text", color: .orange, label: AppLocalized("Logs & Caches"), value: vm.format(vm.logsAndCachesSize))
+                storageRow(icon: "clock", color: .teal, label: AppLocalized("Temporary Files"), value: vm.format(vm.temporarySize))
                 // Only shown when non-zero: these two are failure residue, and a
                 // permanent "0 bytes" row would read as a normal part of the app.
                 if vm.orphanedSessionSize > 0 {
-                    storageRow(icon: "questionmark.folder", color: .brown, label: "Orphaned Session Files", value: vm.format(vm.orphanedSessionSize))
+                    storageRow(icon: "questionmark.folder", color: .brown, label: AppLocalized("Orphaned Session Files"), value: vm.format(vm.orphanedSessionSize))
                 }
                 if vm.staleRootfsSize > 0 {
-                    storageRow(icon: "exclamationmark.triangle", color: .red, label: "Stale Shell Leftovers", value: vm.format(vm.staleRootfsSize))
+                    storageRow(icon: "exclamationmark.triangle", color: .red, label: AppLocalized("Stale Shell Leftovers"), value: vm.format(vm.staleRootfsSize))
                 }
-                storageRow(icon: "ellipsis", color: .gray, label: "Other", value: vm.format(vm.otherSize))
+                storageRow(icon: "ellipsis", color: .gray, label: AppLocalized("Other"), value: vm.format(vm.otherSize))
                 HStack {
-                    Text("Total")
+                    Text(AppLocalized("Total"))
                         .fontWeight(.semibold)
                     Spacer()
                     Text(vm.format(vm.containerTotalSize))
                         .fontWeight(.semibold)
                 }
             } header: {
-                Text("Overview")
+                Text(AppLocalized("Overview"))
             } footer: {
-                Text("Total is the app's full container size and should match the figure iOS Settings shows for Minis. \"Other\" covers everything not itemized above, so the categories always add up to the total.")
+                Text(AppLocalized("Total is the app's full container size and should match the figure iOS Settings shows for Minis. \"Other\" covers everything not itemized above, so the categories always add up to the total."))
             }
 
-            Section("Sessions") {
+            Section(AppLocalized("Sessions")) {
                 if vm.isLoading {
                     HStack {
                         Spacer()
@@ -317,7 +317,7 @@ struct StorageManagementView: View {
                         Spacer()
                     }
                 } else if vm.sessions.isEmpty {
-                    Text("No sessions")
+                    Text(AppLocalized("No sessions"))
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(vm.sessions) { session in
@@ -325,7 +325,7 @@ struct StorageManagementView: View {
                             SessionStorageDetailView(session: session, onFilesCleared: { vm.load() })
                         } label: {
                             HStack {
-                                Text(session.title ?? "Untitled")
+                                Text(session.title ?? AppLocalized("Untitled"))
                                     .lineLimit(1)
                                 Spacer()
                                 Text(vm.format(session.totalSize))
@@ -336,7 +336,7 @@ struct StorageManagementView: View {
                 }
             }
         }
-        .navigationTitle("Storage")
+        .navigationTitle(AppLocalized("Storage"))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { vm.load() }
     }
@@ -389,20 +389,20 @@ struct SessionStorageDetailView: View {
 
     var body: some View {
         List {
-            Section("Minis Files") {
+            Section(AppLocalized("Minis Files")) {
                 if currentMinisSize > 0 {
                     NavigationLink {
                         FileBrowserView(rootPath: minisURL)
                     } label: {
                         HStack {
-                            Label("Browse Files", systemImage: "folder")
+                            Label(AppLocalized("Browse Files"), systemImage: "folder")
                             Spacer()
                             Text(formatter.string(fromByteCount: currentMinisSize))
                                 .foregroundStyle(.secondary)
                         }
                     }
                 } else {
-                    Text("No minis files")
+                    Text(AppLocalized("No minis files"))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -415,9 +415,9 @@ struct SessionStorageDetailView: View {
                         if isClearing {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("Clearing…")
+                            Text(AppLocalized("Clearing…"))
                         } else {
-                            Label("Clear Session Files", systemImage: "trash")
+                            Label(AppLocalized("Clear Session Files"), systemImage: "trash")
                         }
                         Spacer()
                         if !isClearing {
@@ -428,18 +428,18 @@ struct SessionStorageDetailView: View {
                 }
                 .disabled(!hasFiles || isClearing)
             } footer: {
-                Text("Removes all files generated by this session. The conversation itself will be preserved.")
+                Text(AppLocalized("Removes all files generated by this session. The conversation itself will be preserved."))
             }
         }
-        .navigationTitle(session.title ?? "Session")
+        .navigationTitle(session.title ?? AppLocalized("Session"))
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Clear Session Files?", isPresented: $showClearConfirmation) {
-            Button("Clear \(formatter.string(fromByteCount: totalFileSize))", role: .destructive) {
+        .alert(AppLocalized("Clear Session Files?"), isPresented: $showClearConfirmation) {
+            Button(String(format: AppLocalized("Clear %@"), formatter.string(fromByteCount: totalFileSize)), role: .destructive) {
                 clearFiles()
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This will delete \(formatter.string(fromByteCount: totalFileSize)) of files. This action cannot be undone.")
+            Text(String(format: AppLocalized("This will delete %@ of files. This action cannot be undone."), formatter.string(fromByteCount: totalFileSize)))
         }
     }
 
