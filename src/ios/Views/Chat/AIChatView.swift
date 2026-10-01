@@ -4070,6 +4070,17 @@ struct AIChatView: View {
                 }
                 inputBarHeightDebounce?.cancel()
                 let voiceAtCapture = voiceInputActive
+                let previousHeight = inputBarHeight
+                let delta = abs(newH - previousHeight)
+                // Typing changes the composer by roughly one line at a time.
+                // Waiting a full animation debounce for every line makes a long
+                // draft visibly lag behind its content. Commit small changes
+                // immediately and reserve the delayed settle for the large
+                // voice/keyboard transitions that actually animate.
+                if delta <= 48 {
+                    inputBarHeight = newH
+                    return
+                }
                 inputBarHeightDebounce = Task { @MainActor in
                     // [T-voice-inputbar-anim-tail] 380ms, not 300ms. The panel's
                     // expand/collapse and transcript-band animations are
