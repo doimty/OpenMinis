@@ -139,6 +139,12 @@ do {
     check("gpt61Sol mirrors gpt6Sol's official context template",
           body("static let gpt61Sol = LLMModel(").contains("contextWindow: gpt6Sol.contextWindow")
           && body("static let gpt6Sol = LLMModel(").contains("contextWindow: 1_050_000"))
+    check("gpt6Sol declares image and PDF input with a 128K output cap",
+          body("static let gpt6Sol = LLMModel(").contains("modalityOverride: .vision")
+          && body("static let gpt6Sol = LLMModel(").contains("maxOutputTokens: 128_000"))
+    check("gpt61Sol mirrors gpt6Sol modality and output cap",
+          body("static let gpt61Sol = LLMModel(").contains("modalityOverride: gpt6Sol.modalityOverride")
+          && body("static let gpt61Sol = LLMModel(").contains("maxOutputTokens: gpt6Sol.maxOutputTokens"))
 }
 
 print("\n▶️  3b. the detail sheet uses effective capabilities")

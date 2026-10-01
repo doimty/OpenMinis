@@ -513,16 +513,29 @@ enum ModelsDevAPI {
         let tail = (model.id.split(separator: "/").last.map(String.init) ?? model.id).lowercased()
         var result = model
 
-        // OpenAI's GPT-6 Sol family is officially a 1.05M-context model, but
-        // Codex discovery can return a generic 128K value (and gpt-6.1-sol is
-        // not present in every bundled models.dev snapshot). Keep this known
-        // identity overlay after catalog/API data so a stale lower value cannot
-        // leak into compaction policy or the model-detail placeholder.
+        // OpenAI's GPT-6 Sol family is officially a 1.05M-context model with
+        // text/image/PDF input, text output and a 128K output cap. Codex
+        // discovery can return a generic 128K text-only snapshot, and
+        // gpt-6.1-sol is not present in every bundled models.dev snapshot.
+        // Copy the compiled-in GPT-6 Sol template after catalog/API data so a
+        // stale lower value cannot leak into the model-detail sheet. User
+        // overrides still win: ModelEntry.model applies them after this.
         if tail == "gpt-6-sol" || tail == "gpt-6.1-sol" {
-            if (result.contextWindow ?? 0) < 1_050_000 {
-                result.contextWindow = 1_050_000
+            let template = LLMModel.gpt6Sol
+            if (result.contextWindow ?? 0) < (template.contextWindow ?? 0) {
+                result.contextWindow = template.contextWindow
             }
-            result.supportsReasoning = true
+            if let cap = template.maxOutputTokens, (result.maxOutputTokens ?? 0) < cap {
+                result.maxOutputTokens = cap
+            }
+            if let templateReasoning = template.supportsReasoning {
+                result.supportsReasoning = templateReasoning
+            }
+            if let templateModality = template.modalityOverride {
+                var modality = result.modalityOverride ?? []
+                modality.formUnion(templateModality)
+                result.modalityOverride = modality
+            }
         }
 
         guard tail == "deepseek-flash" || tail.hasPrefix("deepseek-flash-") else { return result }

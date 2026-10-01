@@ -321,9 +321,11 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
     /// to the Codex-OAuth fallback `reasoning.effort: "low"`.
     ///
     /// `contextWindow` mirrors the bundled models.dev metadata: GPT-6 Sol has
-    /// a 1,050,000-token context window. Keep this on the static entry so an
-    /// offline Codex OAuth discovery does not fall back to the generic 128K
-    /// heuristic. GPT-6.1 Sol uses the same window.
+    /// a 1,050,000-token context window and a 128,000-token output cap.
+    /// Input is text, image and PDF; output is text only. Keep this on the
+    /// static entry so an offline Codex OAuth discovery does not fall back
+    /// to the generic 128K heuristic or a text-only modality. GPT-6.1 Sol
+    /// uses the same template.
     ///
     /// Both need Codex client >= 0.155.0 (`minimal_client_version` in OpenAI's
     /// codex_client_models.json); see `OpenAIProvider.codexClientVersion`.
@@ -335,7 +337,9 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
         id: "gpt-6-sol",
         displayName: "GPT-6 Sol",
         provider: "OpenAI",
+        modalityOverride: .vision,
         contextWindow: 1_050_000,
+        maxOutputTokens: 128_000,
         supportsReasoning: true
     )
 
@@ -346,7 +350,9 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
         id: "gpt-6.1-sol",
         displayName: "GPT 6.1 Sol",
         provider: "OpenAI",
+        modalityOverride: gpt6Sol.modalityOverride,
         contextWindow: gpt6Sol.contextWindow,
+        maxOutputTokens: gpt6Sol.maxOutputTokens,
         supportsReasoning: gpt6Sol.supportsReasoning
     )
 

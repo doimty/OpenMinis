@@ -78,6 +78,29 @@ final class ModelEntryLiveCapabilitiesTests: XCTestCase {
         )
         XCTAssertEqual(entry.model.contextWindow, 1_050_000)
         XCTAssertEqual(entry.model.contextWindowTokens, 1_050_000)
+        XCTAssertEqual(entry.model.maxOutputTokens, 128_000)
         XCTAssertEqual(entry.model.supportsReasoning, true)
+        XCTAssertTrue(entry.model.capabilities.supportedModalities.contains(.imageInput))
+        XCTAssertTrue(entry.model.capabilities.supportedModalities.contains(.pdfInput))
+        XCTAssertFalse(entry.model.capabilities.supportedModalities.contains(.audioInput))
+        XCTAssertFalse(entry.model.capabilities.supportedModalities.contains(.videoInput))
+        XCTAssertFalse(entry.model.capabilities.supportedModalities.contains(.imageOutput))
+    }
+
+    func testSolUserModalityOverrideStillWins() {
+        let stale = LLMModel(
+            id: "gpt-6.1-sol",
+            displayName: "GPT 6.1 Sol",
+            provider: "OpenAI",
+            modalityOverride: [.textInput, .textOutput],
+            contextWindow: 128_000
+        )
+        let entry = ModelEntry(
+            providerInstanceId: "p",
+            model: stale,
+            overrides: ModelOverrides(modalityOverride: [.textInput, .textOutput])
+        )
+        XCTAssertFalse(entry.model.capabilities.supportedModalities.contains(.imageInput))
+        XCTAssertFalse(entry.model.capabilities.supportedModalities.contains(.pdfInput))
     }
 }
