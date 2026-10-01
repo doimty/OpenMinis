@@ -1422,6 +1422,17 @@ struct ModelEntryDetailSheet: View {
         return entry.model.provider
     }
 
+    /// Metadata from the provider/catalog without user overrides. This is
+    /// what reset and API-limit hints should use; unlike `baseModel`, it also
+    /// includes the known-id repair for an old persisted Sol snapshot.
+    private var providerModel: LLMModel { ModelsDevAPI.enrichModel(entry.baseModel) }
+
+    /// The detail sheet must render the same effective model used by requests:
+    /// catalog/known-model enrichment first, then user overrides. Reading
+    /// `baseModel` here would show a stale persisted snapshot (128K for older
+    /// gpt-6.1-sol entries) even though the effective model is 1.05M.
+    private var effectiveModel: LLMModel { entry.model }
+
     @State private var displayName: String = ""
     @State private var modelId: String = ""
     @State private var isHidden: Bool = false
@@ -1523,7 +1534,7 @@ struct ModelEntryDetailSheet: View {
                             Text(AppLocalized("Context Window"))
                             Spacer()
                             TextField(
-                                "\(entry.baseModel.contextWindowTokens)",
+                                "\(effectiveModel.contextWindowTokens)",
                                 text: $contextWindowText
                             )
                             .keyboardType(.numberPad)
@@ -1541,7 +1552,7 @@ struct ModelEntryDetailSheet: View {
                                 Label(AppLocalized("Supported"), systemImage: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                                     .labelStyle(.titleAndIcon)
-                            } else if entry.baseModel.supportsReasoning == false {
+                            } else if effectiveModel.supportsReasoning == false {
                                 Text(AppLocalized("Not Supported"))
                                     .foregroundStyle(.secondary)
                             } else {
@@ -1682,7 +1693,7 @@ struct ModelEntryDetailSheet: View {
     /// Placeholder text for the Max Output Tokens field — shows the API-reported value
     /// if one exists so users know what they'd get by leaving the field empty.
     private var maxTokensPlaceholder: String {
-        if let apiMax = entry.baseModel.maxOutputTokens {
+        if let apiMax = providerModel.maxOutputTokens {
             return "\(apiMax)"
         }
         return AppLocalized("Default")
@@ -1690,10 +1701,10 @@ struct ModelEntryDetailSheet: View {
 
     /// True when the user has typed a value that exceeds the API-reported maximum.
     /// UI-only check: the data layer accepts any value. Only meaningful for non-custom
-    /// entries where `baseModel.maxOutputTokens` reflects real API truth.
+    /// entries where `providerModel.maxOutputTokens` reflects current API truth.
     private var maxTokensExceedsApiLimit: Bool {
         guard !entry.isCustom,
-              let apiMax = entry.baseModel.maxOutputTokens,
+              let apiMax = providerModel.maxOutputTokens,
               let typed = Int(maxTokensText.trimmingCharacters(in: .whitespaces)) else {
             return false
         }
@@ -1711,7 +1722,7 @@ struct ModelEntryDetailSheet: View {
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 120)
             }
-            if maxTokensExceedsApiLimit, let apiMax = entry.baseModel.maxOutputTokens {
+            if maxTokensExceedsApiLimit, let apiMax = providerModel.maxOutputTokens {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
                     Text(String(
@@ -1735,9 +1746,8 @@ struct ModelEntryDetailSheet: View {
         // Reading straight from baseModel hid prior overrides and made the sheet appear to
         // "revert" right after save.
         let effective = entry.model
-        let base = entry.baseModel
         let modality = effective.modalityOverride
-            ?? base.capabilities.supportedModalities
+            ?? effective.capabilities.supportedModalities
         imageInput = modality.contains(.imageInput)
         pdfInput = modality.contains(.pdfInput)
         audioInput = modality.contains(.audioInput)
@@ -1762,7 +1772,7 @@ struct ModelEntryDetailSheet: View {
         cleared.overrides = ModelOverrides()
         store.updateEntry(cleared)
 
-        let base = entry.baseModel
+        let base = providerModel
         displayName = base.displayName
         supportsThinking = base.supportsReasoning ?? false
         maxTokensText = ""

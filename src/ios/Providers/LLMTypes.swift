@@ -838,6 +838,11 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
         // OpenAI
         if lid.contains("gpt-3.5") { return 16_000 }
         if lid.contains("gpt-4o") || lid.contains("gpt-4-turbo") { return 128_000 }
+        // OpenAI GPT-6 Sol / 6.1 Sol officially expose a 1.05M context
+        // window. Keep this fallback for old/provider snapshots that carry no
+        // usable context value; ModelsDevAPI's known-id overlay also upgrades
+        // stale lower API values before this property is consumed.
+        if lid.contains("gpt-6-sol") || lid.contains("gpt-6.1-sol") { return 1_050_000 }
         if lid.contains("gpt-5") { return 400_000 }
         if lid.contains("gpt-4") { return 8_000 }
         if lid.contains("o3") || lid.contains("o4") { return 200_000 }

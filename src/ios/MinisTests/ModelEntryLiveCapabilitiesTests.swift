@@ -60,4 +60,24 @@ final class ModelEntryLiveCapabilitiesTests: XCTestCase {
         let entry = ModelEntry(providerInstanceId: "p", model: frozen)
         XCTAssertFalse(entry.model.capabilities.supportedModalities.contains(.imageInput))
     }
+
+    func testStaleSolSnapshotUsesOfficialWindowWithOtherOverride() {
+        let stale = LLMModel(
+            id: "gpt-6.1-sol",
+            displayName: "GPT 6.1 Sol",
+            provider: "OpenAI",
+            contextWindow: 128_000
+        )
+        // The real device shape: an older persisted entry has a stale 128K
+        // snapshot and an unrelated user override (for example forced thinking).
+        // The effective model must still receive the known 1.05M capability.
+        let entry = ModelEntry(
+            providerInstanceId: "p",
+            model: stale,
+            overrides: ModelOverrides(supportsReasoning: true)
+        )
+        XCTAssertEqual(entry.model.contextWindow, 1_050_000)
+        XCTAssertEqual(entry.model.contextWindowTokens, 1_050_000)
+        XCTAssertEqual(entry.model.supportsReasoning, true)
+    }
 }

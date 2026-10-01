@@ -60,7 +60,10 @@ let catalog = codeOnly(source("Providers/ThinkingLevelCatalog.swift"))
 let openai = codeOnly(source("Providers/OpenAI/OpenAIProvider.swift"))
 let anthropicUA = codeOnly(source("Providers/Anthropic/OAuthHTTPClient.swift"))
 let anthropic = codeOnly(source("Providers/Anthropic/AnthropicProvider.swift"))
-guard !types.isEmpty, !catalog.isEmpty, !openai.isEmpty, !anthropicUA.isEmpty, !anthropic.isEmpty else {
+let detail = codeOnly(source("Views/Providers/ProviderInstanceDetailView.swift"))
+let entry = codeOnly(source("Providers/ModelEntry.swift"))
+guard !types.isEmpty, !catalog.isEmpty, !openai.isEmpty, !anthropicUA.isEmpty, !anthropic.isEmpty,
+      !detail.isEmpty, !entry.isEmpty else {
     print("  ⏭  sources not readable from \(#filePath)")
     exit(0)
 }
@@ -135,6 +138,18 @@ do {
           body("static let gpt6Sol = LLMModel(").contains("contextWindow: 1_050_000"))
     check("gpt61Sol carries the same official 1.05M context",
           body("static let gpt61Sol = LLMModel(").contains("contextWindow: 1_050_000"))
+}
+
+print("\n▶️  3b. the detail sheet uses effective capabilities")
+do {
+    check("detail context placeholder uses the effective model",
+          detail.contains("\\(effectiveModel.contextWindowTokens)"))
+    check("detail thinking status uses the effective model",
+          detail.contains("effectiveModel.supportsReasoning == false"))
+    check("ModelEntry overlays overrides on enriched live metadata",
+          entry.contains("contextWindow: overrides.contextWindow ?? live.contextWindow"))
+    check("Sol known-id overlay upgrades stale snapshots",
+          codeOnly(source("Providers/ModelsDevAPI.swift")).contains("tail == \"gpt-6-sol\" || tail == \"gpt-6.1-sol\""))
 }
 
 print("\n▶️  4. thinking ceilings")

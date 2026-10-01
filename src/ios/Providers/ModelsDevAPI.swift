@@ -511,8 +511,21 @@ enum ModelsDevAPI {
     /// `ModelEntry.model` applies them afterwards.
     private static func applyKnownCapabilityOverlay(_ model: LLMModel) -> LLMModel {
         let tail = (model.id.split(separator: "/").last.map(String.init) ?? model.id).lowercased()
-        guard tail == "deepseek-flash" || tail.hasPrefix("deepseek-flash-") else { return model }
         var result = model
+
+        // OpenAI's GPT-6 Sol family is officially a 1.05M-context model, but
+        // Codex discovery can return a generic 128K value (and gpt-6.1-sol is
+        // not present in every bundled models.dev snapshot). Keep this known
+        // identity overlay after catalog/API data so a stale lower value cannot
+        // leak into compaction policy or the model-detail placeholder.
+        if tail == "gpt-6-sol" || tail == "gpt-6.1-sol" {
+            if (result.contextWindow ?? 0) < 1_050_000 {
+                result.contextWindow = 1_050_000
+            }
+            result.supportsReasoning = true
+        }
+
+        guard tail == "deepseek-flash" || tail.hasPrefix("deepseek-flash-") else { return result }
         var modality = result.modalityOverride ?? []
         modality.insert(.textInput)
         modality.insert(.textOutput)

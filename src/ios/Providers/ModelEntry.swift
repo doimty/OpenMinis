@@ -236,20 +236,27 @@ struct ModelEntry: Identifiable, Codable, Hashable {
         let live = ModelsDevAPI.enrichModel(baseModel)
         guard !overrides.isEmpty else { return live }
         // LLMModel.displayName is a `let`, so rebuild via memberwise init to apply any override.
+        // Use the ENRICHED `live` values as the base of this rebuild. Previously this
+        // used `baseModel` here, which discarded models.dev / known-id capability
+        // updates whenever an entry had any unrelated override (for example a
+        // forced-thinking flag). That made a stale 128K Sol snapshot reappear in
+        // the effective model even after the 1.05M overlay had run.
         var rebuilt = LLMModel(
-            id: baseModel.id,
-            displayName: overrides.displayName ?? baseModel.displayName,
-            provider: baseModel.provider,
-            modalityOverride: overrides.modalityOverride ?? baseModel.modalityOverride,
-            contextWindow: overrides.contextWindow ?? baseModel.contextWindow,
-            maxOutputTokens: overrides.maxOutputTokens ?? baseModel.maxOutputTokens,
-            supportsReasoning: overrides.supportsReasoning ?? baseModel.supportsReasoning,
-            interleavedReasoningField: baseModel.interleavedReasoningField
+            id: live.id,
+            displayName: overrides.displayName ?? live.displayName,
+            provider: live.provider,
+            modalityOverride: overrides.modalityOverride ?? live.modalityOverride,
+            contextWindow: overrides.contextWindow ?? live.contextWindow,
+            maxOutputTokens: overrides.maxOutputTokens ?? live.maxOutputTokens,
+            supportsReasoning: overrides.supportsReasoning ?? live.supportsReasoning,
+            interleavedReasoningField: live.interleavedReasoningField,
+            reasoningEffortValues: live.reasoningEffortValues,
+            declaresNoEffortTiers: live.declaresNoEffortTiers
         )
-        // Not an init parameter, so the rebuild would drop it and a renamed or
-        // re-moded OpenRouter entry would fall back to the audio-bit rule.
+        // These are not init parameters, so carry them across the rebuild too.
         // [T-openrouter-voice-catalog]
-        rebuilt.voiceRole = baseModel.voiceRole
+        rebuilt.effortDeclarationIsAuthoritative = live.effortDeclarationIsAuthoritative
+        rebuilt.voiceRole = live.voiceRole
         return rebuilt
     }
 

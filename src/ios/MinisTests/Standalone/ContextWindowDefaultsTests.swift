@@ -50,6 +50,7 @@ struct Model {
         }
         if lid.contains("gpt-3.5") { return 16_000 }
         if lid.contains("gpt-4o") || lid.contains("gpt-4-turbo") { return 128_000 }
+        if lid.contains("gpt-6-sol") || lid.contains("gpt-6.1-sol") { return 1_050_000 }
         if lid.contains("gpt-5") { return 400_000 }
         if lid.contains("gpt-4") { return 8_000 }
         if lid.contains("o3") || lid.contains("o4") { return 200_000 }
@@ -138,6 +139,8 @@ checkEq("gpt-3.5-turbo → 16K", w("gpt-3.5-turbo"), 16_000)
 checkEq("gpt-4o → 128K", w("gpt-4o"), 128_000)
 checkEq("gpt-4-turbo → 128K", w("gpt-4-turbo"), 128_000)
 checkEq("gpt-5 → 400K", w("gpt-5"), 400_000)
+checkEq("gpt-6-sol → official 1.05M", w("gpt-6-sol"), 1_050_000)
+checkEq("gpt-6.1-sol → official 1.05M", w("gpt-6.1-sol"), 1_050_000)
 checkEq("gpt-6-astra → 128K (no gpt-6 rule; the generic default)", w("gpt-6-astra"), 128_000)
 checkEq("gpt-4 → 8K", w("gpt-4"), 8_000)
 checkEq("o3 → 200K", w("o3"), 200_000)
