@@ -1266,14 +1266,36 @@ class PastableUITextView: UITextView, UIDropInteractionDelegate {
         guard bounds.width > 0 else {
             return CGSize(width: UIView.noIntrinsicMetric, height: font?.lineHeight ?? 20)
         }
-        let size = sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude))
-        isScrollEnabled = size.height > maxHeight
         // [T-ipad-composer-resize] A dragged composer keeps its height even when
         // the text is short; otherwise the box would shrink back around one line.
         if let pinnedHeight {
             return CGSize(width: UIView.noIntrinsicMetric, height: pinnedHeight)
         }
-        return CGSize(width: UIView.noIntrinsicMetric, height: min(size.height, maxHeight))
+        let contentH = contentHeightForSizing(width: bounds.width)
+        let shouldScroll = contentH > maxHeight + 0.5
+        if isScrollEnabled != shouldScroll { isScrollEnabled = shouldScroll }
+        return CGSize(width: UIView.noIntrinsicMetric, height: min(contentH, maxHeight))
+    }
+
+    /// Text height used to grow and shrink a content-sized composer.
+    ///
+    /// `sizeThatFits` cannot be read directly. With scrolling enabled it
+    /// reports the current frame, and the top-align inset below stores the
+    /// surplus of a still-tall frame. Either value is the height BEFORE the
+    /// user deleted the text, so a cut or a clear would leave the box open
+    /// until the chat view was rebuilt. The glyph rect excludes both, and
+    /// reading it does not toggle scrolling (that would reset the caret's
+    /// scroll offset on every layout pass).
+    func contentHeightForSizing(width: CGFloat) -> CGFloat {
+        let line = ceil(font?.lineHeight ?? 20)
+        guard width > 0 else { return line }
+        if abs(textContainer.size.width - width) > 0.5 {
+            textContainer.size = CGSize(width: width, height: .greatestFiniteMagnitude)
+        }
+        layoutManager.ensureLayout(for: textContainer)
+        let glyphs = ceil(layoutManager.usedRect(for: textContainer).height)
+        let textH = text.isEmpty || glyphs < 1 ? line : glyphs
+        return textH + textContainerInset.top
     }
 
     /// [T-ios-composer-paste-scroll-stale] Whether the CURRENT text overflows
@@ -1293,8 +1315,7 @@ class PastableUITextView: UITextView, UIDropInteractionDelegate {
     var overflowsMaxHeight: Bool {
         let width = bounds.width > 0 ? bounds.width : textContainer.size.width
         guard width > 0 else { return false }
-        let fit = sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-        return fit.height > maxHeight
+        return contentHeightForSizing(width: width) > maxHeight + 0.5
     }
 
     /// [T-ios-composer-swipe-send-at-bottom] Whether the text is scrolled to
@@ -1358,8 +1379,19 @@ class PastableUITextView: UITextView, UIDropInteractionDelegate {
         // the centering is applied on every layout pass — so the fix is to
         // absorb the surplus as BOTTOM inset, which leaves the first line at the
         // top edge where the caret belongs.
-        let surplus = bounds.height - ceil(layoutManager.usedRect(for: textContainer).height)
-        let desiredBottomInset = shouldScroll ? 0 : max(0, surplus)
+        //
+        // [T-composer-shrink-after-delete] Only a pinned frame may do this. A
+        // content-sized composer is still at its previous tall bounds during
+        // the layout pass that follows a cut or delete. Parking that surplus
+        // as an inset makes the next measurement report the old height, so
+        // the empty box stays open until the chat view is rebuilt.
+        let desiredBottomInset: CGFloat
+        if pinnedHeight == nil || shouldScroll {
+            desiredBottomInset = 0
+        } else {
+            let surplus = bounds.height - ceil(layoutManager.usedRect(for: textContainer).height)
+            desiredBottomInset = max(0, surplus)
+        }
         if abs(textContainerInset.bottom - desiredBottomInset) > 0.5 {
             textContainerInset = UIEdgeInsets(
                 top: 0, left: 0, bottom: desiredBottomInset, right: 0)
@@ -1695,15 +1727,12 @@ struct PastableTextView: UIViewRepresentable {
         // proposed value triggers an immediate re-layout against the real
         // wrap point, so the returned height matches what the user will
         // actually see once the cell renders.
-        if abs(tv.textContainer.size.width - width) > 0.5 {
-            tv.textContainer.size = CGSize(width: width, height: .greatestFiniteMagnitude)
-            tv.layoutManager.ensureLayout(for: tv.textContainer)
-        }
-        let fitSize = tv.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-        let lineH = tv.font?.lineHeight ?? 20
-        let effective = tv.text.isEmpty ? lineH : fitSize.height
+        // [T-composer-shrink-after-delete] Measure the text, not the frame
+        // left behind by the previous draft. contentHeightForSizing also
+        // retargets the text container to `width`.
+        let contentH = tv.contentHeightForSizing(width: width)
         let maxH = tv.maxHeight
-        tv.isScrollEnabled = fitSize.height > maxH
+        tv.isScrollEnabled = contentH > maxH + 0.5
         // [T-ipad-composer-resize] When the user has dragged the composer to an
         // explicit height, that height IS the answer — report it verbatim.
         //
@@ -1716,7 +1745,7 @@ struct PastableTextView: UIViewRepresentable {
         if let maxHeightOverride {
             return CGSize(width: width, height: maxHeightOverride)
         }
-        return CGSize(width: width, height: min(effective, maxH))
+        return CGSize(width: width, height: min(contentH, maxH))
     }
 
     func updateUIView(_ tv: PastableUITextView, context: Context) {
@@ -1781,6 +1810,11 @@ struct PastableTextView: UIViewRepresentable {
                 tv.selectedRange = NSRange(location: 0, length: 0)
                 if let label = tv.viewWithTag(999) as? UILabel {
                     label.isHidden = false
+                }
+                // A content-sized composer must not keep the inset that was
+                // compensating for the deleted draft's frame.
+                if tv.pinnedHeight == nil, tv.textContainerInset.bottom != 0 {
+                    tv.textContainerInset.bottom = 0
                 }
             }
             tv.invalidateIntrinsicContentSize()
