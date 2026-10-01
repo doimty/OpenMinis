@@ -170,6 +170,8 @@ struct TranscriptHeightKey: PreferenceKey {
 struct InputAttachmentGridView: View {
     let attachments: [InputAttachment]
     var loadingVideoCount: Int = 0
+    /// Composer content width available to the legacy attachment flow.
+    var availableWidth: CGFloat? = nil
     let onRemove: (InputAttachment) -> Void
     var onMove: ((_ fromID: UUID, _ toID: UUID) -> Void)?
 
@@ -183,7 +185,8 @@ struct InputAttachmentGridView: View {
                     ForEach(0..<loadingVideoCount, id: \.self) { _ in VideoLoadingChip() }
                 }
             } else {
-                LegacyFlowLayout(items: legacyItems, hSpacing: 8, vSpacing: 8)
+                LegacyFlowLayout(items: legacyItems, hSpacing: 8, vSpacing: 8,
+                                 alignment: .leading, widthOverride: availableWidth)
             }
         }
         .padding(.horizontal, 16)
@@ -192,9 +195,9 @@ struct InputAttachmentGridView: View {
 
     private var legacyItems: [LegacyFlowItem] {
         attachments.map { attachment in
-            LegacyFlowItem(id: attachment.id) { chip(attachment) }
+            LegacyFlowItem(id: attachment.id, expectedSize: CGSize(width: 64, height: 64)) { chip(attachment) }
         } + (0..<loadingVideoCount).map { index in
-            LegacyFlowItem(id: "loading-video-\(index)") { VideoLoadingChip() }
+            LegacyFlowItem(id: "loading-video-\(index)", expectedSize: CGSize(width: 64, height: 64)) { VideoLoadingChip() }
         }
     }
 

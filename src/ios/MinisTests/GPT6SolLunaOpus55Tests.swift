@@ -20,7 +20,8 @@ final class GPT6SolLunaOpus55Tests: XCTestCase {
         XCTAssertEqual(LLMModel.gpt6Sol.supportsReasoning, true)
         XCTAssertEqual(LLMModel.gpt6Luna.supportsReasoning, true)
         XCTAssertEqual(LLMModel.gpt6Sol.contextWindow, 1_050_000)
-        XCTAssertEqual(LLMModel.gpt61Sol.contextWindow, 1_050_000)
+        XCTAssertEqual(LLMModel.gpt61Sol.contextWindow, LLMModel.gpt6Sol.contextWindow)
+        XCTAssertEqual(LLMModel.gpt61Sol.supportsReasoning, LLMModel.gpt6Sol.supportsReasoning)
         XCTAssertEqual(LLMModel.gpt6Sol.id, "gpt-6-sol")
         XCTAssertEqual(LLMModel.gpt6Luna.id, "gpt-6-luna")
     }
@@ -28,11 +29,13 @@ final class GPT6SolLunaOpus55Tests: XCTestCase {
     func testBothAreOfferedOverCodexOAuth() {
         let ids = LLMModel.allOpenAICodexOAuth.map(\.id)
         XCTAssertTrue(ids.contains("gpt-6-sol"))
+        XCTAssertTrue(ids.contains("gpt-6.1-sol"))
         XCTAssertTrue(ids.contains("gpt-6-luna"))
     }
 
     func testCatalogCeilingIsMaxLikeAstra() {
         XCTAssertEqual(ThinkingLevelCatalog.declaredMaxLevel(for: "gpt-6-sol"), .max)
+        XCTAssertEqual(ThinkingLevelCatalog.declaredMaxLevel(for: "gpt-6.1-sol"), .max)
         XCTAssertEqual(ThinkingLevelCatalog.declaredMaxLevel(for: "gpt-6-luna"), .max)
         XCTAssertEqual(ThinkingLevelCatalog.declaredMaxLevel(for: "gpt-6-sol"),
                        ThinkingLevelCatalog.declaredMaxLevel(for: "gpt-6-astra"))
@@ -51,7 +54,7 @@ final class GPT6SolLunaOpus55Tests: XCTestCase {
     }
 
     func testEveryLevelReachesTheWire() {
-        for m in [LLMModel.gpt6Sol, LLMModel.gpt6Luna] {
+        for m in [LLMModel.gpt6Sol, LLMModel.gpt61Sol, LLMModel.gpt6Luna] {
             XCTAssertNil(OpenAIAgentProvider.reasoningEffort(for: m, level: .off), m.id)
             XCTAssertEqual(OpenAIAgentProvider.reasoningEffort(for: m, level: .low), "low", m.id)
             XCTAssertEqual(OpenAIAgentProvider.reasoningEffort(for: m, level: .medium), "medium", m.id)

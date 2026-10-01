@@ -50,7 +50,10 @@ struct Model {
         }
         if lid.contains("gpt-3.5") { return 16_000 }
         if lid.contains("gpt-4o") || lid.contains("gpt-4-turbo") { return 128_000 }
-        if lid.contains("gpt-6-sol") || lid.contains("gpt-6.1-sol") { return 1_050_000 }
+        // GPT-6.1 Sol follows the same built-in capability template as the
+        // adjacent GPT-6 Sol entry. Its provider/API value wins when present;
+        // this only supplies the missing-value fallback used by old snapshots.
+        if lid.contains("gpt-6.1-sol") { return 1_050_000 }
         if lid.contains("gpt-5") { return 400_000 }
         if lid.contains("gpt-4") { return 8_000 }
         if lid.contains("o3") || lid.contains("o4") { return 200_000 }
@@ -243,6 +246,8 @@ check("gpt-4o is checked before the bare gpt-4 rule", {
           let b = src.range(of: "if lid.contains(\"gpt-4\") { return 8_000 }") else { return false }
     return a.lowerBound < b.lowerBound
 }())
+check("the Sol fallback follows the adjacent built-in model template",
+      src.contains("if lid.contains(\"gpt-6.1-sol\") { return 1_050_000 }"))
 check("gpt-5 is checked before codex", {
     guard let a = src.range(of: "if lid.contains(\"gpt-5\") { return 400_000 }"),
           let b = src.range(of: "if lid.contains(\"codex\") { return 200_000 }") else { return false }
@@ -269,8 +274,8 @@ check("the Anthropic rationale is still documented",
 let entrySrc = (try? String(contentsOf: root.appendingPathComponent("src/ios/Providers/ModelEntry.swift"),
                             encoding: .utf8)) ?? ""
 check("ModelEntry read", !entrySrc.isEmpty)
-check("ModelEntry.model applies the contextWindow override over the base",
-      entrySrc.contains("contextWindow: overrides.contextWindow ?? baseModel.contextWindow"))
+check("ModelEntry.model applies the contextWindow override over live metadata",
+      entrySrc.contains("contextWindow: overrides.contextWindow ?? live.contextWindow"))
 
 print("")
 if failures == 0 { print("✅ ALL PASSED") } else { print("❌ \(failures) FAILED") }

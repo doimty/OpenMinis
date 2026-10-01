@@ -340,15 +340,14 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
     )
 
     /// GPT-6.1 Sol is the newer Sol model identifier exposed by Codex OAuth.
-    /// Keep the same official 1,050,000-token context as GPT-6 Sol, plus the
-    /// explicit reasoning flag because it is not guaranteed to be present in
-    /// the bundled models.dev snapshot.
+    /// Keep its capabilities in lockstep with the adjacent GPT-6 Sol template;
+    /// only the wire id and display name differ.
     static let gpt61Sol = LLMModel(
         id: "gpt-6.1-sol",
         displayName: "GPT 6.1 Sol",
         provider: "OpenAI",
-        contextWindow: 1_050_000,
-        supportsReasoning: true
+        contextWindow: gpt6Sol.contextWindow,
+        supportsReasoning: gpt6Sol.supportsReasoning
     )
 
     static let gpt6Luna = LLMModel(
@@ -594,6 +593,14 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
         .gptImage25Sunburst, .gptImage25Flare,
     ]
 
+    static func builtInTemplate(for id: String) -> LLMModel? {
+        let bareID = id.split(separator: "/").last.map(String.init) ?? id
+        return allOpenAICodexOAuth.first { model in
+            model.id.caseInsensitiveCompare(id) == .orderedSame
+                || model.id.caseInsensitiveCompare(bareID) == .orderedSame
+        }
+    }
+
     // MARK: - OpenRouter Models
 
     static let orClaudeSonnet4 = LLMModel(
@@ -838,11 +845,10 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
         // OpenAI
         if lid.contains("gpt-3.5") { return 16_000 }
         if lid.contains("gpt-4o") || lid.contains("gpt-4-turbo") { return 128_000 }
-        // OpenAI GPT-6 Sol / 6.1 Sol officially expose a 1.05M context
-        // window. Keep this fallback for old/provider snapshots that carry no
-        // usable context value; ModelsDevAPI's known-id overlay also upgrades
-        // stale lower API values before this property is consumed.
-        if lid.contains("gpt-6-sol") || lid.contains("gpt-6.1-sol") { return 1_050_000 }
+        // GPT-6.1 Sol follows the same built-in capability template as the
+        // adjacent GPT-6 Sol entry. Its provider/API value wins when present;
+        // this only supplies the missing-value fallback used by old snapshots.
+        if lid.contains("gpt-6.1-sol") { return 1_050_000 }
         if lid.contains("gpt-5") { return 400_000 }
         if lid.contains("gpt-4") { return 8_000 }
         if lid.contains("o3") || lid.contains("o4") { return 200_000 }

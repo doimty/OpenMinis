@@ -130,14 +130,15 @@ do {
     }
     check("gpt6Sol declares supportsReasoning: true",
           body("static let gpt6Sol = LLMModel(").contains("supportsReasoning: true"))
-    check("gpt61Sol declares supportsReasoning: true",
-          body("static let gpt61Sol = LLMModel(").contains("supportsReasoning: true"))
+    check("gpt61Sol inherits gpt6Sol reasoning support",
+          body("static let gpt61Sol = LLMModel(").contains("supportsReasoning: gpt6Sol.supportsReasoning"))
     check("gpt6Luna declares supportsReasoning: true",
           body("static let gpt6Luna = LLMModel(").contains("supportsReasoning: true"))
     check("gpt6Sol declares official 1.05M context",
           body("static let gpt6Sol = LLMModel(").contains("contextWindow: 1_050_000"))
-    check("gpt61Sol carries the same official 1.05M context",
-          body("static let gpt61Sol = LLMModel(").contains("contextWindow: 1_050_000"))
+    check("gpt61Sol mirrors gpt6Sol's official context template",
+          body("static let gpt61Sol = LLMModel(").contains("contextWindow: gpt6Sol.contextWindow")
+          && body("static let gpt6Sol = LLMModel(").contains("contextWindow: 1_050_000"))
 }
 
 print("\n▶️  3b. the detail sheet uses effective capabilities")
@@ -149,7 +150,8 @@ do {
     check("ModelEntry overlays overrides on enriched live metadata",
           entry.contains("contextWindow: overrides.contextWindow ?? live.contextWindow"))
     check("Sol known-id overlay upgrades stale snapshots",
-          codeOnly(source("Providers/ModelsDevAPI.swift")).contains("tail == \"gpt-6-sol\" || tail == \"gpt-6.1-sol\""))
+          codeOnly(source("Providers/ModelsDevAPI.swift"))
+              .contains("tail == \"gpt-6-sol\" || tail == \"gpt-6.1-sol\""))
 }
 
 print("\n▶️  4. thinking ceilings")

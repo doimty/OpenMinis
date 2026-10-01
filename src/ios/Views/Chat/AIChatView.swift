@@ -4678,11 +4678,22 @@ struct AIChatView: View {
     }
 
     /// Attachment grid extracted to help the Swift type-checker.
+    private var inputAttachmentAvailableWidth: CGFloat? {
+        let screenWidth = UIScreen.main.bounds.width
+        let composerWidth = maxContentWidth.map { min(screenWidth, $0) } ?? screenWidth
+        // Composer side padding (12+12) plus the attachment grid's own inset
+        // (16+16). Keep the width explicit for the legacy flow so a single
+        // 64pt tile packs from the leading edge instead of a stale window-wide
+        // measurement.
+        return max(64, composerWidth - 56)
+    }
+
     @ViewBuilder
     private var inputAttachmentGrid: some View {
         InputAttachmentGridView(
             attachments: vm.attachments,
             loadingVideoCount: vm.loadingVideoCount,
+            availableWidth: inputAttachmentAvailableWidth,
             onRemove: { attachment in vm.removeAttachment(attachment) },
             onMove: { fromID, toID in
                 withAnimation(.easeInOut(duration: 0.2)) {

@@ -70,7 +70,7 @@ final class ModelEntryLiveCapabilitiesTests: XCTestCase {
         )
         // The real device shape: an older persisted entry has a stale 128K
         // snapshot and an unrelated user override (for example forced thinking).
-        // The effective model must still receive the known 1.05M capability.
+        // The effective model must still receive the compiled-in Sol template.
         let entry = ModelEntry(
             providerInstanceId: "p",
             model: stale,
