@@ -915,15 +915,15 @@ struct UnifiedModelPicker: View {
             let available = availableMemberEntryIds(group).count
             let total = group.memberEntryIds.count
             if available == total {
-                Text(AppLocalized("\(total) models"))
+                Text(String(format: AppLocalized("%lld models"), Int64(total)))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             } else if available == 0 {
-                Text(AppLocalized("\(total) models · all unavailable"))
+                Text(String(format: AppLocalized("%lld models · all unavailable"), Int64(total)))
                     .font(.caption)
                     .foregroundStyle(.red.opacity(0.7))
             } else {
-                Text(AppLocalized("\(available)/\(total) available"))
+                Text(String(format: AppLocalized("%lld/%lld available"), Int64(available), Int64(total)))
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
@@ -1270,7 +1270,7 @@ struct UnifiedModelPicker: View {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 11, weight: .medium))
-                        Text(AppLocalized("Show \(item.entries.count) models"))
+                        Text(String(format: AppLocalized("Show %lld models"), Int64(item.entries.count)))
                             .font(.caption)
                     }
                     .foregroundStyle(.tint)

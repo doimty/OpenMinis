@@ -137,9 +137,9 @@ enum ProviderType: String, Codable, CaseIterable, Hashable, Sendable {
         case .githubCopilot:
             return AppLocalized("Sign in with GitHub — unofficial, use at your own risk")
         case .antigravity:
-            return AppLocalized("\(builtInModels.count) built-in models")
+            return String(format: AppLocalized("%lld built-in models"), Int64(builtInModels.count))
         case .unsupported:
-            return AppLocalized("\(builtInModels.count) built-in models")
+            return String(format: AppLocalized("%lld built-in models"), Int64(builtInModels.count))
         }
     }
 

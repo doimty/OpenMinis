@@ -84,7 +84,7 @@ struct AgentLoopModelsSection: View {
                 Text(group.name)
                     .font(.subheadline.weight(.medium))
                 let count = group.memberEntryIds.count
-                Text(AppLocalized("\(count) models") + " · \(group.strategy == .fallback ? AppLocalized("Fallback") : AppLocalized("Load Balance"))")
+                Text(String(format: AppLocalized("%lld models"), Int64(count)) + " · " + (group.strategy == .fallback ? AppLocalized("Fallback") : AppLocalized("Load Balance")))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }

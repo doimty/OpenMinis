@@ -109,8 +109,8 @@ private struct CommandPermissionRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(command.displayLabel)
-                Text(command.description)
+                Text(command.localizedDisplayLabel)
+                Text(command.localizedDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -399,7 +399,7 @@ private struct GroupRow: View {
                 Text("·")
                     .font(.caption)
                     .foregroundStyle(.quaternary)
-                Text(AppLocalized("\(group.memberEntryIds.count) models"))
+                Text(String(format: AppLocalized("%lld models"), Int64(group.memberEntryIds.count)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

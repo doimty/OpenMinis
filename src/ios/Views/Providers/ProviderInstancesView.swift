@@ -449,7 +449,7 @@ private struct InstanceRow: View {
                         .lineLimit(1)
                 }
                 if modelCount > 0 {
-                    Text(AppLocalized("\(modelCount) models"))
+                    Text(String(format: AppLocalized("%lld models"), Int64(modelCount)))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -505,8 +505,12 @@ private struct ShadowVoiceRow: View {
 
     private func voiceSummary(asr: Int, tts: Int) -> String {
         var parts: [String] = []
-        if asr > 0 { parts.append(AppLocalized("\(asr) speech-to-text", comment: "ASR model count")) }
-        if tts > 0 { parts.append(AppLocalized("\(tts) text-to-speech", comment: "TTS model count")) }
+        if asr > 0 {
+            parts.append(String(format: AppLocalized("%lld speech-to-text"), Int64(asr)))
+        }
+        if tts > 0 {
+            parts.append(String(format: AppLocalized("%lld text-to-speech"), Int64(tts)))
+        }
         return parts.joined(separator: " · ")
     }
 }
