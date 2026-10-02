@@ -803,7 +803,7 @@ struct UnifiedModelPicker: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             if isMulti {
-                Button("Add (\(selectedEntryIds.count))") {
+                Button(String(format: AppLocalized("Add (%lld)"), Int64(selectedEntryIds.count))) {
                     config.onAddMulti?(selectedEntryIds)
                     dismiss()
                 }

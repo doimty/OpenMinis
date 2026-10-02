@@ -253,7 +253,7 @@ struct AddAgentLoopGroupsSheet: View {
 
                         Spacer()
 
-                        Text("\(group.memberEntryIds.count) models")
+                        Text(String(format: AppLocalized("%lld models"), Int64(group.memberEntryIds.count)))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -267,7 +267,7 @@ struct AddAgentLoopGroupsSheet: View {
                 Button("Cancel") { dismiss() }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Add (\(selectedGroupIds.count))") {
+                Button(String(format: AppLocalized("Add (%lld)"), Int64(selectedGroupIds.count))) {
                     addSelected()
                 }
                 .font(.body.weight(.semibold))

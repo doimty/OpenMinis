@@ -42430,6 +42430,22 @@
         }
       }
     },
+    "Add (%lld) models" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add (%lld) models"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加（%lld）个模型"
+          }
+        }
+      }
+    },
     "Add (%lld)" : {
       "localizations" : {
         "de" : {
