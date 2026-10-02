@@ -1369,7 +1369,7 @@ struct AddCustomModelSheet: View {
         let model = LLMModel(
             id: trimmedId,
             displayName: name.isEmpty ? trimmedId : name,
-            provider: instanceLabel.isEmpty ? instance.providerType.displayName : instanceLabel,
+            provider: instanceLabel.isEmpty ? instance.providerType.localizedDisplayName : instanceLabel,
             modalityOverride: modality,
             contextWindow: parsedContextWindow,
             supportsReasoning: supportsThinking

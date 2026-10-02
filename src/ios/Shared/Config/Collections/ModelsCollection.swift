@@ -133,7 +133,7 @@ struct ModelsCollection: ConfigCollection {
                 return instanceId
             }
             let label = inst.label.trimmingCharacters(in: .whitespacesAndNewlines)
-            return label.isEmpty ? inst.providerType.displayName : label
+            return label.isEmpty ? inst.providerType.localizedDisplayName : label
         }()
         let model = LLMModel(
             id: modelId,

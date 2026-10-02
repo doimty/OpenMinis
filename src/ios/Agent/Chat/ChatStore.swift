@@ -3198,11 +3198,9 @@ actor ChatStore {
             }
         }
         sqlite3_finalize(cmStmt)
-        // SessionFile records — walk the workspace and queue a delete for
-        // every file that lives on iCloud. MUST run before
-        // deleteSessionMedia removes the local files. recordIds are
-        // "<sessionId>:<rel>" matching appendMediaFile +
-        // scanAndMarkSessionFilesForResurrect.
+        // SessionFile records cover the remaining per-session media trees.
+        // `/var/minis/workspace` is global shared storage and is backed up
+        // with Shared Files instead of being owned by a chat session.
         let sessionDir = minisBaseURL.appendingPathComponent(sessionId, isDirectory: true)
         var fileDeleteCount = 0
         if let enumerator = FileManager.default.enumerator(
@@ -3222,8 +3220,8 @@ actor ChatStore {
     }
 
     /// Public entry: queue a SessionFile cloud delete for one file under
-    /// a session's workspace. Used by FileBrowserView.deleteItem when the
-    /// user removes a file inside `Library/MinisChat/minis/<sid>/...`.
+    /// a session's attachments/browser/offloads tree. Workspace is global and
+    /// therefore must not be passed to this API.
     /// `relPath` must be "<subdir>/<rest>" matching the recordId scheme.
     func markSessionFileForCloudDeletion(sessionId: String, relPath: String) {
         guard !syncZoneName.isEmpty, !sessionId.isEmpty, !relPath.isEmpty else { return }
@@ -5377,7 +5375,7 @@ actor ChatStore {
         // Standardize to resolve /private/var vs /var symlink differences
         let sessionDirStd = sessionDir.standardizedFileURL.path
 
-        let subdirs = ["workspace", "offloads", "attachments", "browser"]
+        let subdirs = ["offloads", "attachments", "browser"]
         var count = 0
         var subdirCounts: [String: Int] = [:]
         var totalBytes: Int = 0

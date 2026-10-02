@@ -59,6 +59,8 @@ extension AIChatViewModel {
     }
 
     /// Snapshot all files under /var/minis/ with their modification dates.
+    /// Workspace is global; session-scoped media still resolves by the active
+    /// session context.
     func snapshotMinisFiles() -> [String: Date] {
         let fm = FileManager.default
         guard let hostBase = resolveHostPath(Self.minisLinuxBaseDir) else { return [:] }
@@ -98,9 +100,10 @@ extension AIChatViewModel {
         return result
     }
 
-    /// Resolve a minis:// URL string to a host filesystem URL.
-    /// Global dirs (memory/skills/shared) live in the App Group container;
-    /// session dirs live under minisPersistentBase/<sessionId>/<host>/.
+    /// Resolve a minis:// URL to a host filesystem URL.
+    /// Global dirs (workspace, memory, skills, shared) live outside sessions;
+    /// other session dirs live under minisPersistentBase/<sessionId>/<host>/.
+
     private func resolveMinisURL(_ urlString: String) -> URL? {
         guard let url = URL(string: urlString), url.scheme == "minis",
               let host = url.host else { return nil }
@@ -110,6 +113,7 @@ extension AIChatViewModel {
         // [T-fix-double-encoding]
         let base: URL
         switch host {
+        case "workspace": base = Self.minisGlobalWorkspacePersistentDir
         case "memory": base = Self.minisMemoryPersistentDir
         case "skills": base = Self.minisSkillsPersistentDir
         case "shared": base = Self.minisSharedPersistentDir

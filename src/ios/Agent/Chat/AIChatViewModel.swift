@@ -2226,15 +2226,21 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         let subPaths = MinisURLPathDecoding.subPathCandidates(for: url)
         let fm = FileManager.default
 
-        // Global directories resolve without session ID
-        let globalDirs = ["memory", "skills", "shared"]
+        // Global namespaces (workspace, skills, memory, shared)
+        let globalDirs = ["workspace", "memory", "skills", "shared"]
         if globalDirs.contains(host) {
             let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!
             for subPath in subPaths {
-                let globalURL = library.appendingPathComponent("MinisChat/\(host)", isDirectory: true)
-                    .appendingPathComponent(subPath)
+                let globalURL: URL
+                if host == "workspace" {
+                    globalURL = minisGlobalWorkspacePersistentDir.appendingPathComponent(subPath)
+                } else {
+                    globalURL = library.appendingPathComponent("MinisChat/\(host)", isDirectory: true)
+                        .appendingPathComponent(subPath)
+                }
                 if fm.fileExists(atPath: globalURL.path) { return globalURL }
             }
+            return nil
         }
 
         if let sid = activeSessionId {
@@ -2247,14 +2253,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             }
         }
 
-        // [T-ios-minisurl-cross-session-isolation] Fallback to the iSH-visible
-        // /var/minis data dir ONLY for the global, non-session-scoped
-        // namespaces (memory/skills/shared). For a session-scoped host like
-        // `attachments`, /var/minis/<host> binds to whichever session is
-        // currently MOUNTED — which may not be the session whose message is
-        // being rendered — so reaching it here would be a cross-session leak.
-        // Session-scoped resolution already happened above against
-        // activeSessionId; not-found is correct beyond that.
+        // /var/minis data fallback is safe only for global namespaces.
         if globalDirs.contains(host) {
             let dataPath = RootfsManager.shared.dataPath
             for subPath in subPaths {

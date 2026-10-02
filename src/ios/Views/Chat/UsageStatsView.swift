@@ -121,12 +121,14 @@ class UsageStatsViewModel: ObservableObject {
         func providerGroup(for modelId: String) -> String {
             if let g = modelIdToProviderGroup[modelId] { return g }
             if let p = staticLookup[modelId]?.provider {
-                // Normalize built-in provider strings to ProviderType display names.
+                // Normalize built-in provider strings to ProviderType groups.
                 switch p {
-                case "Google", "Gemini", "Google Gemini": return ProviderType.gemini.displayName
-                case "xAI":       return ProviderType.xAI.displayName
-                case "OpenRouter": return ProviderType.openRouter.displayName
-                default:          return p   // "Anthropic"/"OpenAI" already canonical
+                case "Google", "Gemini", "Google Gemini": return ProviderType.gemini.localizedDisplayName
+                case "xAI":       return ProviderType.xAI.localizedDisplayName
+                case "OpenRouter": return ProviderType.openRouter.localizedDisplayName
+                case "Anthropic": return ProviderType.anthropic.localizedDisplayName
+                case "OpenAI": return ProviderType.openAI.localizedDisplayName
+                default:          return p
                 }
             }
             return AppLocalized("Other", comment: "Usage stats: unknown provider group")
@@ -169,7 +171,8 @@ class UsageStatsViewModel: ObservableObject {
                 // unlike the display strings that produced duplicate
                 // "Google" / "Gemini" / "Google Gemini" sections.
                 providerGroupOverride: record.providerType.flatMap {
-                    ProviderType(rawValue: $0)?.displayName
+                    guard let type = ProviderType(rawValue: $0) else { return nil }
+                    return type.localizedDisplayName
                 }
             )
             stats.inputTokens += record.usage.inputTokens

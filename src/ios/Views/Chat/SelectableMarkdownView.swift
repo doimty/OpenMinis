@@ -9767,7 +9767,8 @@ private func resolveMinisFileURLForNativeText(url: URL) -> URL? {
     // points at the same global dir the iSH mount binds to. We explicitly
     // restrict it to those hosts so it can never reach another session's
     // attachments via whichever session happens to be mounted.
-    let globalHosts: Set<String> = ["skills", "memory", "shared"]
+    // Global namespaces (workspace, skills, memory, shared)
+    let globalHosts: Set<String> = ["workspace", "skills", "memory", "shared"]
     if globalHosts.contains(host) {
         for subPath in subPaths {
             let rootfsURL = RootfsManager.shared.dataPath

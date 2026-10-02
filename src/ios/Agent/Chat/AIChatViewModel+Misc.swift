@@ -124,13 +124,15 @@ extension AIChatViewModel {
     // Unified bidirectional file area between iOS and iSH:
     //   /var/minis/attachments/  — screenshots, images, media
     //   /var/minis/offloads/     — large tool outputs (migrated from /var/offloads/)
-    //   /var/minis/workspace/    — general session working area
+    //   /var/minis/workspace/    — shared project working area
+    //   /var/minis/browser/      — session browser snapshots
     //
-    // Persistent storage: Library/MinisChat/minis/<sessionId>/{attachments,offloads,workspace}/
-    // iSH-visible path:   /var/minis/{attachments,offloads,workspace}/  (session-unaware)
+    // Persistent storage: workspace under the global shared-files root;
+    // attachments/offloads/browser under Library/MinisChat/minis/<sessionId>/.
+    // iSH-visible paths keep their stable names; only the host ownership differs.
     //
-    // On session load/switch, the current session's files are synced into the
-    // iSH-visible directory so the model and shell commands always see /var/minis/.
+    // A session switch therefore changes only the media buckets. Project files
+    // in workspace remain available to every conversation.
 
     nonisolated static let minisLinuxBaseDir = "/var/minis"
     nonisolated static let minisAttachmentsLinuxDir = "/var/minis/attachments"

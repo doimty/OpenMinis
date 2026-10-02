@@ -923,7 +923,135 @@ extension AIChatViewModel {
         return false
     }
 
+    /// One-time migration gate for the old per-session workspace layout.
+    /// The flag is process-local on purpose: if a move is interrupted, the
+    /// next launch retries it; the individual moves are idempotent.
+    private static var didMigrateGlobalWorkspace = false
+
+    /// Move old `<sid>/workspace` contents into the new global workspace.
+    /// Non-conflicting paths keep their original relative name. A collision
+    /// is never overwritten: it is retained under `.legacy/<sid>/…` so a
+    /// second session's file cannot destroy the first one's project.
+    private func migrateLegacyWorkspacesToGlobalIfNeeded() {
+        guard !Self.didMigrateGlobalWorkspace else { return }
+        let fm = FileManager.default
+        let global = Self.minisGlobalWorkspacePersistentDir
+        do {
+            try fm.createDirectory(at: global, withIntermediateDirectories: true)
+        } catch {
+            logger.error("[MinisWorkspace] cannot create global workspace: \(error.localizedDescription)")
+            return
+        }
+
+        let sessionRoots = (try? fm.contentsOfDirectory(
+            at: Self.minisPersistentBase,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        var moved = 0
+        var collisions = 0
+        var migrationIncomplete = false
+        var cloudDeletes: [(String, String)] = []
+
+        for root in sessionRoots {
+            let sid = root.lastPathComponent
+            guard UUID(uuidString: sid) != nil else { continue }
+            let legacy = Self.minisLegacyWorkspacePersistentDir(for: sid)
+            guard fm.fileExists(atPath: legacy.path) else { continue }
+
+            // Snapshot old SessionFile ids before moving the bytes. The old
+            // cloud records point at `<sid>:workspace/...`; after migration
+            // that path no longer exists and must be tombstoned rather than
+            // allowed to resurrect on another device.
+            if let e = fm.enumerator(at: legacy,
+                                     includingPropertiesForKeys: [.isRegularFileKey],
+                                     options: [.skipsHiddenFiles]) {
+                for case let url as URL in e {
+                    guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
+                    let rel = url.path.replacingOccurrences(of: legacy.path + "/", with: "")
+                    cloudDeletes.append((sid, "workspace/\(rel)"))
+                }
+            }
+
+            func uniqueLegacyDestination(for relative: String) -> URL {
+                let base = global.appendingPathComponent(".legacy", isDirectory: true)
+                    .appendingPathComponent(sid, isDirectory: true)
+                    .appendingPathComponent(relative)
+                var candidate = base
+                var n = 1
+                while fm.fileExists(atPath: candidate.path) {
+                    let ext = (relative as NSString).pathExtension
+                    let stem = (relative as NSString).deletingPathExtension
+                    let name = ext.isEmpty ? "\(stem)-\(n)" : "\(stem)-\(n).\(ext)"
+                    candidate = global.appendingPathComponent(".legacy", isDirectory: true)
+                        .appendingPathComponent(sid, isDirectory: true)
+                        .appendingPathComponent((relative as NSString).deletingLastPathComponent)
+                        .appendingPathComponent(name)
+                    n += 1
+                }
+                return candidate
+            }
+
+            func merge(_ source: URL, relative: String) {
+                let destination = global.appendingPathComponent(relative)
+                var sourceStat = stat()
+                let sourceIsSymlink = lstat(source.path, &sourceStat) == 0
+                    && (sourceStat.st_mode & S_IFMT) == S_IFLNK
+                let sourceIsDir = !sourceIsSymlink
+                    && ((try? source.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true)
+                let destinationIsDir = fm.fileExists(atPath: destination.path)
+                    && ((try? destination.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true)
+
+                if sourceIsDir && destinationIsDir {
+                    for child in (try? fm.contentsOfDirectory(at: source,
+                                                               includingPropertiesForKeys: nil,
+                                                               options: [.skipsHiddenFiles])) ?? [] {
+                        merge(child, relative: relative + "/" + child.lastPathComponent)
+                    }
+                    try? fm.removeItem(at: source)
+                    return
+                }
+
+                let target: URL
+                if !fm.fileExists(atPath: destination.path) {
+                    target = destination
+                } else {
+                    collisions += 1
+                    target = uniqueLegacyDestination(for: relative)
+                }
+                do {
+                    try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try fm.moveItem(at: source, to: target)
+                    moved += 1
+                } catch {
+                    migrationIncomplete = true
+                    logger.error("[MinisWorkspace] migrate failed \(sid)/\(relative): \(error.localizedDescription)")
+                }
+            }
+
+            for child in (try? fm.contentsOfDirectory(at: legacy,
+                                                       includingPropertiesForKeys: nil,
+                                                       options: [.skipsHiddenFiles])) ?? [] {
+                merge(child, relative: child.lastPathComponent)
+            }
+            try? fm.removeItem(at: legacy) // succeeds only when the tree is empty
+        }
+
+        if !migrationIncomplete {
+            Self.didMigrateGlobalWorkspace = true
+        }
+        if !cloudDeletes.isEmpty {
+            Task {
+                for (sid, rel) in cloudDeletes {
+                    await ChatStore.shared.markSessionFileForCloudDeletion(sessionId: sid, relPath: rel)
+                }
+            }
+        }
+        logger.info("[MinisWorkspace] legacy migration complete moved=\(moved) collisions=\(collisions) incomplete=\(migrationIncomplete) oldCloudFiles=\(cloudDeletes.count)")
+    }
+
     private func ensureMinisSymlinks(for sid: String) {
+        migrateLegacyWorkspacesToGlobalIfNeeded()
         let fm = FileManager.default
         let dataPath = RootfsManager.shared.dataPath
         Self.noteContainerMigrationIfNeeded()
@@ -933,9 +1061,12 @@ extension AIChatViewModel {
         try? fm.createDirectory(at: minisDataDir, withIntermediateDirectories: true)
 
         let mappings: [(persistDir: URL, linuxDir: String)] = [
+            // workspace is intentionally cross-session. It is mounted from
+            // the global shared-files tree, so every fs_context sees the same
+            // project files while attachments/offloads/browser stay isolated.
+            (Self.minisGlobalWorkspacePersistentDir, Self.minisWorkspaceLinuxDir),
             (Self.minisOffloadsPersistentDir(for: sid), Self.minisOffloadsLinuxDir),
             (Self.minisAttachmentsPersistentDir(for: sid), Self.minisAttachmentsLinuxDir),
-            (Self.minisWorkspacePersistentDir(for: sid), Self.minisWorkspaceLinuxDir),
             (Self.minisBrowserPersistentDir(for: sid), Self.minisBrowserLinuxDir),
             (Self.minisMemoryPersistentDir, Self.minisMemoryLinuxDir),
             (Self.minisSkillsPersistentDir, Self.minisSkillsLinuxDir),

@@ -183,13 +183,13 @@ struct AgentLoopModelsSection: View {
     private func modalityBadges(_ model: LLMModel) -> [String] {
         let m = model.capabilities.supportedModalities
         var badges: [String] = []
-        if m.contains(.imageInput)  { badges.append("img") }
-        if m.contains(.audioInput)  { badges.append("audio") }
-        if m.contains(.videoInput)  { badges.append("video") }
-        if m.contains(.pdfInput)    { badges.append("pdf") }
-        if m.contains(.imageOutput) { badges.append("img-out") }
-        if m.contains(.audioOutput) { badges.append("audio-out") }
-        if m.contains(.videoOutput) { badges.append("video-out") }
+        if m.contains(.imageInput)  { badges.append(AppLocalized("image")) }
+        if m.contains(.audioInput)  { badges.append(AppLocalized("audio")) }
+        if m.contains(.videoInput)  { badges.append(AppLocalized("video")) }
+        if m.contains(.pdfInput)    { badges.append(AppLocalized("PDF input")) }
+        if m.contains(.imageOutput) { badges.append(AppLocalized("Image output")) }
+        if m.contains(.audioOutput) { badges.append(AppLocalized("Audio output")) }
+        if m.contains(.videoOutput) { badges.append(AppLocalized("Video output")) }
         return badges
     }
 

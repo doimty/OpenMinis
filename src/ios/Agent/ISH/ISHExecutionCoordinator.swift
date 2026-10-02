@@ -96,15 +96,14 @@ actor ISHExecutionCoordinator {
     private var perSessionInflight: [String: [InflightExec]] = [:]
 
     /// Set of sessions for which the static (memory/skills/shared/external)
-    /// mount layer has been initialized. The per-session 4 buckets are now
-    /// handled by MinisFsRouter's hook, not by bind_mount, so they don't
-    /// need to be re-mounted on session switch.
+    /// mount layer has been initialized. The per-session 3 buckets are now
+    /// handled by MinisFsRouter's hook, not by bind_mount; workspace is part
+    /// of the static global mount layer.
     private var staticMountsInitialized: Set<String> = []
 
     /// Maps linux mount paths (e.g. "/var/minis/memory") to their host
-    /// persistent URLs. Holds only the static (global) mounts and external
-    /// folders today. Per-session buckets are no longer in this map; use
-    /// MinisFsRouter to resolve their host paths.
+    /// persistent URLs. Holds the global mounts (workspace/memory/skills/shared)
+    /// and external folders. Per-session buckets are routed by MinisFsRouter.
     private var mountedPaths: [String: URL] = [:]
 
     // MARK: - Constants
@@ -199,8 +198,8 @@ actor ISHExecutionCoordinator {
     private func ensureStaticMountsInitialized(for sessionId: String) {
         // Static mounts are session-independent, but performMount needs a sid
         // to log against; once the first session has initialized them, all
-        // others are no-ops. The per-session buckets are NOT touched here —
-        // they're hooked by MinisFsRouter.
+        // others are no-ops. Workspace is global and is mounted exactly once;
+        // offloads/attachments/browser are handled by MinisFsRouter.
         if !staticMountsInitialized.isEmpty { return }
         performMount(sessionId)
         staticMountsInitialized.insert(sessionId)
@@ -215,10 +214,9 @@ actor ISHExecutionCoordinator {
     #endif
 
     /// Resolve a Linux path under /var/minis/ to its current host URL.
-    /// Tries the static bind-mount table first (memory/skills/shared +
-    /// external folders), then falls back to MinisFsRouter for the per-
-    /// session buckets. Per-session lookups need a sessionId because the
-    /// router routes by fs_context; pass it via `sessionId` for those paths.
+    /// Tries the static bind-mount table first (workspace/memory/skills/shared +
+    /// external folders), then falls back to MinisFsRouter for the remaining
+    /// per-session buckets.
     func hostURL(for linuxPath: String, sessionId: String? = nil) -> URL? {
         for (prefix, hostBase) in mountedPaths {
             if linuxPath == prefix {
@@ -607,11 +605,10 @@ actor ISHExecutionCoordinator {
         ensureFakefsMetadata(for: AIChatViewModel.minisLinuxBaseDir, isDirectory: true)
 
         // Only the global (cross-session) directories are bind-mounted here.
-        // The per-session buckets (offloads/attachments/workspace/browser) are
-        // routed dynamically by MinisFsRouter's path-translate hook based on
-        // the calling task's fs_context, so they don't need a static mount and
-        // don't need to be swapped on session change.
+        // workspace is deliberately global as well; the remaining three
+        // per-session buckets are routed dynamically by MinisFsRouter.
         let subdirs: [(persistDir: URL, linuxDir: String)] = [
+            (AIChatViewModel.minisGlobalWorkspacePersistentDir, AIChatViewModel.minisWorkspaceLinuxDir),
             (AIChatViewModel.minisMemoryPersistentDir, AIChatViewModel.minisMemoryLinuxDir),
             (AIChatViewModel.minisSkillsPersistentDir, AIChatViewModel.minisSkillsLinuxDir),
             (AIChatViewModel.minisSharedPersistentDir, AIChatViewModel.minisSharedLinuxDir),

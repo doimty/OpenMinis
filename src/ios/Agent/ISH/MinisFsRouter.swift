@@ -2,8 +2,9 @@
 //  MinisFsRouter.swift
 //  MinisApp
 //
-//  Routes guest paths under /var/minis/{offloads,attachments,workspace,browser}
+//  Routes guest paths under /var/minis/{offloads,attachments,browser}
 //  to per-session host directories via the iSH fakefs path-translate hook.
+//  `/var/minis/workspace` is global and is handled by the static mount layer.
 //
 //  Each session gets a unique fs_context token (u64) that is stamped on the
 //  task group spawned for that session. When the task (or any of its forked
@@ -23,7 +24,6 @@ final class MinisFsRouter: @unchecked Sendable {
     private let perSessionBuckets: [(linuxPrefix: String, hostSubdir: String)] = [
         (AIChatViewModel.minisOffloadsLinuxDir,    "offloads"),
         (AIChatViewModel.minisAttachmentsLinuxDir, "attachments"),
-        (AIChatViewModel.minisWorkspaceLinuxDir,   "workspace"),
         (AIChatViewModel.minisBrowserLinuxDir,     "browser"),
     ]
 

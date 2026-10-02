@@ -234,8 +234,9 @@ func resolveMinisFileURL(url: URL, sessionId: String? = nil) -> URL? {
 
     let fm = FileManager.default
 
-    // Primary: resolve via the owning session → persistent directory
-    if let sid = sessionId ?? AIChatViewModel.activeSessionId {
+    // Primary: resolve the owning session only for session-scoped hosts.
+    let globalHosts: Set<String> = ["workspace", "skills", "memory", "shared"]
+    if !globalHosts.contains(host), let sid = sessionId ?? AIChatViewModel.activeSessionId {
         for subPath in subPaths {
             let persistURL = AIChatViewModel.minisPersistentBase
                 .appendingPathComponent(sid, isDirectory: true)
@@ -248,8 +249,9 @@ func resolveMinisFileURL(url: URL, sessionId: String? = nil) -> URL? {
         }
     }
 
-    // Fallback: global directories (skills, memory) are not per-session
+    // Global namespaces (workspace, skills, memory, shared)
     let globalDirs: [(subdir: String, url: URL)] = [
+        ("workspace", AIChatViewModel.minisGlobalWorkspacePersistentDir),
         ("skills", AIChatViewModel.minisSkillsPersistentDir),
         ("memory", AIChatViewModel.minisMemoryPersistentDir),
         ("shared", AIChatViewModel.minisSharedPersistentDir),

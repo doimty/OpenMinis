@@ -249832,5 +249832,37 @@
       }
     }
   },
+  "No longer in your configured providers" : {
+    "localizations" : {
+      "en" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "No longer in your configured providers"
+        }
+      },
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "已不在当前配置的服务商中"
+        }
+      }
+    }
+  },
+  "Model unknown — the session record was deleted" : {
+    "localizations" : {
+      "en" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "Model unknown — the session record was deleted"
+        }
+      },
+      "zh-Hans" : {
+        "stringUnit" : {
+          "state" : "translated",
+          "value" : "模型未知：会话记录已删除"
+        }
+      }
+    }
+  },
   "version" : "1.0"
 }

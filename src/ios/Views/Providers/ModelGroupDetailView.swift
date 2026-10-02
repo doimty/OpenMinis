@@ -431,7 +431,7 @@ struct ModelGroupDetailView: View {
             Text({
                 if let instance {
                     let label = instance.label.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return label.isEmpty ? instance.providerType.displayName : label
+                    return label.isEmpty ? instance.providerType.localizedDisplayName : label
                 }
                 return entry.model.provider
             }())

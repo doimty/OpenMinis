@@ -53,7 +53,8 @@ final class BrowserUseManager: NSObject, ObservableObject {
     var hasInflightDownloads: Bool { !inflightDownloads.isEmpty }
 
     /// Returns the chat session id owning this browser — wired by BrowserTabPool.
-    /// Downloads are saved into that session's /var/minis/workspace/ directory.
+    /// The session's `/var/minis/workspace/` host directory — now shared by
+    /// all conversations. Downloads remain visible from any new chat.
     var sessionIdProvider: (() -> String?)?
 
     /// Returns this tab's pool id — wired by BrowserTabPool. Diagnostics only,

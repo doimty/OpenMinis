@@ -1514,7 +1514,7 @@ final class BrowserTabPool: ObservableObject {
         manager.closeHandler = { [weak self] webView in
             self?.closeWebView(webView)
         }
-        // Downloads land in this session's /var/minis/workspace/ so the agent
+        // Downloads land in the global /var/minis/workspace/ so every chat
         // can read and operate on them in follow-up turns.
         manager.sessionIdProvider = { [weak self] in self?.sessionId }
         // [BrowserToolDiag] Let the manager name its own tab when its WebContent

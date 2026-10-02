@@ -1125,9 +1125,8 @@ class FileBrowserViewModel: ObservableObject {
 
     /// If `removedURL` lives inside a session's per-session minis directory
     /// (`Library/MinisChat/minis/<sid>/<subdir>/<rel>`), queue a SessionFile
-    /// cloud-delete so peer devices stop seeing the file. Silent when the URL
-    /// is outside any session tree (e.g. shared/skills/memory deletes — those
-    /// are not SessionFile-scoped) or when sync isn't configured.
+    /// cloud-delete so peer devices stop seeing the file. Global workspace
+    /// files are shared-file storage and are intentionally not SessionFiles.
     private static func queueSessionFileCloudDelete(forRemovedURL removedURL: URL) {
         let baseURL = ChatStore.shared.minisBaseURL
             .resolvingSymlinksInPath().standardized
@@ -1146,12 +1145,12 @@ class FileBrowserViewModel: ObservableObject {
         let rel = String(parts[1])
         guard !sid.isEmpty, !rel.isEmpty else { return }
 
-        // Only the session-scoped subdirs are SessionFiles. Filter early
-        // so global trees (memory/skills/shared) and stray dirs don't
-        // produce phantom cloud deletes.
+        // Only the session-scoped subdirs are SessionFiles. Global
+        // workspace/skills/memory/shared trees have their own storage
+        // and backup/sync paths.
         let firstSlash = rel.firstIndex(of: "/")
         let subdir: String = firstSlash.map { String(rel[..<$0]) } ?? rel
-        let scoped: Set<String> = ["workspace", "attachments", "browser", "offloads"]
+        let scoped: Set<String> = ["attachments", "browser", "offloads"]
         guard scoped.contains(subdir) else { return }
 
         let traceLogger = AppLogger(category: "SessionFileTracker")

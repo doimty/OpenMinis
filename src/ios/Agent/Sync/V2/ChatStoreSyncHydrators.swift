@@ -384,6 +384,7 @@ enum ChatStoreSyncHydrators {
     // MARK: - SessionFile
 
     /// SessionFile recordId is "sessionId:relativePath" (compositeKey).
+    /// Workspace is global shared storage and is not represented by this type.
     private static func buildSessionFile(id: String) async -> PortableRecord? {
         let parts = id.split(separator: ":", maxSplits: 1)
         guard parts.count == 2 else { return nil }

@@ -256,13 +256,13 @@ actor SessionFileChangeTracker {
         return nil
     }
 
-    /// Validate that "<subdir>/<rest>" is one of the session-scoped
-    /// SessionFile subdirs. memory/skills/shared/mounts have their own
-    /// sync mechanisms and do NOT produce SessionFile rows.
+    /// Validate that `<subdir>/<rest>` is one of the session-scoped
+    /// SessionFile subdirs (`attachments`, `browser`, `offloads`). Workspace
+    /// is now global shared-file storage and has no SessionFile owner.
     private nonisolated static func validateAndReturnSubpath(_ subpath: String) -> String? {
         guard let slash = subpath.firstIndex(of: "/") else { return nil }
         let subdir = String(subpath[..<slash])
-        let scoped: Set<String> = ["workspace", "attachments", "browser", "offloads"]
+        let scoped: Set<String> = ["attachments", "browser", "offloads"]
         guard scoped.contains(subdir) else { return nil }
         return subpath
     }

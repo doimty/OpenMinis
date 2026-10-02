@@ -252,10 +252,29 @@ extension AIChatViewModel {
         return raw
     }
 
-    /// Persistent storage directory for a specific session's workspace.
-    nonisolated static func minisWorkspacePersistentDir(for sid: String) -> URL {
+    /// Persistent storage directory shared by every conversation's
+    /// `/var/minis/workspace`. It lives below the existing shared-files root
+    /// so it survives new-session creation and is included in the existing
+    /// Shared Files backup/FileProvider tree.
+    nonisolated static var minisGlobalWorkspacePersistentDir: URL {
+        minisSharedPersistentDir.appendingPathComponent("workspace", isDirectory: true)
+    }
+
+    /// Legacy per-session workspace location. Kept for one-way migration and
+    /// for old on-disk data; new reads/writes use `minisWorkspacePersistentDir`.
+    nonisolated static func minisLegacyWorkspacePersistentDir(for sid: String) -> URL {
         minisPersistentBase.appendingPathComponent(sid, isDirectory: true)
             .appendingPathComponent("workspace", isDirectory: true)
+    }
+
+    /// Persistent workspace exposed at `/var/minis/workspace`.
+    ///
+    /// The `sid` parameter remains for source compatibility with callers that
+    /// previously resolved a session workspace. The workspace itself is now
+    /// intentionally global: every conversation sees the same files.
+    nonisolated static func minisWorkspacePersistentDir(for sid: String) -> URL {
+        _ = sid
+        return minisGlobalWorkspacePersistentDir
     }
 
     /// Persistent storage directory for a specific session's browser snapshots.
@@ -297,7 +316,7 @@ extension AIChatViewModel {
         minisAppGroupRoot.appendingPathComponent("skills", isDirectory: true)
     }
 
-    /// Persistent storage directory for shared files (shared across all sessions).
+    /// Persistent storage directory for shared files and the global workspace.
     /// Stored in the App Group container so the FileProvider extension can access it.
     nonisolated static var minisSharedPersistentDir: URL {
         minisAppGroupRoot.appendingPathComponent("shared", isDirectory: true)
@@ -315,7 +334,8 @@ extension AIChatViewModel {
     /// Shared resolution logic used by Markdown link handlers and the browser's WKURLSchemeHandler.
     ///
     /// [T-minisurl-wrong-active-session] `sessionId` scopes the per-session
-    /// hosts (attachments/workspace/…) to the session that OWNS the reference.
+    /// hosts (attachments/offloads/browser) to the session that OWNS the
+    /// reference. Workspace is global and ignores the session scope.
     /// Callers running inside an agent loop MUST pass their own session id —
     /// the `activeSessionId` fallback tracks the session whose UI is
     /// frontmost, which is the wrong scope whenever another session is
@@ -327,42 +347,34 @@ extension AIChatViewModel {
         let subPaths = MinisURLPathDecoding.subPathCandidates(for: url)
         let fm = FileManager.default
 
-        // Primary: resolve via the owning session (explicit), else frontmost
-        if let sid = sessionId ?? activeSessionId {
+        // Global namespaces (workspace, skills, memory, shared)
+        let globalDirs = ["workspace", "memory", "skills", "shared"]
+        if !globalDirs.contains(host), let sid = sessionId ?? activeSessionId {
             for subPath in subPaths {
-                let candidate = minisPersistentBase
+                let persistURL = minisPersistentBase
                     .appendingPathComponent(sid, isDirectory: true)
                     .appendingPathComponent(host, isDirectory: true)
                     .appendingPathComponent(subPath)
-                if fm.fileExists(atPath: candidate.path) { return candidate }
+                if fm.fileExists(atPath: persistURL.path) { return persistURL }
             }
         }
 
-        // Global directories (skills, memory, shared)
-        let globalDirs: [(String, URL)] = [
-            ("skills", minisSkillsPersistentDir),
-            ("memory", minisMemoryPersistentDir),
-            ("shared", minisSharedPersistentDir),
-        ]
-        for (subdir, dir) in globalDirs where host == subdir {
+        // Global dirs resolve without a session ID.
+        if globalDirs.contains(host) {
+            let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!
             for subPath in subPaths {
-                let candidate = dir.appendingPathComponent(subPath)
-                if fm.fileExists(atPath: candidate.path) { return candidate }
+                let globalURL: URL
+                switch host {
+                case "workspace": globalURL = minisGlobalWorkspacePersistentDir.appendingPathComponent(subPath)
+                default: globalURL = library.appendingPathComponent("MinisChat/\(host)", isDirectory: true).appendingPathComponent(subPath)
+                }
+                if fm.fileExists(atPath: globalURL.path) { return globalURL }
             }
+            return nil
         }
 
-        // Scan all sessions
-        if let sessions = try? fm.contentsOfDirectory(atPath: minisPersistentBase.path) {
-            for sid in sessions {
-                for subPath in subPaths {
-                    let candidate = minisPersistentBase
-                        .appendingPathComponent(sid, isDirectory: true)
-                        .appendingPathComponent(host, isDirectory: true)
-                        .appendingPathComponent(subPath)
-                    if fm.fileExists(atPath: candidate.path) { return candidate }
-                }
-            }
-        }
+        // No cross-session fallback: session-scoped links are intentionally
+        // resolved only in the active session.
         return nil
     }
 
