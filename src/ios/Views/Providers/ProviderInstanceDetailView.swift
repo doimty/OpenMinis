@@ -761,7 +761,7 @@ struct ProviderInstanceDetailView: View {
                 let resolvedLabel = resolved == .imagesGenerations
                     ? "/v1/images/generations"
                     : "/v1/chat/completions"
-                Text(AppLocalized("Auto: tries /v1/images/generations first, falls back to /v1/chat/completions. Last successful endpoint: \(resolvedLabel)."))
+                Text(String(format: AppLocalized("Auto: tries /v1/images/generations first, falls back to /v1/chat/completions. Last successful endpoint: %@."), String(resolvedLabel)))
             } else {
                 Text(AppLocalized("Auto: tries /v1/images/generations first, falls back to /v1/chat/completions. Caches the working endpoint after the first call."))
             }
@@ -913,7 +913,7 @@ struct ProviderInstanceDetailView: View {
         .contextMenu {
             Button {
                 UIPasteboard.general.string = "entry:\(entry.compositeKey)"
-                MinisToast.show(AppLocalized("Copied: \(entry.model.displayName)"))
+                MinisToast.show(String(format: AppLocalized("Copied: %@"), String(entry.model.displayName)))
             } label: {
                 Label(AppLocalized("Copy Shortcut Model ID"), systemImage: "link")
             }
@@ -1383,7 +1383,7 @@ struct AddCustomModelSheet: View {
         if store.addEntry(entry) {
             dismiss()
         } else {
-            duplicateError = AppLocalized("Model ID \"\(trimmedId)\" already exists.")
+            duplicateError = String(format: AppLocalized("Model ID \"%@\" already exists."), String(trimmedId))
         }
     }
 }

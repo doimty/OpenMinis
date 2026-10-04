@@ -2001,7 +2001,7 @@ struct ContentView: View {
                             .controlSize(.large)
                             .tint(ChatColors.primaryText)
                         if let p = exportProgress, p.total > 0 {
-                            Text(AppLocalized("Exporting… \(p.done) / \(p.total)"))
+                            Text(String(format: AppLocalized("Exporting… %lld / %lld"), Int(p.done), Int(p.total)))
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         } else {
@@ -4288,7 +4288,7 @@ struct ContentView: View {
         if cachedLockLabelKey == key, let cached = cachedLockLabel {
             return cached
         }
-        let value = AppLocalized("Lock with \(biometry)")
+        let value = String(format: AppLocalized("Lock with %@"), String(biometry))
         cachedLockLabel = value
         cachedLockLabelKey = key
         return value
@@ -4342,7 +4342,7 @@ struct ContentView: View {
                 SessionLockStore.shared.lock(sid)
             case .unlockSession(let sid):
                 Task {
-                    let reason = AppLocalized("Unlock this session to remove \(BiometricAuth.biometryDisplayName) protection")
+                    let reason = String(format: AppLocalized("Unlock this session to remove %@ protection"), String(BiometricAuth.biometryDisplayName))
                     let ok = await BiometricAuth.authenticate(reason: reason)
                     if ok { SessionLockStore.shared.unlockPermanently(sid) }
                 }
@@ -5714,7 +5714,7 @@ struct ContentView: View {
             }
             await MainActor.run {
                 let sessionCount = ids.count
-                forceSyncToast = AppLocalized("Marked \(sessionCount) sessions (\(totalMarked) records) for sync. iCloud is syncing now.")
+                forceSyncToast = String(format: AppLocalized("Marked %lld sessions (%lld records) for sync. iCloud is syncing now."), Int(sessionCount), Int(totalMarked))
                 forceSyncInFlight = false
                 if singleSession == nil {
                     // Multi-select path also exits selection mode for the user.
@@ -5752,11 +5752,11 @@ struct ContentView: View {
             let outcome = await ChatStore.shared.forcePullSession(sessionId: sessionId)
             switch outcome {
             case .applied(let pulled, let deleted):
-                forceSyncToast = AppLocalized("Pulled \(pulled) records · removed \(deleted) local")
+                forceSyncToast = String(format: AppLocalized("Pulled %lld records · removed %lld local"), Int(pulled), Int(deleted))
             case .cloudEmpty:
                 forceSyncToast = AppLocalized("iCloud has no records for this chat — local messages preserved")
             case .failed(let msg):
-                forceSyncToast = AppLocalized("Force Pull failed: \(msg) — local messages preserved")
+                forceSyncToast = String(format: AppLocalized("Force Pull failed: %@ — local messages preserved"), String(msg))
             }
             forceSyncInFlight = false
             // Refresh sessions so any title/updatedAt that came down from
@@ -7343,10 +7343,10 @@ private struct SessionRow: View, Equatable {
                 return AppLocalized("Just now")
             } else if seconds < 3600 {
                 let mins = seconds / 60
-                return AppLocalized("\(mins) min ago")
+                return String(format: AppLocalized("%lld min ago"), Int(mins))
             } else {
                 let hrs = seconds / 3600
-                return AppLocalized("\(hrs) hr ago")
+                return String(format: AppLocalized("%lld hr ago"), Int(hrs))
             }
         } else if calendar.isDateInYesterday(date) {
             return AppLocalized("Yesterday")

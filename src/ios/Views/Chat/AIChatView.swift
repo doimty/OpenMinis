@@ -940,7 +940,7 @@ struct AIChatView: View {
         ) { _ in
             Button(AppLocalized("OK"), role: .cancel) { missingMinisFileName = nil }
         } message: { name in
-            Text(AppLocalized("\(name) is unavailable. It may have been deleted or not yet synced from iCloud."))
+            Text(String(format: AppLocalized("%@ is unavailable. It may have been deleted or not yet synced from iCloud."), String(name)))
         }
         .fullScreenCover(item: $imageGallery) { presentation in
             MessageImageGallery(items: presentation.items, startIndex: presentation.startIndex)
@@ -2069,7 +2069,7 @@ struct AIChatView: View {
             }
             await MainActor.run {
                 isForcePulling = false
-                forcePullToast = AppLocalized("Marked \(n) records for sync. iCloud is uploading now.")
+                forcePullToast = String(format: AppLocalized("Marked %lld records for sync. iCloud is uploading now."), Int(n))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                     forcePullToast = nil
                 }
@@ -2095,11 +2095,11 @@ struct AIChatView: View {
                 isForcePulling = false
                 switch outcome {
                 case .applied(let pulled, let deleted):
-                    forcePullToast = AppLocalized("Pulled \(pulled) records · removed \(deleted) local")
+                    forcePullToast = String(format: AppLocalized("Pulled %lld records · removed %lld local"), Int(pulled), Int(deleted))
                 case .cloudEmpty:
                     forcePullToast = AppLocalized("iCloud has no records for this chat — local messages preserved")
                 case .failed(let msg):
-                    forcePullToast = AppLocalized("Force Pull failed: \(msg) — local messages preserved")
+                    forcePullToast = String(format: AppLocalized("Force Pull failed: %@ — local messages preserved"), String(msg))
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                     forcePullToast = nil
@@ -2396,11 +2396,11 @@ struct AIChatView: View {
                     .accessibilityValue(Text(
                         isGroupBound
                             ? (isAuthed
-                                ? AppLocalized("\(modelName), group, signed in", comment: "VoiceOver value: model picker, group-bound, authenticated")
-                                : AppLocalized("\(modelName), group, not signed in", comment: "VoiceOver value: model picker, group-bound, not authenticated"))
+                                ? String(format: AppLocalized("%@, group, signed in", comment: "VoiceOver value: model picker, group-bound, authenticated"), String(modelName))
+                                : String(format: AppLocalized("%@, group, not signed in", comment: "VoiceOver value: model picker, group-bound, not authenticated"), String(modelName)))
                             : (isAuthed
-                                ? AppLocalized("\(modelName), signed in", comment: "VoiceOver value: model picker, authenticated")
-                                : AppLocalized("\(modelName), not signed in", comment: "VoiceOver value: model picker, not authenticated"))
+                                ? String(format: AppLocalized("%@, signed in", comment: "VoiceOver value: model picker, authenticated"), String(modelName))
+                                : String(format: AppLocalized("%@, not signed in", comment: "VoiceOver value: model picker, not authenticated"), String(modelName)))
                     ))
                     .accessibilityHint(Text("Opens the model picker", comment: "VoiceOver hint for the model picker button"))
                     .accessibilityAddTraits(.isButton)
@@ -3663,14 +3663,14 @@ struct AIChatView: View {
             // `%@` form ("Message %@ (@ to mention files)") as the lookup
             // key in Localizable.xcstrings, so translators get one
             // parameterized entry per locale instead of one per soul name.
-            placeholder: AppLocalized("Message \(soulName) (@ to mention files)"),
+            placeholder: String(format: AppLocalized("Message %@ (@ to mention files)"), String(soulName)),
             // [T-ios-composer-placeholder-rotation] Feature hints cycled
             // while the composer sits empty. Same parameterized-`%@` rule as
             // the default above: the soul name is interpolated INTO the
             // localized key, never concatenated onto it, so each hint stays
             // one translatable entry rather than one per soul name.
             placeholderRotation: [
-                AppLocalized("Try @ to mention files for \(soulName) to read"),
+                String(format: AppLocalized("Try @ to mention files for %@ to read"), String(soulName)),
                 AppLocalized("Type / for SKILLs and quick commands"),
                 AppLocalized("Try dragging text into the chat to send it"),
                 AppLocalized("Long-press anywhere in a reply to select and copy it all"),
@@ -5199,7 +5199,7 @@ private struct ProviderImportPromptModifier: ViewModifier {
                     onImport: {
                         pending = nil
                         if let label = onImport(item.json) {
-                            result = AppLocalized("Imported provider \"\(label)\".")
+                            result = String(format: AppLocalized("Imported provider \"%@\"."), String(label))
                         } else {
                             result = AppLocalized("Could not import this provider configuration.")
                         }

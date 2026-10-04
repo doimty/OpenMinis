@@ -268,7 +268,7 @@ struct RetryRunIntent: AppIntent {
         // has exactly one placeholder. Inlining the ternary would bake a second
         // one into the key and make it fragile to translate.
         let elidedPreview = promptPreview + (targetMessage.content.count > 50 ? "…" : "")
-        return .result(value: result, dialog: IntentDialog(stringLiteral: AppLocalized("Retrying from message: \(elidedPreview)")))
+        return .result(value: result, dialog: IntentDialog(stringLiteral: String(format: AppLocalized("Retrying from message: %@"), String(elidedPreview))))
     }
 
     static var parameterSummary: some ParameterSummary {

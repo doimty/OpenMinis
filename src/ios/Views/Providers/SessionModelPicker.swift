@@ -79,7 +79,7 @@ struct SessionModelPicker: View {
                 }
             }
         } message: { selection in
-            Text(AppLocalized("\(selection.entry.model.displayName) outputs \(selection.modalityLabel) and usually can't drive an Agent task. Pick a text-output model for the session, or add this model to Available Models in Agent Loop so the agent can call it via minis-model-use when it needs to generate \(selection.modalityLabel)."))
+            Text(String(format: AppLocalized("%@ outputs %@ and usually can't drive an Agent task. Pick a text-output model for the session, or add this model to Available Models in Agent Loop so the agent can call it via minis-model-use when it needs to generate %@."), String(selection.entry.model.displayName), String(selection.modalityLabel), String(selection.modalityLabel)))
         }
     }
 

@@ -128,7 +128,7 @@ struct ChatScreenshotPreviewSheet: View {
     private func saveImageToPhotos(_ image: UIImage) {
         ImageSaver.shared.save(image) { error in
             if let error {
-                flashToast(AppLocalized("Save failed: \(error.localizedDescription)"))
+                flashToast(String(format: AppLocalized("Save failed: %@"), String(error.localizedDescription)))
             } else {
                 flashToast(AppLocalized("Saved to Photos"))
             }

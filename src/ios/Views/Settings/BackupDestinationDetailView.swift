@@ -869,7 +869,7 @@ struct RcloneConnectionEditor: View {
             // because re-entering it is the more likely intent after a
             // failure, and it cannot be read back to restore anyway.
             _ = try? RcloneRemoteStore.update(name: remote.name, newParams: previousParams)
-            errorText = AppLocalized("Couldn't connect with these settings, so they weren't saved. \(error.localizedDescription)")
+            errorText = String(format: AppLocalized("Couldn't connect with these settings, so they weren't saved. %@"), String(error.localizedDescription))
         }
     }
 

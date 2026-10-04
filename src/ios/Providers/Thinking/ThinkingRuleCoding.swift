@@ -104,7 +104,7 @@ extension ThinkingWireFormat {
             return AppLocalized("Send no thinking fields")
         case .reasoningEffort(let off):
             return off == nil ? AppLocalized("reasoning_effort · omit when off")
-                              : AppLocalized("reasoning_effort · off = \(off!)")
+                              : String(format: AppLocalized("reasoning_effort · off = %@"), String(off!))
         case .reasoningEffortNested:
             return AppLocalized("reasoning.effort (nested)")
         case .deepSeekSibling:
@@ -117,15 +117,15 @@ extension ThinkingWireFormat {
             return style == .adaptive ? AppLocalized("thinking: adaptive")
                                       : AppLocalized("thinking: budget_tokens")
         case .geminiBudget(let floor, _):
-            return AppLocalized("thinkingBudget · floor \(floor)")
+            return String(format: AppLocalized("thinkingBudget · floor %lld"), Int(floor))
         case .geminiThinkingLevel:
             return AppLocalized("thinkingLevel (string)")
         case .booleanToggle(let path):
-            return AppLocalized("boolean toggle · \(path)")
+            return String(format: AppLocalized("boolean toggle · %@"), String(path))
         case .extraBodyToggle(let path):
-            return AppLocalized("extra_body toggle · \(path)")
+            return String(format: AppLocalized("extra_body toggle · %@"), String(path))
         case .customPath(let path, _, _):
-            return AppLocalized("custom path · \(path)")
+            return String(format: AppLocalized("custom path · %@"), String(path))
         }
     }
 }

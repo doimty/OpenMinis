@@ -601,7 +601,7 @@ extension BackupImporter {
                 takenNames.insert(group.name)
                 continue
             }
-            let base = AppLocalized("\(group.name) (from backup)")
+            let base = String(format: AppLocalized("%@ (from backup)"), String(group.name))
             var candidate = base
             var n = 2
             while takenNames.contains(candidate) {

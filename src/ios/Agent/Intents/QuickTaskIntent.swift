@@ -203,8 +203,8 @@ struct QuickTaskIntent: AppIntent {
         if sendCompletionNotification {
             ShortcutNotification.post(
                 id: "shortcut-start-\(sid)",
-                title: AppLocalized("Minis: \(taskName)"),
-                body: AppLocalized("\(modelName) is working on it…"),
+                title: String(format: AppLocalized("Minis: %@"), String(taskName)),
+                body: String(format: AppLocalized("%@ is working on it…"), String(modelName)),
                 sessionId: sid
             )
         }
@@ -225,7 +225,7 @@ struct QuickTaskIntent: AppIntent {
             if sendCompletionNotification {
                 ShortcutNotification.post(
                     id: "shortcut-done-\(sid)",
-                    title: AppLocalized("Minis: \(taskName) Done"),
+                    title: String(format: AppLocalized("Minis: %@ Done"), String(taskName)),
                     body: "\(modelName): \(String(responseText.prefix(200)))",
                     sessionId: sid
                 )
@@ -261,7 +261,7 @@ struct QuickTaskIntent: AppIntent {
             if capturedSendCompletionNotification {
                 ShortcutNotification.post(
                     id: "shortcut-done-\(capturedSid)",
-                    title: AppLocalized("Minis: \(capturedTaskName) Done"),
+                    title: String(format: AppLocalized("Minis: %@ Done"), String(capturedTaskName)),
                     body: "\(capturedModelName): \(summary)",
                     sessionId: capturedSid
                 )
@@ -276,7 +276,7 @@ struct QuickTaskIntent: AppIntent {
             prompt: task.prompt
         )
 
-        return .result(value: result, dialog: IntentDialog(stringLiteral: AppLocalized("\(taskName) started with \(modelName).")))
+        return .result(value: result, dialog: IntentDialog(stringLiteral: String(format: AppLocalized("%@ started with %@."), String(taskName), String(modelName))))
     }
 
     // This intent previously declared no `parameterSummary`. AppIntents uses the

@@ -68,9 +68,9 @@ enum MemoryWriteRevoker {
                 let newFileContent = nsContent.replacingCharacters(in: removeRange, with: "")
                 do {
                     try newFileContent.write(to: fileURL, atomically: true, encoding: .utf8)
-                    return AppLocalized("Removed from \(dateStr).md")
+                    return String(format: AppLocalized("Removed from %@.md"), String(dateStr))
                 } catch {
-                    return AppLocalized("Error writing file: \(error.localizedDescription)")
+                    return String(format: AppLocalized("Error writing file: %@"), String(error.localizedDescription))
                 }
             }
         }

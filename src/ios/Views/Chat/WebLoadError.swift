@@ -49,7 +49,7 @@ struct WebLoadError: Equatable {
              (NSURLErrorDomain, NSURLErrorDNSLookupFailed):
             title = AppLocalized("Cannot Open Page")
             message = host.map {
-                AppLocalized("Minis can’t open the page because it can’t find the server “\($0)”.")
+                String(format: AppLocalized("Minis can’t open the page because it can’t find the server “%@”."), String($0))
             } ?? AppLocalized("Minis can’t open the page because it can’t find the server.")
             systemImage = "wifi.exclamationmark"
 
@@ -69,7 +69,7 @@ struct WebLoadError: Equatable {
         case (NSURLErrorDomain, NSURLErrorTimedOut):
             title = AppLocalized("The Connection Timed Out")
             message = host.map {
-                AppLocalized("The server “\($0)” took too long to respond.")
+                String(format: AppLocalized("The server “%@” took too long to respond."), String($0))
             } ?? AppLocalized("The server took too long to respond.")
             systemImage = "clock.badge.exclamationmark"
 
@@ -82,7 +82,7 @@ struct WebLoadError: Equatable {
              (NSURLErrorDomain, NSURLErrorClientCertificateRequired):
             title = AppLocalized("This Connection Is Not Private")
             message = host.map {
-                AppLocalized("Minis can’t verify the identity of the server “\($0)”.")
+                String(format: AppLocalized("Minis can’t verify the identity of the server “%@”."), String($0))
             } ?? AppLocalized("Minis can’t verify the identity of the server.")
             systemImage = "lock.slash"
 
@@ -95,7 +95,7 @@ struct WebLoadError: Equatable {
         default:
             title = AppLocalized("Cannot Open Page")
             message = host.map {
-                AppLocalized("A problem occurred loading “\($0)”.")
+                String(format: AppLocalized("A problem occurred loading “%@”."), String($0))
             } ?? AppLocalized("A problem occurred while loading this page.")
             systemImage = "exclamationmark.triangle"
         }

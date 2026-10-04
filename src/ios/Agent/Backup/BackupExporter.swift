@@ -190,8 +190,8 @@ actor BackupExporter {
         // already done.
         let categoryCount = options.categories.count
         say(resumed == nil
-                  ? AppLocalized("Starting backup — \(categoryCount) categor(ies)")
-                  : AppLocalized("Resuming previous backup — \(categoryCount) categor(ies)"))
+                  ? String(format: AppLocalized("Starting backup — %lld categor(ies)"), Int(categoryCount))
+                  : String(format: AppLocalized("Resuming previous backup — %lld categor(ies)"), Int(categoryCount)))
 
         // Staging lives in Application Support, NOT tmp/: iOS purges tmp on its
         // own schedule, and a resume needs this tree to survive to the next
@@ -467,9 +467,9 @@ actor BackupExporter {
         let elapsed = Date().timeIntervalSince(started)
         let sizeText = ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
         if blobStore.skippedFiles > 0 {
-            say(AppLocalized("Export complete — \(sizeText) in \(BackupProgressReporter.durationText(elapsed)), \(blobStore.skippedFiles) file(s) excluded"))
+            say(String(format: AppLocalized("Export complete — %@ in %@, %lld file(s) excluded"), String(sizeText), String(BackupProgressReporter.durationText(elapsed)), Int(blobStore.skippedFiles)))
         } else {
-            say(AppLocalized("Export complete — \(sizeText) in \(BackupProgressReporter.durationText(elapsed))"))
+            say(String(format: AppLocalized("Export complete — %@ in %@"), String(sizeText), String(BackupProgressReporter.durationText(elapsed))))
         }
 
         var titles: [String: String] = [:]
@@ -624,7 +624,7 @@ actor BackupExporter {
         // part: "did my 400 conversations really go in?" is answerable from
         // the log rather than only from the finished package.
         reporter.finish(AppLocalized("Chats exported"),
-                        detail: AppLocalized("\(inScope.count) conversations, \(messageCount) messages, \(fileCount) files"))
+                        detail: String(format: AppLocalized("%lld conversations, %lld messages, %lld files"), Int(inScope.count), Int(messageCount), Int(fileCount)))
 
         return BackupManifest.CategoryStat(
             entries: messageCount + fileCount,

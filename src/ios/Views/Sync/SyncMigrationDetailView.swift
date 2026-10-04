@@ -351,7 +351,7 @@ struct SyncMigrationDetailView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("V1 zone deleted")
                                     .foregroundStyle(.primary)
-                                Text(AppLocalized("Deleted \(deletedAtRelativeString())"))
+                                Text(String(format: AppLocalized("Deleted %@"), String(deletedAtRelativeString())))
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -413,7 +413,7 @@ struct SyncMigrationDetailView: View {
         } message: {
             let count = vm?.unmigratedHistoryCount ?? 0
             let etaH = max(1, count / (50 * 60))   // 50 records/min ballpark, hours
-            Text(AppLocalized("About \(count) local records will upload to iCloud. Estimated time ~\(etaH) hr depending on iCloud throttling. You can pause or cancel any time."))
+            Text(String(format: AppLocalized("About %lld local records will upload to iCloud. Estimated time ~%lld hr depending on iCloud throttling. You can pause or cancel any time."), Int(count), Int(etaH)))
         }
         .confirmationDialog("Cancel Migration?", isPresented: $showCancelMigrationConfirm, titleVisibility: .visible) {
             Button("Cancel Migration", role: .destructive) {
@@ -722,7 +722,7 @@ struct SyncMigrationDetailView: View {
 
     private var zoneDeleteDialogTitle: String {
         guard let row = pendingZoneDelete else { return "" }
-        return AppLocalized("Delete zone \"\(row.name)\"?")
+        return String(format: AppLocalized("Delete zone \"%@\"?"), String(row.name))
     }
 
     private func zoneDeleteMessage(for row: ZoneRow) -> String {
@@ -741,7 +741,7 @@ struct SyncMigrationDetailView: View {
     /// of the final button so the user sees the same wording twice.
     private var zoneSecondConfirmTitle: String {
         guard let row = zoneSecondConfirm else { return "" }
-        return AppLocalized("Permanently delete \"\(row.name)\"?")
+        return String(format: AppLocalized("Permanently delete \"%@\"?"), String(row.name))
     }
 
     /// Second-stage hard-confirm message. Spells out the irreversible
@@ -923,14 +923,14 @@ struct SyncMigrationDetailView: View {
     private func pauseLabel(hours: Int) -> String {
         if hours == 1 { return AppLocalized("1 hour") }
         if hours == 24 { return AppLocalized("1 day") }
-        return AppLocalized("\(hours) hours")
+        return String(format: AppLocalized("%lld hours"), Int(hours))
     }
 
     private func throttleRemaining(until: Date) -> String {
         let secs = max(0, Int(until.timeIntervalSinceNow))
-        if secs < 60 { return AppLocalized("Throttled · \(secs)s") }
+        if secs < 60 { return String(format: AppLocalized("Throttled · %llds"), Int(secs)) }
         let mins = (secs + 30) / 60
-        return AppLocalized("Throttled · \(mins)m")
+        return String(format: AppLocalized("Throttled · %lldm"), Int(mins))
     }
 
     /// ETA from current 1-min average rate. Returns "—" when rate is
@@ -942,11 +942,11 @@ struct SyncMigrationDetailView: View {
         let secs = Int(Double(remaining) / rps)
         if secs < 60 { return AppLocalized("<1 min") }
         let mins = secs / 60
-        if mins < 60 { return AppLocalized("\(mins) min") }
+        if mins < 60 { return String(format: AppLocalized("%lld min"), Int(mins)) }
         let hours = mins / 60
-        if hours < 24 { return AppLocalized("\(hours) hr") }
+        if hours < 24 { return String(format: AppLocalized("%lld hr"), Int(hours)) }
         let days = hours / 24
-        return AppLocalized("\(days) day")
+        return String(format: AppLocalized("%lld day"), Int(days))
     }
 
     private func formatRate(_ rps: Double) -> String {
@@ -957,18 +957,18 @@ struct SyncMigrationDetailView: View {
 
     private func bootDelayRemaining(until: Date) -> String {
         let secs = max(0, Int(until.timeIntervalSinceNow))
-        if secs < 60 { return AppLocalized("Starting in \(secs) sec") }
+        if secs < 60 { return String(format: AppLocalized("Starting in %lld sec"), Int(secs)) }
         let mins = (secs + 30) / 60
-        return AppLocalized("Starting in \(mins) min")
+        return String(format: AppLocalized("Starting in %lld min"), Int(mins))
     }
 
     private func pauseRemaining(until: Date) -> String {
         let secs = Int(until.timeIntervalSinceNow)
         if secs < 60 { return AppLocalized("Resume in <1 min") }
         let mins = secs / 60
-        if mins < 60 { return AppLocalized("Resume in \(mins) min") }
+        if mins < 60 { return String(format: AppLocalized("Resume in %lld min"), Int(mins)) }
         let hours = (mins + 30) / 60
-        return AppLocalized("Resume in \(hours) hr")
+        return String(format: AppLocalized("Resume in %lld hr"), Int(hours))
     }
 
     private func relative(_ date: Date?) -> String {
@@ -976,11 +976,11 @@ struct SyncMigrationDetailView: View {
         let secs = Int(Date().timeIntervalSince(date))
         if secs < 60 { return AppLocalized("Just now") }
         let mins = secs / 60
-        if mins < 60 { return AppLocalized("\(mins) min ago") }
+        if mins < 60 { return String(format: AppLocalized("%lld min ago"), Int(mins)) }
         let hours = mins / 60
-        if hours < 24 { return AppLocalized("\(hours) hr ago") }
+        if hours < 24 { return String(format: AppLocalized("%lld hr ago"), Int(hours)) }
         let days = hours / 24
-        return AppLocalized("\(days) day ago")
+        return String(format: AppLocalized("%lld day ago"), Int(days))
     }
 
     /// Renders the persisted v1-zone-deleted timestamp as a relative

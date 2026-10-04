@@ -234,7 +234,7 @@ struct ThinkingRuleEditorView: View {
     private func seedFromExisting() {
         guard let e = existing else { return }
         label = createsNew && !e.isEditable
-            ? AppLocalized("Copy of \(e.label)")
+            ? String(format: AppLocalized("Copy of %@"), String(e.label))
             : e.label
         switch e.scope {
         case .allModels: scopeIsAllModels = true

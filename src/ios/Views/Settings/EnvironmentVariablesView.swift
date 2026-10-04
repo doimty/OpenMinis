@@ -119,7 +119,7 @@ struct EnvironmentVariablesView: View {
             }
             Button(AppLocalized("Cancel"), role: .cancel) {}
         } message: { request in
-            Text(AppLocalized("\"\(request.key)\" already has a value. Replace it with \"\(request.newValue)\"?"))
+            Text(String(format: AppLocalized("\"%@\" already has a value. Replace it with \"%@\"?"), String(request.key), String(request.newValue)))
         }
         .sheet(item: $editingEntry) { entry in
             EnvVarFormSheet(

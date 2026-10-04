@@ -58,7 +58,7 @@ struct BackupProgressReporter {
     /// likely to be believed.
     func begin(_ label: String) {
         emit(total > 0
-             ? AppLocalized("\(label) — \(total) \(noun)")
+             ? String(format: AppLocalized("%@ — %lld %@"), String(label), Int(total), String(noun))
              : label, false)
     }
 
@@ -76,7 +76,7 @@ struct BackupProgressReporter {
         let elapsed = now.timeIntervalSince(started)
         let perItem = elapsed / Double(done)
         let remaining = perItem * Double(max(0, total - done))
-        emit(AppLocalized("\(done)/\(total) \(noun) · about \(Self.durationText(remaining)) left"),
+        emit(String(format: AppLocalized("%lld/%lld %@ · about %@ left"), Int(done), Int(total), String(noun), String(Self.durationText(remaining))),
              true)   // replaced by the next progress line
     }
 
@@ -85,9 +85,9 @@ struct BackupProgressReporter {
         let elapsed = Date().timeIntervalSince(started)
         let took = Self.durationText(elapsed)
         if let detail {
-            emit(AppLocalized("\(label) — \(detail) in \(took)"), false)
+            emit(String(format: AppLocalized("%@ — %@ in %@"), String(label), String(detail), String(took)), false)
         } else {
-            emit(AppLocalized("\(label) — \(total) \(noun) in \(took)"), false)
+            emit(String(format: AppLocalized("%@ — %lld %@ in %@"), String(label), Int(total), String(noun), String(took)), false)
         }
     }
 
@@ -95,8 +95,8 @@ struct BackupProgressReporter {
     /// "1m 47s left" that is wrong by a minute reads worse than "about 2m".
     static func durationText(_ seconds: TimeInterval) -> String {
         if seconds < 1 { return AppLocalized("less than a second") }
-        if seconds < 60 { return AppLocalized("\(Int(seconds.rounded()))s") }
+        if seconds < 60 { return String(format: AppLocalized("%llds"), Int(Int(seconds.rounded()))) }
         let minutes = Int((seconds / 60).rounded())
-        return AppLocalized("\(minutes)m")
+        return String(format: AppLocalized("%lldm"), Int(minutes))
     }
 }

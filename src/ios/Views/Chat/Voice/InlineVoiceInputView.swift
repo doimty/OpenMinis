@@ -1211,7 +1211,7 @@ struct InlineVoiceInputView: View {
             return AppLocalized("Microphone access denied — enable it in Settings", comment: "Inline voice permission denied")
         }
         if let err = viewModel.startError {
-            return AppLocalized("Couldn't start microphone: \(err)", comment: "Inline voice start error")
+            return String(format: AppLocalized("Couldn't start microphone: %@", comment: "Inline voice start error"), String(err))
         }
         if viewModel.isEditingTranscript {
             return AppLocalized("Editing — tap mic to resume", comment: "Inline voice editing state")

@@ -64,7 +64,7 @@ struct SkillsManagementView: View {
                 }
             } else if filteredSkills.isEmpty {
                 Section {
-                    Text(AppLocalized("No skills match \"\(searchQuery)\"."))
+                    Text(String(format: AppLocalized("No skills match \"%@\"."), String(searchQuery)))
                         .foregroundStyle(.secondary)
                         .font(.subheadline)
                 }
@@ -184,7 +184,7 @@ struct SkillsManagementView: View {
         let count = store.skills.count
         for s in store.skills { store.forceMarkDirty(s.id) }
         SyncCore.shared.scheduleSend(delay: 0.5)
-        forceSyncAllToast = AppLocalized("Queued \(count) skills for sync")
+        forceSyncAllToast = String(format: AppLocalized("Queued %lld skills for sync"), Int(count))
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { forceSyncAllToast = nil }
     }
 
@@ -947,7 +947,7 @@ struct MinisSkillsBrowserView: View {
                 }
                 Button(AppLocalized("Cancel"), role: .cancel) {}
             } message: {
-                Text(AppLocalized("\"\(coordinator.pendingOverwriteName)\" is already installed. Update to the latest version?"))
+                Text(String(format: AppLocalized("\"%@\" is already installed. Update to the latest version?"), String(coordinator.pendingOverwriteName)))
             }
         }
     }
@@ -964,7 +964,7 @@ struct MinisSkillsBrowserView: View {
             case .success(let name):
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
-                Text(AppLocalized("\(name) imported"))
+                Text(String(format: AppLocalized("%@ imported"), String(name)))
                     .foregroundStyle(.white)
                     .lineLimit(1)
             case .error(let msg):

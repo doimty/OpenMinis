@@ -159,7 +159,7 @@ enum BackupDelivery {
                 atPath: partial.path)[.size] as? Int64) ?? -2
             guard want == got else {
                 throw NSError(domain: "Backup", code: 1, userInfo: [
-                    NSLocalizedDescriptionKey: AppLocalized("Copy verification failed: the folder has \(max(got, 0)) bytes but the backup is \(want) bytes."),
+                    NSLocalizedDescriptionKey: String(format: AppLocalized("Copy verification failed: the folder has %lld bytes but the backup is %lld bytes."), Int(max(got, 0)), Int(want)),
                 ])
             }
         } catch {

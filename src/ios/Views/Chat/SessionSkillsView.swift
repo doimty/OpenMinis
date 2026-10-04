@@ -99,7 +99,7 @@ struct SessionSkillsView: View {
                     }
                 } else if filteredSkills.isEmpty {
                     Section {
-                        Text(AppLocalized("No skills match \"\(searchQuery)\"."))
+                        Text(String(format: AppLocalized("No skills match \"%@\"."), String(searchQuery)))
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     }

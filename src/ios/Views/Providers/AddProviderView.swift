@@ -408,7 +408,7 @@ struct AddProviderView: View {
                 return
             }
             if let label = store.importInstanceJSON(json) {
-                importMessage = AppLocalized("Imported provider \"\(label)\" successfully.")
+                importMessage = String(format: AppLocalized("Imported provider \"%@\" successfully."), String(label))
                 importSucceeded = true
             } else {
                 importMessage = AppLocalized("Invalid provider configuration file.")
@@ -435,7 +435,7 @@ struct AddProviderView: View {
             // this view and would need editing for every vendor added later.
             // The step that KNOWS which vendor was tapped sets
             // `configuringDisplayName` instead, and this just renders it.
-            return AppLocalized("Configure \(configuringDisplayName)")
+            return String(format: AppLocalized("Configure %@"), String(configuringDisplayName))
         } else if selectedType != nil {
             return AppLocalized("Auth Method")
         }
@@ -1281,7 +1281,7 @@ struct AddProviderView: View {
         case (.openAIResponses, .apiKey):
             return AppLocalized("Use an API key for a Responses API endpoint")
         case (_, .apiKey):
-            return AppLocalized("Use an API key from your \(type.displayName) account")
+            return String(format: AppLocalized("Use an API key from your %@ account"), String(type.displayName))
         case (.anthropic, .oauth):
             return AppLocalized("Sign in with your Claude account")
         case (.gemini, .oauth):

@@ -117,19 +117,19 @@ enum VoiceProviderError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unsupported(let msg):
-            return AppLocalized("Unsupported: \(msg)", comment: "Voice provider unsupported capability")
+            return String(format: AppLocalized("Unsupported: %@", comment: "Voice provider unsupported capability"), String(msg))
         case .httpError(let code, let body):
             // Surface the server's own error message when present (most APIs put
             // the reason in the body, e.g. {"error":{"message":"..."}}).
             if let detail = Self.serverMessage(from: body) {
-                return AppLocalized("Request failed (HTTP \(code)): \(detail)", comment: "Voice provider HTTP error with detail")
+                return String(format: AppLocalized("Request failed (HTTP %lld): %@", comment: "Voice provider HTTP error with detail"), Int(code), String(detail))
             }
             if code == 404 {
                 return AppLocalized("Request failed (HTTP 404) — check the provider's Base URL and model name", comment: "Voice provider 404 hint")
             }
-            return AppLocalized("Request failed (HTTP \(code))", comment: "Voice provider HTTP error")
+            return String(format: AppLocalized("Request failed (HTTP %lld)", comment: "Voice provider HTTP error"), Int(code))
         case .parseError(let msg):
-            return AppLocalized("Parse failed: \(msg)", comment: "Voice provider response parse error")
+            return String(format: AppLocalized("Parse failed: %@", comment: "Voice provider response parse error"), String(msg))
         case .authError:
             return AppLocalized("Authentication failed, please check the API key", comment: "Voice provider auth error")
         case .noAudioData:

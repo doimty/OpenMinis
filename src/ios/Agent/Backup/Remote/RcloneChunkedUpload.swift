@@ -75,7 +75,7 @@ enum RcloneTransfer {
             case .unreadableSource: return AppLocalized("Couldn't read the backup file.")
             case .remoteRejected(let m): return m
             case .sizeMismatch(let expected, let actual):
-                return AppLocalized("Upload verification failed: the server has \(actual) bytes but the backup is \(expected) bytes.")
+                return String(format: AppLocalized("Upload verification failed: the server has %lld bytes but the backup is %lld bytes."), Int(actual), Int(expected))
             case .cancelled: return AppLocalized("Upload cancelled.")
             }
         }

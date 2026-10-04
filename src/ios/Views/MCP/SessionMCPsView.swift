@@ -94,7 +94,7 @@ struct SessionMCPsView: View {
                     }
                 } else if filteredServers.isEmpty {
                     Section {
-                        Text(AppLocalized("No MCP servers match \"\(searchQuery)\"."))
+                        Text(String(format: AppLocalized("No MCP servers match \"%@\"."), String(searchQuery)))
                             .foregroundStyle(.secondary)
                             .font(.subheadline)
                     }

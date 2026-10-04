@@ -690,13 +690,13 @@ struct BackupSettingsView: View {
         let total = ByteCountFormatter.string(fromByteCount: d.totalBytes, countStyle: .file)
         let elapsed = BackupTransferStatus.durationText(d.elapsed)
         if d.finishedAt != nil {
-            return AppLocalized("\(total) in \(elapsed)")
+            return String(format: AppLocalized("%@ in %@"), String(total), String(elapsed))
         }
         let rate = BackupTransferStatus.rateText(d.bytesPerSecond)
         if let remaining = d.remaining {
-            return AppLocalized("\(sent) of \(total) · \(rate) · \(elapsed) elapsed · about \(BackupTransferStatus.durationText(remaining)) left")
+            return String(format: AppLocalized("%@ of %@ · %@ · %@ elapsed · about %@ left"), String(sent), String(total), String(rate), String(elapsed), String(BackupTransferStatus.durationText(remaining)))
         }
-        return AppLocalized("\(sent) of \(total) · \(elapsed) elapsed")
+        return String(format: AppLocalized("%@ of %@ · %@ elapsed"), String(sent), String(total), String(elapsed))
     }
 
     /// Whether this record is the interrupted run whose staging is still on

@@ -6700,7 +6700,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                         msgIdx = resynced
                         let trailLines = fallbackReasons.map { "⚠️ \($0.model) (\($0.instance)): \($0.reason)" }
                         let instanceLabel = ProviderConfigStore.shared.instance(for: newEntry.providerInstanceId)?.label ?? newEntry.model.provider
-                        let noticeText = trailLines.joined(separator: "\n") + "\n" + AppLocalized("Switched to \(newEntry.model.displayName) (\(instanceLabel))")
+                        let noticeText = trailLines.joined(separator: "\n") + "\n" + String(format: AppLocalized("Switched to %@ (%@)"), String(newEntry.model.displayName), String(instanceLabel))
                         let infoBlock = AssistantBlock(kind: .info, content: noticeText)
                         messages[msgIdx].blocks.insert(infoBlock, at: 0)
                         fallbackReasons.removeAll()

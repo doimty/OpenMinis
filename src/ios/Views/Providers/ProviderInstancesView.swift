@@ -170,7 +170,7 @@ struct ProviderInstancesView: View {
                     return
                 }
                 if let label = store.importInstanceJSON(json) {
-                    importMessage = AppLocalized("Imported provider \"\(label)\" successfully.")
+                    importMessage = String(format: AppLocalized("Imported provider \"%@\" successfully."), String(label))
                 } else {
                     importMessage = AppLocalized("Invalid provider configuration file.")
                 }

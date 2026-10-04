@@ -37,7 +37,7 @@ struct FaceIDProtectionSettingsView: View {
                         return
                     }
                     Task { @MainActor in
-                        let reason = AppLocalized("Enable \(BiometricAuth.biometryDisplayName) app lock")
+                        let reason = String(format: AppLocalized("Enable %@ app lock"), String(BiometricAuth.biometryDisplayName))
                         let ok = await BiometricAuth.authenticate(reason: reason)
                         if ok {
                             store.appLockEnabled = true
@@ -81,7 +81,7 @@ struct FaceIDProtectionSettingsView: View {
                 .onChange(of: enabled) { newValue in
                     guard newValue else { return }
                     Task { @MainActor in
-                        let reason = AppLocalized("Enable \(BiometricAuth.biometryDisplayName) protection for chat sessions")
+                        let reason = String(format: AppLocalized("Enable %@ protection for chat sessions"), String(BiometricAuth.biometryDisplayName))
                         let ok = await BiometricAuth.authenticate(reason: reason)
                         if !ok {
                             enabled = false

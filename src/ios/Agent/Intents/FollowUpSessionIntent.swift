@@ -215,7 +215,7 @@ struct FollowUpSessionIntent: AppIntent {
             prompt: prompt
         )
 
-        return .result(value: result, dialog: IntentDialog(stringLiteral: AppLocalized("Follow-up sent to \(session.displayName) with \(modelName).")))
+        return .result(value: result, dialog: IntentDialog(stringLiteral: String(format: AppLocalized("Follow-up sent to %@ with %@."), String(session.displayName), String(modelName))))
     }
 
     // See the note in QuickTaskIntent: without a `parameterSummary` the action

@@ -168,11 +168,11 @@ struct ConfigAuditView: View {
         }
         if secs < 3600 {
             let m = secs / 60
-            return AppLocalized("\(m) min ago")
+            return String(format: AppLocalized("%lld min ago"), Int(m))
         }
         if secs < 86_400 {
             let h = secs / 3600
-            return AppLocalized("\(h) hr ago")
+            return String(format: AppLocalized("%lld hr ago"), Int(h))
         }
         let cal = Calendar.current
         if cal.isDateInYesterday(date) {

@@ -193,7 +193,7 @@ struct SendPromptIntent: AppIntent {
                 prompt: prompt,
                 responseText: reason
             )
-            return .result(value: rejected, dialog: IntentDialog(stringLiteral: AppLocalized("Minis could not accept the prompt (\(reason)).")))
+            return .result(value: rejected, dialog: IntentDialog(stringLiteral: String(format: AppLocalized("Minis could not accept the prompt (%@)."), String(reason))))
         }
 
         // Resolve actual model from session binding (matches what the agent loop uses)
@@ -313,7 +313,7 @@ struct SendPromptIntent: AppIntent {
             prompt: prompt
         )
 
-        return .result(value: result, dialog: IntentDialog(stringLiteral: AppLocalized("Task started with \(modelName). I'll notify you when it's done.")))
+        return .result(value: result, dialog: IntentDialog(stringLiteral: String(format: AppLocalized("Task started with %@. I'll notify you when it's done."), String(modelName))))
     }
 
     // [T-shortcuts-automation-no-prompt-field] Without a `parameterSummary` the

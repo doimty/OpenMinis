@@ -493,10 +493,10 @@ struct BackupHistoryRow: View {
             }
             let ok = record.destinations.filter(\.succeeded).count
             if !record.destinations.isEmpty {
-                bits.append(AppLocalized("\(ok)/\(record.destinations.count) destinations"))
+                bits.append(String(format: AppLocalized("%lld/%lld destinations"), Int(ok), Int(record.destinations.count)))
             }
             if record.skippedFiles > 0 {
-                bits.append(AppLocalized("\(record.skippedFiles) excluded"))
+                bits.append(String(format: AppLocalized("%lld excluded"), Int(record.skippedFiles)))
             }
             return bits.joined(separator: " · ")
         }

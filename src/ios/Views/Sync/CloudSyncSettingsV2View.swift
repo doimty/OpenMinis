@@ -273,10 +273,10 @@ struct CloudSyncSettingsV2View: View {
         let secs = Int(Date().timeIntervalSince(d))
         if secs < 60 { return AppLocalized("Just now") }
         let mins = secs / 60
-        if mins < 60 { return AppLocalized("\(mins) min ago") }
+        if mins < 60 { return String(format: AppLocalized("%lld min ago"), Int(mins)) }
         let hrs = mins / 60
-        if hrs < 24 { return AppLocalized("\(hrs) hr ago") }
+        if hrs < 24 { return String(format: AppLocalized("%lld hr ago"), Int(hrs)) }
         let days = hrs / 24
-        return AppLocalized("\(days) day ago")
+        return String(format: AppLocalized("%lld day ago"), Int(days))
     }
 }

@@ -97,7 +97,7 @@ struct AssistantBlockView: View {
             // Truncate middle if more than 9 reason lines
             let displayReasons: [String] = {
                 if reasonLines.count <= 9 { return reasonLines }
-                return Array(reasonLines.prefix(4)) + [AppLocalized("⋯ \(reasonLines.count - 8) more")] + Array(reasonLines.suffix(4))
+                return Array(reasonLines.prefix(4)) + [String(format: AppLocalized("⋯ %lld more"), Int(reasonLines.count - 8))] + Array(reasonLines.suffix(4))
             }()
             VStack(alignment: .leading, spacing: 3) {
                 ForEach(Array(displayReasons.enumerated()), id: \.offset) { _, line in

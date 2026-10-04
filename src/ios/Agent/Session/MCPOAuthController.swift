@@ -437,7 +437,7 @@ final class MCPOAuthController: NSObject, ObservableObject {
         } else if scheme == "http" || scheme == "https" {
             // A public http(s) redirect can't be intercepted by a native app
             // (that's a web-app flow). Point the user at the loopback form.
-            throw OAuthError.badConfig(AppLocalized("An http(s) Redirect URI must use localhost, e.g. \(Self.defaultRedirectURI)."))
+            throw OAuthError.badConfig(String(format: AppLocalized("An http(s) Redirect URI must use localhost, e.g. %@."), String(Self.defaultRedirectURI)))
         } else {
             code = try await runSchemeFlow(authURL: authURL, scheme: scheme, state: state)
         }
@@ -466,7 +466,7 @@ final class MCPOAuthController: NSObject, ObservableObject {
         guard let http = resp as? HTTPURLResponse, http.statusCode < 400 else {
             let body = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
             logger.error("[Authorize] '\(server)' token exchange HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)")
-            throw OAuthError.exchangeFailed(AppLocalized("Token exchange failed: \(String(body))"))
+            throw OAuthError.exchangeFailed(String(format: AppLocalized("Token exchange failed: %@"), String(String(body))))
         }
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let access = obj["access_token"] as? String else {
@@ -551,7 +551,7 @@ final class MCPOAuthController: NSObject, ObservableObject {
             // [T-mcp-oauth-dcr] `access_denied` is the user saying no on the
             // consent page — report it as a decision, not a raw error code.
             if err == "access_denied" { throw OAuthError.denied }
-            throw OAuthError.exchangeFailed(AppLocalized("Authorization failed: \(err)"))
+            throw OAuthError.exchangeFailed(String(format: AppLocalized("Authorization failed: %@"), String(err)))
         }
         return code
     }

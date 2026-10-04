@@ -277,7 +277,7 @@ struct SoulSettingsView: View {
                 Text(soulBodyCountText(bodyText))
                     .foregroundStyle(.secondary)
             case .overLimit(let count, let cap):
-                Text(AppLocalized("Over limit: \(count) / \(cap) tokens. Each CJK character and each Latin word counts as one."))
+                Text(String(format: AppLocalized("Over limit: %lld / %lld tokens. Each CJK character and each Latin word counts as one."), Int(count), Int(cap)))
                     .foregroundStyle(.red)
             }
         }
@@ -287,7 +287,7 @@ struct SoulSettingsView: View {
     /// Counter shown when the body is within budget.
     private func soulBodyCountText(_ body: String) -> String {
         let count = SoulStore.tokenCount(body)
-        return AppLocalized("\(count) / \(SoulStore.bodyTokenLimit) tokens")
+        return String(format: AppLocalized("%lld / %lld tokens"), Int(count), Int(SoulStore.bodyTokenLimit))
     }
 
     private var isBodyOverLimit: Bool {

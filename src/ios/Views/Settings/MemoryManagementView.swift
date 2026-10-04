@@ -91,7 +91,7 @@ struct MemoryManagementView: View {
         let count = await ForceSyncHelper.markMemoryDirty()
         await ForceSyncHelper.bidirectionalSync(
             recordTypes: ["MemoryGlobalV2", "MemoryDailyV2"])
-        forceSyncToast = AppLocalized("Synced \(count) memory files")
+        forceSyncToast = String(format: AppLocalized("Synced %lld memory files"), Int(count))
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             forceSyncToast = nil
         }

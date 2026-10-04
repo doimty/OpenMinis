@@ -374,12 +374,12 @@ private struct DeviceSyncSection: View {
         let seconds = Int(Date().timeIntervalSince(date))
         if seconds < 60 { return AppLocalized("just now") }
         let minutes = seconds / 60
-        if minutes < 60 { return AppLocalized("\(minutes) min ago") }
+        if minutes < 60 { return String(format: AppLocalized("%lld min ago"), Int(minutes)) }
         let hours = minutes / 60
-        if hours < 24 { return AppLocalized("\(hours) hr ago") }
+        if hours < 24 { return String(format: AppLocalized("%lld hr ago"), Int(hours)) }
         let days = hours / 24
-        if days == 1 { return AppLocalized("\(days) day ago") }
-        return AppLocalized("\(days) days ago")
+        if days == 1 { return String(format: AppLocalized("%lld day ago"), Int(days)) }
+        return String(format: AppLocalized("%lld days ago"), Int(days))
     }
 
     private var deviceIcon: String {
