@@ -92,13 +92,19 @@ class SourceGuards(unittest.TestCase):
 
     def test_teardown_is_local_and_never_writes_binding(self):
         self.assertIn("coordinator.dismantle(uiView)", self.representable)
-        body = section(self.representable, "func dismantle(", "deinit")
+        body = section(self.representable, "func dismantle(", "init(_ parent:")
         ordered = ["isDismantled = true", "cancelPendingFocus()", "allowsFirstResponder = false",
                    "textView.delegate = nil", "textView.resignFirstResponder()"]
         positions = [body.index(value) for value in ordered]
         self.assertEqual(positions, sorted(positions))
         self.assertNotIn("parent.", body)
         self.assertNotIn("endEditing(", self.representable)
+
+    def test_single_deinit_cancels_both_pending_tasks(self):
+        self.assertEqual(self.representable.count("deinit {"), 1)
+        cleanup = section(self.representable, "deinit {", "\n        }")
+        self.assertIn("pendingFocusWorkItem?.cancel()", cleanup)
+        self.assertIn("contextHintDebounce?.cancel()", cleanup)
 
     def test_touch_gate_and_default_callsite_contract_are_preserved(self):
         subclass = section(self.source, "class PastableUITextView:", "struct PastableTextView:")

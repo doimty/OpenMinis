@@ -2063,8 +2063,6 @@ struct PastableTextView: UIViewRepresentable {
             if textView.isFirstResponder { textView.resignFirstResponder() }
         }
 
-        deinit { pendingFocusWorkItem?.cancel() }
-
         init(_ parent: PastableTextView) {
             self.parent = parent
         }
@@ -2259,6 +2257,7 @@ struct PastableTextView: UIViewRepresentable {
         }
 
         deinit {
+            pendingFocusWorkItem?.cancel()
             contextHintDebounce?.cancel()
         }
 
