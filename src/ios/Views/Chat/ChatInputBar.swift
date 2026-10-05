@@ -1908,59 +1908,8 @@ struct PastableTextView: UIViewRepresentable {
             context.coordinator.refreshPlaceholderText(in: tv)
         }
 
-        // Sync focus from SwiftUI → UIKit (guard to prevent feedback loops)
-        let wantsFocus = isFocused
-        let hasFocus = tv.isFirstResponder
-        if wantsFocus != hasFocus {
-            pasteLog.debug("[updateUIView] focus sync: wantsFocus=\(wantsFocus) hasFocus=\(hasFocus)")
-            let coordinator = context.coordinator
-            coordinator.isSyncingFocus = true
-            if wantsFocus {
-                DispatchQueue.main.async {
-                    // Only become first responder when no sheet /
-                    // fullScreenCover is presented above this view.
-                    // SwiftUI sheets share the same window on iOS, so
-                    // isKeyWindow is always true — instead walk the VC
-                    // hierarchy and check presentedViewController.
-                    let blocked: Bool = {
-                        guard let vc = tv.nearestViewController else { return true }
-                        var walk: UIViewController? = vc
-                        while let w = walk {
-                            if w.presentedViewController != nil { return true }
-                            walk = w.parent
-                        }
-                        return false
-                    }()
-                    guard !blocked else {
-                        pasteLog.debug("[updateUIView] skipping becomeFirstResponder — a modal is presented")
-                        coordinator.isSyncingFocus = false
-                        return
-                    }
-                    pasteLog.debug("[updateUIView] calling becomeFirstResponder")
-                    // [T-voice-text-switch-autofocus-race] SwiftUI is
-                    // deliberately requesting focus — open the gate so
-                    // canBecomeFirstResponder permits it (it defaults closed to
-                    // block unsolicited chain hand-offs on mount).
-                    tv.allowsFirstResponder = true
-                    tv.becomeFirstResponder()
-                    coordinator.isSyncingFocus = false
-                }
-            } else {
-                DispatchQueue.main.async {
-                    pasteLog.debug("[updateUIView] calling resignFirstResponder")
-                    // [T-voice-text-switch-autofocus-race] Re-close the gate on
-                    // resign so a later unsolicited chain hand-off (if UIKit
-                    // reuses this instance) is refused again until the next real
-                    // tap or focus-sync request.
-                    tv.allowsFirstResponder = false
-                    tv.resignFirstResponder()
-                    // Re-measure after keyboard dismiss so the text view
-                    // doesn't retain its keyboard-present height (iOS 16).
-                    tv.invalidateIntrinsicContentSize()
-                    coordinator.isSyncingFocus = false
-                }
-            }
-        }
+        // Sync focus through one cancellable request, never a captured parent.
+        context.coordinator.syncFocus(tv)
 
         // Sync scroll state back to SwiftUI.
         // [T-ios-composer-paste-scroll-stale] Measure it, don't read the flag.
@@ -1994,11 +1943,127 @@ struct PastableTextView: UIViewRepresentable {
         }
     }
 
+    static func dismantleUIView(_ uiView: PastableUITextView, coordinator: Coordinator) {
+        coordinator.dismantle(uiView)
+    }
+
     class Coordinator: NSObject, UITextViewDelegate {
         var parent: PastableTextView
-        /// Guard flag to prevent focus feedback loop between UIKit delegate → SwiftUI → updateUIView
-        var isSyncingFocus = false
-        /// [T-ios-composer-residual-text-33549] When `updateUIView` clears
+        /// Only synchronous UIKit focus calls suppress delegate feedback.
+        private(set) var isSyncingFocus = false
+        private var pendingFocusWorkItem: DispatchWorkItem?
+        private var pendingFocusTarget: Bool?
+        private var focusGeneration: UInt = 0
+        private var isDismantled = false
+
+        func cancelPendingFocus() {
+            pendingFocusWorkItem?.cancel()
+            pendingFocusWorkItem = nil
+            pendingFocusTarget = nil
+            focusGeneration &+= 1
+        }
+
+        // [T-ios15-composer-focus-race] Updates can arrive several times before
+        // the main queue runs. Deduplicate without delaying an existing request;
+        // a changed intent, real delegate edge or teardown invalidates its token.
+        func syncFocus(_ textView: PastableUITextView) {
+            guard !isDismantled else { return }
+            let wantsFocus = parent.isFocused
+            if !wantsFocus { textView.allowsFirstResponder = false }
+            guard wantsFocus != textView.isFirstResponder else {
+                cancelPendingFocus()
+                return
+            }
+            if pendingFocusWorkItem != nil, pendingFocusTarget == wantsFocus { return }
+            cancelPendingFocus()
+            let generation = focusGeneration
+            pendingFocusTarget = wantsFocus
+            let item = DispatchWorkItem { [weak self, weak textView] in
+                guard let self, let textView, !self.isDismantled,
+                      generation == self.focusGeneration else { return }
+                self.pendingFocusWorkItem = nil
+                self.pendingFocusTarget = nil
+                // Re-read the live Binding even when no updateUIView has run
+                // since the request was queued. Never replay a captured intent.
+                guard self.parent.isFocused == wantsFocus,
+                      wantsFocus != textView.isFirstResponder else { return }
+                if wantsFocus {
+                    guard self.canAcquireFocus(for: textView) else {
+                        textView.allowsFirstResponder = false
+                        pasteLog.debug("[focus] skipping becomeFirstResponder — composer unavailable/offscreen or transitioning")
+                        return
+                    }
+                    textView.allowsFirstResponder = true
+                    pasteLog.debug("[focus] calling becomeFirstResponder")
+                    self.withFocusSync {
+                        if !textView.becomeFirstResponder() {
+                            textView.allowsFirstResponder = false
+                        }
+                    }
+                } else {
+                    textView.allowsFirstResponder = false
+                    pasteLog.debug("[focus] calling resignFirstResponder")
+                    self.withFocusSync { _ = textView.resignFirstResponder() }
+                    // Preserve the existing post-dismiss measurement behavior.
+                    textView.invalidateIntrinsicContentSize()
+                }
+            }
+            pendingFocusWorkItem = item
+            DispatchQueue.main.async(execute: item)
+        }
+
+        private func withFocusSync(_ action: () -> Void) {
+            isSyncingFocus = true
+            defer { isSyncingFocus = false }
+            action()
+        }
+
+        private func canAcquireFocus(for textView: PastableUITextView) -> Bool {
+            guard let window = textView.window, textView.isEditable else { return false }
+            let frame = textView.convert(textView.bounds, to: window)
+            // Window membership alone is insufficient during iOS 15 pop: the
+            // outgoing composer can still be attached at x = window.maxX.
+            guard frame.intersects(window.bounds) else { return false }
+            var visibleFrame = frame.intersection(window.bounds)
+            var view: UIView? = textView
+            while let current = view {
+                guard !current.isHidden, current.alpha > 0.01,
+                      current.isUserInteractionEnabled else { return false }
+                if current.clipsToBounds {
+                    visibleFrame = visibleFrame.intersection(current.convert(current.bounds, to: window))
+                }
+                guard !visibleFrame.isNull, !visibleFrame.isEmpty else { return false }
+                view = current.superview
+            }
+            guard let vc = textView.nearestViewController else { return false }
+            var ancestor: UIViewController? = vc
+            while let current = ancestor {
+                if current.isMovingFromParent || current.isBeingDismissed { return false }
+                if current.presentedViewController != nil { return false }
+                // Only a navigation transition FROM this ancestor blocks focus.
+                // Do not block the destination, rotations, or latch a permanent
+                // disable after an interactive pop is cancelled.
+                if let transition = current.navigationController?.transitionCoordinator,
+                   !transition.isCancelled,
+                   transition.viewController(forKey: .from) === current,
+                   let destination = transition.viewController(forKey: .to),
+                   destination !== current { return false }
+                ancestor = current.parent
+            }
+            return true
+        }
+
+        func dismantle(_ textView: PastableUITextView) {
+            isDismantled = true
+            cancelPendingFocus()
+            textView.allowsFirstResponder = false
+            // Detach before resigning: teardown must not write an old SwiftUI
+            // Binding (including selection) or dismiss an unrelated app input.
+            textView.delegate = nil
+            if textView.isFirstResponder { textView.resignFirstResponder() }
+        }
+
+        deinit { pendingFocusWorkItem?.cancel() }
 
         init(_ parent: PastableTextView) {
             self.parent = parent
@@ -2409,8 +2474,10 @@ struct PastableTextView: UIViewRepresentable {
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
+            guard !isDismantled else { return }
             pasteLog.debug("[Coordinator] textViewDidBeginEditing isSyncing=\(self.isSyncingFocus)")
             if !isSyncingFocus {
+                cancelPendingFocus()
                 parent.isFocused = true
             }
             // [T-ios-composer-placeholder-rotation] Focus gain is the sole
@@ -2422,8 +2489,12 @@ struct PastableTextView: UIViewRepresentable {
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
+            guard !isDismantled else { return }
             pasteLog.debug("[Coordinator] textViewDidEndEditing isSyncing=\(self.isSyncingFocus)")
             if !isSyncingFocus {
+                // User dismissal / navigation wins over every queued acquire.
+                cancelPendingFocus()
+                (textView as? PastableUITextView)?.allowsFirstResponder = false
                 parent.isFocused = false
             }
             // Force re-layout after keyboard dismiss — on iOS 16 the
