@@ -8167,6 +8167,19 @@ private struct SettingsSheet: View {
                 Section("Agent Runtime") {
                     // [T-tools-granular-switches] First row: per-tool switches.
                     NavigationLink {
+                        AutoCompactionSettingsView()
+                    } label: {
+                        Label {
+                            Text(AppLocalized("Auto-Compact"))
+                        } icon: {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(.indigo, in: Circle())
+                        }
+                    }
+                    NavigationLink {
                         ToolsSettingsView()
                     } label: {
                         Label {

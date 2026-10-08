@@ -23,7 +23,9 @@ extension AIChatViewModel {
         let contextWindow = resolved.window
         guard contextWindow > 0 else { return .ok }
 
-        let policy = ContextPolicy(contextWindow: contextWindow, isUserCap: resolved.isUserCap)
+        let budget = AutoCompactionPreferences.activeBudgetTokens
+        let policy = ContextPolicy(contextWindow: contextWindow, isUserCap: resolved.isUserCap,
+                                   autoCompactBudgetTokens: budget)
         // [T-ctx-measure-outbound] Judge the request that is about to go out.
         //
         // This used to be `max(estimateContextTokens(), lastReportedContextTokens())`.
@@ -43,7 +45,7 @@ extension AIChatViewModel {
         let result = policy.check(estimatedTokens: measured, contextWindow: contextWindow)
         // [CtxMeter] decide — every capacity decision with its inputs, so a
         // field log can replay why a turn compacted, stopped or was sent.
-        logger.info("[CtxMeter] decide site=\(site) model=\(entry.model.id) history=\(m.history) fixed=\(m.fixed) ratio=\(String(format: "%.3f", m.ratio))(\(m.source)) measured=\(measured) threshold=\(policy.compactThreshold) window=\(contextWindow) userCap=\(resolved.isUserCap) → \(String(describing: result))")
+        logger.info("[CtxMeter] decide site=\(site) model=\(entry.model.id) history=\(m.history) fixed=\(m.fixed) ratio=\(String(format: "%.3f", m.ratio))(\(m.source)) measured=\(measured) threshold=\(policy.compactThreshold) window=\(contextWindow) userCap=\(resolved.isUserCap) autoCompact=\(autoCompactEnabled) budget=\(budget) → \(String(describing: result))")
         let markerInfo: String
         if let m = cachedLatestMarker {
             let ageSec = Int(Date().timeIntervalSince(m.createdAt))
@@ -240,7 +242,8 @@ extension AIChatViewModel {
         guard let entry = resolveCurrentEntry() else { return (warmUp, false) }
         let resolved = resolvedContextWindow(for: entry.model)
         guard resolved.window > 0, contextFixedTokens > 0 else { return (warmUp, false) }
-        let policy = ContextPolicy(contextWindow: resolved.window, isUserCap: resolved.isUserCap)
+        let policy = ContextPolicy(contextWindow: resolved.window, isUserCap: resolved.isUserCap,
+                                   autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens)
         let line = policy.compactThreshold > 0 ? policy.compactThreshold : resolved.window
         let budget = Int(Double(line) / contextCalibrationRatio(for: entry.model.id)) - contextFixedTokens
         let restTokens = ContextSizeMeter.estimateTokens(rest) + ContextSizeMeter.estimateTokens(summaryText)

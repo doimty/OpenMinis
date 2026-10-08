@@ -183,6 +183,13 @@ jobs:
           set -euo pipefail
           python3 scripts/test_ios15_compat_contract.py -v
 
+      - name: Automatic compaction budget native and source gates
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_auto_compaction_budget.py \
+            --runner "$(xcrun --find swiftc)" \
+            --json "$RUNNER_TEMP/auto-compaction-budget.json"
+
       - name: TrollStore IPA packager tests
         run: |
           set -euo pipefail

@@ -1,5 +1,49 @@
 import Foundation
 
+/// [T-auto-compact-budget] Global preferences, read at each decision rather
+/// than captured in a cached ViewModel. Keep the legacy opt-in key unchanged.
+enum AutoCompactionPreferences {
+    static let enabledKey = "autoCompactOnThreshold"
+    static let budgetKey = "autoCompactBudgetTokens"
+    static let defaultBudgetTokens = 256_000
+    static let minimumBudgetTokens = 32_000
+    static let maximumBudgetTokens = 4_000_000
+
+    static func isValidBudget(_ tokens: Int) -> Bool {
+        tokens == 0 || (minimumBudgetTokens...maximumBudgetTokens).contains(tokens)
+    }
+
+    static func normalizedBudget(_ tokens: Int) -> Int {
+        isValidBudget(tokens) ? tokens : defaultBudgetTokens
+    }
+
+    static var enabled: Bool {
+        UserDefaults.standard.bool(forKey: enabledKey)
+    }
+
+    static var budgetTokens: Int {
+        budgetTokens(in: .standard)
+    }
+
+    static func budgetTokens(in defaults: UserDefaults) -> Int {
+        guard let raw = defaults.object(forKey: budgetKey) else { return defaultBudgetTokens }
+        // Do not let integer(forKey:) turn a corrupt string or Boolean into
+        // zero (which has the special meaning "follow the model window").
+        guard let number = raw as? NSNumber, String(cString: number.objCType) != "c" else {
+            return defaultBudgetTokens
+        }
+        let value = number.doubleValue
+        guard value.isFinite, value.rounded(.towardZero) == value,
+              value == 0 || (Double(minimumBudgetTokens)...Double(maximumBudgetTokens)).contains(value)
+        else { return defaultBudgetTokens }
+        return normalizedBudget(Int(value))
+    }
+
+    static var activeBudgetTokens: Int {
+        enabled ? budgetTokens : 0
+    }
+}
+
 /// Determines offload / compact / exhausted thresholds based on model context window size.
 ///
 /// Tiers:
@@ -29,15 +73,19 @@ struct ContextPolicy {
     /// the compaction call, and "I want this group to stay under 32K" is an
     /// instruction to compact, not a reason to stop compacting. So a user cap
     /// gets proportional thresholds and always keeps auto-compact available.
-    init(contextWindow: Int, isUserCap: Bool = false) {
-        if isUserCap {
+    init(contextWindow: Int, isUserCap: Bool = false, autoCompactBudgetTokens: Int = 0) {
+        // A soft target may only LOWER the policy line, never the provider's
+        // real context window. Callers pass zero when opt-in is disabled, so
+        // the original native-window safety policy remains byte-for-byte below.
+        let hasSoftBudget = AutoCompactionPreferences.isValidBudget(autoCompactBudgetTokens)
+            && autoCompactBudgetTokens > 0 && autoCompactBudgetTokens < contextWindow
+        let policyWindow = hasSoftBudget ? autoCompactBudgetTokens : contextWindow
+        if isUserCap || hasSoftBudget {
             // Proportional: compact at 85%, offload at 70%, settle back to 55%.
-            // Percentages (not fixed subtractions) keep the headroom sane across
-            // the whole 32K…1M slider ladder — at 32K a 20K subtraction would
-            // leave a threshold below the floor, and at 1M it would be noise.
-            offloadThreshold = Int(Double(contextWindow) * 0.70)
-            offloadTarget = Int(Double(contextWindow) * 0.55)
-            compactThreshold = Int(Double(contextWindow) * 0.85)
+            // Applies to a hard group cap or a smaller optional soft target.
+            offloadThreshold = Int(Double(policyWindow) * 0.70)
+            offloadTarget = Int(Double(policyWindow) * 0.55)
+            compactThreshold = Int(Double(policyWindow) * 0.85)
             exhaustedOnly = false
             manualCompactAllowed = true
             return

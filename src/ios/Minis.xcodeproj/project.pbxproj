@@ -103,6 +103,7 @@
 		E52000007 /* ClaudeOAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52000016 /* ClaudeOAuthManager.swift */; };
 		E52000009 /* AnthropicModelsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52000018 /* AnthropicModelsAPI.swift */; };
 		E53000001 /* AIChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000011 /* AIChatViewModel.swift */; };
+		AC000001AC000001AC000002 /* AutoCompactionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC000001AC000001AC000001 /* AutoCompactionSettingsView.swift */; };
 		E53000002 /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000012 /* AIChatView.swift */; };
 		E53000004 /* ChatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000014 /* ChatStore.swift */; };
 		E53000005 /* UsageStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000015 /* UsageStatsView.swift */; };
@@ -662,6 +663,7 @@
 		88993FC8E3F0199C6638F664 /* VoiceProvider+System.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "VoiceProvider+System.swift"; sourceTree = "<group>"; };
 		A11Y0002 /* ChatAccessibilityAnnouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAccessibilityAnnouncer.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* SystemVoiceCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SystemVoiceCatalog.swift; sourceTree = "<group>"; };
+		AC000001AC000001AC000001 /* AutoCompactionSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoCompactionSettingsView.swift; sourceTree = "<group>"; };
 		AA0838A12F3B941A00049557 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsManagementView.swift; sourceTree = "<group>"; };
 		AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsResetButton.swift; sourceTree = "<group>"; };
@@ -2347,6 +2349,7 @@
 		F1V00011 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				AC000001AC000001AC000001 /* AutoCompactionSettingsView.swift */,
 				AA0838A12F3B941A00049557 /* AboutView.swift */,
 				E5S000014 /* CloudSyncSettingsView.swift */,
 				E5G000013 /* EnhancedBackgroundSettingsView.swift */,
@@ -2923,6 +2926,7 @@
 				E5VMC0006 /* AIChatViewModel+BackgroundTask.swift in Sources */,
 				E5VMC0007 /* AIChatViewModel+ConcurrentTools.swift in Sources */,
 				E5LD00001 /* ToolLoopDetector.swift in Sources */,
+				AC000001AC000001AC000002 /* AutoCompactionSettingsView.swift in Sources */,
 				E53000002 /* AIChatView.swift in Sources */,
 				E5CAL0001 /* CookieAuditLogger.swift in Sources */,
 				E5F200001 /* MarkdownPrepRegex.swift in Sources */,

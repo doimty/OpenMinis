@@ -1,6 +1,397 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Auto-Compact" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-Compact"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动压缩"
+          }
+        }
+      }
+    },
+    "Enable automatic compaction" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable automatic compaction"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启用自动压缩"
+          }
+        }
+      }
+    },
+    "Automatic compaction is a global preference and can be turned off at any time." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic compaction is a global preference and can be turned off at any time."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动压缩是全局设置，可随时关闭。"
+          }
+        }
+      }
+    },
+    "Follow model/group limit" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow model/group limit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随模型／模型组上限"
+          }
+        }
+      }
+    },
+    "Budget" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Budget"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文预算"
+          }
+        }
+      }
+    },
+    "Saved custom budget" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved custom budget"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存的自定义预算"
+          }
+        }
+      }
+    },
+    "Edit custom budget" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit custom budget"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑自定义预算"
+          }
+        }
+      }
+    },
+    "Current effective context window" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current effective context window"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前有效上下文窗口"
+          }
+        }
+      }
+    },
+    "Limited by the current model-group cap" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limited by the current model-group cap"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受当前模型组上限限制"
+          }
+        }
+      }
+    },
+    "Resolved from the current model" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resolved from the current model"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按当前模型计算"
+          }
+        }
+      }
+    },
+    "Compaction trigger (current model or budget reference)" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compaction trigger (current model or budget reference)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩触发线（当前模型或预算参考）"
+          }
+        }
+      }
+    },
+    "A zero budget follows the resolved model/group window; the existing model-window safety policy remains in effect." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A zero budget follows the resolved model/group window; the existing model-window safety policy remains in effect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预算为 0 时跟随模型／模型组上限，原有窗口安全保护仍然有效。"
+          }
+        }
+      }
+    },
+    "This budget does not lower the current model window, so its existing safety policy remains in effect." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This budget does not lower the current model window, so its existing safety policy remains in effect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预算未低于当前模型窗口，继续使用原有窗口安全策略。"
+          }
+        }
+      }
+    },
+    "Automatic compaction is off; the saved budget applies when enabled." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic compaction is off; the saved budget applies when enabled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动压缩已关闭，保存的预算在开启后生效。"
+          }
+        }
+      }
+    },
+    "A lower model/group context cap always takes precedence; this budget never changes or increases the model context window." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A lower model/group context cap always takes precedence; this budget never changes or increases the model context window."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "较低的模型／模型组上限优先；此预算不会改变或提高模型上下文窗口。"
+          }
+        }
+      }
+    },
+    "This budget is a soft target. Fixed prompts and the current turn may keep a compacted request above it." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This budget is a soft target. Fixed prompts and the current turn may keep a compacted request above it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预算是软目标，固定提示词和当前回合可能使压缩后的请求仍超出预算。"
+          }
+        }
+      }
+    },
+    "Turning automatic compaction off does not disable the existing near-window safety protection." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turning automatic compaction off does not disable the existing near-window safety protection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭自动压缩不会关闭原有的接近窗口上限安全保护。"
+          }
+        }
+      }
+    },
+    "Compaction keeps a summary of history, which may lose details." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compaction keeps a summary of history, which may lose details."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩使用历史摘要，可能丢失细节；原始聊天记录仍保留。"
+          }
+        }
+      }
+    },
+    "How it works" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How it works"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作方式"
+          }
+        }
+      }
+    },
+    "Budget in tokens" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Budget in tokens"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预算（token）"
+          }
+        }
+      }
+    },
+    "Enter an ASCII whole number from 32,000 to 4,000,000." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter an ASCII whole number from 32,000 to 4,000,000."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请输入 32,000 至 4,000,000 之间的整数，使用半角数字。"
+          }
+        }
+      }
+    },
+    "Custom values are saved only when you tap Apply. Cancel keeps the current budget." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom values are saved only when you tap Apply. Cancel keeps the current budget."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击“应用”才会保存自定义值；取消不会改变当前预算。"
+          }
+        }
+      }
+    },
+    "Custom Budget" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom Budget"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义预算"
+          }
+        }
+      }
+    },
     "" : {
 
     },

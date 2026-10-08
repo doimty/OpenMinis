@@ -390,6 +390,7 @@ struct AIChatView: View {
     @State private var showSessionMemory = false
     @State private var showEnhancedCacheAlert = false
     @State private var showTokenUsage = false
+    @State private var showAutoCompactionSettings = false
     // [T-ios-json-open-provider-import-prompt] A shared/opened JSON file that
     // looks like a Provider export (providerType + credentialType + models)
     // prompts the user to choose: import as a provider, or add as a chat
@@ -1064,6 +1065,16 @@ struct AIChatView: View {
                 }
             }
             .compatPresentationDetents([.large])
+        }
+        .sheet(isPresented: $showAutoCompactionSettings) {
+            let resolved = vm.resolveCurrentEntry().map { vm.resolvedContextWindow(for: $0.model) }
+            CompatNavigationStack {
+                AutoCompactionSettingsView(
+                    contextWindow: resolved?.window ?? 0,
+                    isUserCap: resolved?.isUserCap ?? false,
+                    showsDoneButton: true
+                )
+            }
         }
         .sheet(isPresented: $showTokenUsage) {
             TokenUsageSheet(vm: cached.vm)
@@ -2014,6 +2025,7 @@ struct AIChatView: View {
             // reads the same key at request-build time, so the flip applies
             // to the very next Codex request.
             setFastMode: { enabled in codexFastModeEnabled = enabled },
+            onAutoCompactionSettings: { showAutoCompactionSettings = true },
             onTokenUsage: { showTokenUsage = true },
             // LastAPIRequestBody + copySessionDataToClipboard are DEBUG-only (the
             // menu buttons that invoke these closures are #if DEBUG too); guard the
@@ -5643,6 +5655,7 @@ private struct ChatTrailingMenu: View, Equatable {
     let onSkills: () -> Void
     let onMCPs: () -> Void
     let onMemories: () -> Void
+    let onAutoCompactionSettings: () -> Void
     let setSpeakEnabled: (Bool) -> Void
     let setEnhancedCache: (Bool) -> Void
     let setFastMode: (Bool) -> Void
@@ -5687,6 +5700,10 @@ private struct ChatTrailingMenu: View, Equatable {
                 Label(AppLocalized("Clear Chat"), systemImage: "trash")
             }
             .disabled(messagesEmpty)
+
+            Button { onAutoCompactionSettings() } label: {
+                Label(AppLocalized("Auto-Compact"), systemImage: "arrow.triangle.2.circlepath")
+            }
 
             Divider()
 
@@ -5826,6 +5843,7 @@ private struct ChatTrailingMenuButton: UIViewRepresentable {
     let onSkills: () -> Void
     let onMCPs: () -> Void
     let onMemories: () -> Void
+    let onAutoCompactionSettings: () -> Void
     let setSpeakEnabled: (Bool) -> Void
     let setEnhancedCache: (Bool) -> Void
     let setFastMode: (Bool) -> Void
@@ -5946,6 +5964,13 @@ private struct ChatTrailingMenuButton: UIViewRepresentable {
             UIAction(title: AppLocalized("Clear Chat"),
                      image: UIImage(systemName: "trash"),
                      attributes: key.messagesEmpty ? [.destructive, .disabled] : [.destructive]) { _ in coordinator.parent.onClearChat() },
+        ]))
+
+        groups.append(UIMenu(options: .displayInline, children: [
+            UIAction(title: AppLocalized("Auto-Compact"),
+                     image: UIImage(systemName: "arrow.triangle.2.circlepath")) { _ in
+                coordinator.parent.onAutoCompactionSettings()
+            },
         ]))
 
         // Same gate as before: iOS 17+ (v2 sync engine) AND the user's

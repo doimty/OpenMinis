@@ -2010,6 +2010,11 @@ extension AIChatViewModel {
     }
 
     func effectiveAgentHistoryUncounted() -> [AgentMessage] {
+        let compactionBudget = AutoCompactionPreferences.activeBudgetTokens
+        if warmUpCompactionBudgetTokens != compactionBudget {
+            warmUpDropByMarker.removeAll()
+            warmUpCompactionBudgetTokens = compactionBudget
+        }
         guard let marker = cachedLatestMarker else { return agentHistory }
 
         // ─── v2 markers (id-only model) ────────────────────────────────

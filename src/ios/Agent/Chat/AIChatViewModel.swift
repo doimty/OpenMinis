@@ -795,6 +795,9 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// messages were dropped to fit. Decided once, then reused, so the request
     /// prefix stays stable across turns (see trimWarmUpToFit).
     var warmUpDropByMarker: [String: Int] = [:]
+    /// A settings change is an intentional prefix change; do not reuse a
+    /// warm-up decision made for a different automatic compaction budget.
+    var warmUpCompactionBudgetTokens: Int?
     var contextFixedTokens = 0
     var lastDispatchEstimate = 0
     /// [T-ctx-overflow-attribute-dispatch] Model id and window of the request
@@ -1229,16 +1232,15 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     @Published var isCompacting = false
     /// When true, shows a prompt asking user to compact before sending.
     @Published var showCompactBeforeSendPrompt = false
-    /// [T-chat-auto-compact-opt-in] Global (cross-session) opt-in: when the
-    /// context-capacity threshold fires, compact automatically instead of
-    /// prompting — the same no-UI path shortcut sessions already use. Set
-    /// from the confirm dialog's "Compact & Enable Auto-Compact" button or
-    /// the "..." menu's Auto Compact toggle; persisted in UserDefaults so
-    /// future conversations inherit it.
-    @Published var autoCompactEnabled: Bool = UserDefaults.standard.bool(forKey: "autoCompactOnThreshold") {
-        didSet {
-            guard autoCompactEnabled != oldValue else { return }
-            UserDefaults.standard.set(autoCompactEnabled, forKey: "autoCompactOnThreshold")
+    /// [T-chat-auto-compact-opt-in] Shared opt-in. Read the persisted value
+    /// at decision time so editing settings also updates already-cached VMs.
+    /// Settings and the chat menu both expose the same preference.
+    var autoCompactEnabled: Bool {
+        get { AutoCompactionPreferences.enabled }
+        set {
+            guard newValue != AutoCompactionPreferences.enabled else { return }
+            objectWillChange.send()
+            UserDefaults.standard.set(newValue, forKey: AutoCompactionPreferences.enabledKey)
         }
     }
     /// When true, shows a prompt telling user to start a new session or clear chat.

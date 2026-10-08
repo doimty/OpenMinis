@@ -1157,6 +1157,29 @@ extension ConfigRegistry {
 
     @MainActor
     private static func registerChat(into r: ConfigRegistry) {
+        r.register(AppStorageBoolField(
+            path: "chat.autoCompact",
+            displayName: "Automatic compaction",
+            description: "Whether automatic context compaction is enabled globally when the configured context threshold is reached. Disabling this does not disable the existing near-window safety protection.",
+            userDefaultsKey: AutoCompactionPreferences.enabledKey,
+            defaultValue: false
+        ))
+        r.register(ClosureField(
+            path: "chat.autoCompactBudgetTokens",
+            displayName: "Automatic compaction soft budget",
+            description: "Global soft context budget in tokens. 0 follows the resolved model/group window; otherwise valid values are integers from 32000 through 4000000. The target does not change the actual context window and cannot guarantee fixed prompts/current turns fit.",
+            valueSchema: .int(min: 0, max: AutoCompactionPreferences.maximumBudgetTokens),
+            reader: { .int(AutoCompactionPreferences.budgetTokens) },
+            writer: { value in
+                guard case .int(let tokens) = value else {
+                    throw ConfigError.typeMismatch(expected: "int")
+                }
+                guard AutoCompactionPreferences.isValidBudget(tokens) else {
+                    throw ConfigError.invalidValue("budget must be 0 or an integer from 32000 through 4000000")
+                }
+                UserDefaults.standard.set(tokens, forKey: AutoCompactionPreferences.budgetKey)
+            }
+        ))
         r.register(AppStorageIntCodedEnumField(
             path: "chat.returnKey",
             displayName: "Return key behavior",
