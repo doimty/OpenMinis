@@ -169,7 +169,15 @@ struct SubAgentEditorView: View {
     @State private var instructions = ""
     @State private var modelGroupId: String?
     @State private var thinkingOverride: ThinkingLevel?
-    @State private var didSeed = false
+
+    init(existing: SubAgentDefinition?) {
+        self.existing = existing
+        _name = State(initialValue: existing?.name ?? "")
+        _descriptionText = State(initialValue: existing?.description ?? "")
+        _instructions = State(initialValue: existing?.instructions ?? "")
+        _modelGroupId = State(initialValue: existing?.modelGroupId)
+        _thinkingOverride = State(initialValue: existing?.thinkingLevelOverride)
+    }
 
     private var isBuiltIn: Bool { existing?.isBuiltIn ?? false }
 
@@ -317,7 +325,6 @@ struct SubAgentEditorView: View {
                         .disabled(!isValid)
                 }
             }
-            .onAppear(perform: seed)
         }
     }
 
@@ -351,17 +358,6 @@ struct SubAgentEditorView: View {
                 .font(.caption2)
                 .foregroundStyle(count > limit ? .red : .secondary)
         }
-    }
-
-    private func seed() {
-        guard !didSeed else { return }
-        didSeed = true
-        guard let existing else { return }
-        name = existing.name
-        descriptionText = existing.description
-        instructions = existing.instructions
-        modelGroupId = existing.modelGroupId
-        thinkingOverride = existing.thinkingLevelOverride
     }
 
     private func save() {
