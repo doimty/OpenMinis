@@ -8207,7 +8207,7 @@ private struct SettingsSheet: View {
                             // meant for a caller that already draws the disc — the
                             // wider person.2.wave.2 reached the edge of the 21pt
                             // circle at this section's icon size.
-                            Image(systemName: HelperAccent.glyph)
+                            Image(systemName: CompatSystemSymbol.name(HelperAccent.glyph))
                                 .font(.system(size: 9))
                                 .foregroundStyle(.white)
                                 .frame(width: 21, height: 21)

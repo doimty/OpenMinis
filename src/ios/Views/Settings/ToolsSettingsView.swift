@@ -137,7 +137,7 @@ struct ToolsSettingsView: View {
                  accent: Color = Color.accentColor, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             HStack(spacing: 10) {
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.system(size: iconSize))
                     .foregroundStyle(isOn.wrappedValue ? accent : Color.secondary)
                     .frame(width: 22)

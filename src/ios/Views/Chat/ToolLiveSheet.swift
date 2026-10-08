@@ -1356,7 +1356,7 @@ struct ToolLiveSheet: View {
         case .browserTool: Image(systemName: "globe")
         case .readImageTool: Image(systemName: "photo")
         case .memoryTool: Image(systemName: "brain.head.profile")
-        case .delegateTool: Image(systemName: HelperAccent.icon)
+        case .delegateTool: Image(systemName: CompatSystemSymbol.name(HelperAccent.icon))
         case .info: Image(systemName: "arrow.triangle.2.circlepath")
         case .text: Image(systemName: "text.alignleft")
         case .thinking: Image("ThinkingIcon")
@@ -3296,7 +3296,7 @@ private struct ToolStatusBar: View {
                              enabled: Bool,
                              step: @escaping () -> Void,
                              jump: @escaping () -> Void) -> some View {
-        Image(systemName: glyph)
+        Image(systemName: CompatSystemSymbol.name(glyph))
             .font(.system(size: 10, weight: .semibold))
             .foregroundStyle(enabled ? ChatColors.primaryText : ChatColors.tertiaryText)
             .frame(width: 20, height: 20)

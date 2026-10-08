@@ -4787,7 +4787,7 @@ struct AIChatView: View {
                                 .resizable()
                                 .frame(width: 16, height: 16)
                         } else {
-                            Image(systemName: cmd.icon)
+                            Image(systemName: CompatSystemSymbol.name(cmd.icon))
                                 .font(.system(size: 15, weight: .medium))
                                 .symbolRenderingMode(.hierarchical)
                         }

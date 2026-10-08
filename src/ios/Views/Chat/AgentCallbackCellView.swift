@@ -251,7 +251,7 @@ struct AgentCallbackCellView: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle().fill(accent.opacity(0.15))
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(accent)
             }

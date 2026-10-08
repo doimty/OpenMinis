@@ -569,11 +569,11 @@ struct HelperBlockView: View {
                 // Queued is not a failure — it is waiting its turn, and an
                 // exclamation mark read as something having gone wrong. Pause
                 // matches the accent colour `statusColor` already gives it.
-                Image(systemName: Self.finishedGlyph(status))
+                Image(systemName: CompatSystemSymbol.name(Self.finishedGlyph(status)))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(HelperBlockInfo.statusColor(status))
             } else {
-                Image(systemName: HelperAccent.glyph).font(.system(size: 13)).foregroundStyle(HelperAccent.color)
+                Image(systemName: CompatSystemSymbol.name(HelperAccent.glyph)).font(.system(size: 13)).foregroundStyle(HelperAccent.color)
             }
         }
     }
@@ -602,7 +602,7 @@ struct HelperBlockView: View {
             HStack(spacing: 6) {
                 if let tool {
                     HStack(spacing: 3) {
-                        Image(systemName: HelperAccent.symbol(forTool: tool)).font(.system(size: 10, weight: .semibold))
+                        Image(systemName: CompatSystemSymbol.name(HelperAccent.symbol(forTool: tool))).font(.system(size: 10, weight: .semibold))
                         Text(HelperAccent.displayName(forTool: tool)).font(.system(size: 11, weight: .semibold))
                     }
                     .foregroundStyle(HelperAccent.color)
@@ -694,7 +694,7 @@ struct HelperThumbnailView: View {
         }()
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 3) {
-                Image(systemName: HelperAccent.glyph).font(.system(size: 7, weight: .bold))
+                Image(systemName: CompatSystemSymbol.name(HelperAccent.glyph)).font(.system(size: 7, weight: .bold))
                 Text(AppLocalized("Agent")).font(.system(size: 6, weight: .bold))
             }
             .foregroundStyle(HelperAccent.color)
@@ -707,7 +707,7 @@ struct HelperThumbnailView: View {
             case .running(let tool, let activity, let clock):
                 if let tool {
                     HStack(spacing: 2) {
-                        Image(systemName: HelperAccent.symbol(forTool: tool)).font(.system(size: 6, weight: .bold))
+                        Image(systemName: CompatSystemSymbol.name(HelperAccent.symbol(forTool: tool))).font(.system(size: 6, weight: .bold))
                         Text(HelperAccent.displayName(forTool: tool)).font(.system(size: 6, weight: .semibold))
                     }
                     .foregroundStyle(HelperAccent.color)
@@ -792,7 +792,7 @@ struct HelperDetailCard: View {
                         VStack(alignment: .leading, spacing: 6) {
                             if let tool {
                                 HStack(spacing: 6) {
-                                    Image(systemName: HelperAccent.symbol(forTool: tool)).font(.system(size: 13, weight: .semibold))
+                                    Image(systemName: CompatSystemSymbol.name(HelperAccent.symbol(forTool: tool))).font(.system(size: 13, weight: .semibold))
                                     Text(HelperAccent.displayName(forTool: tool)).font(.system(size: 14, weight: .semibold))
                                 }
                                 .foregroundStyle(HelperAccent.color)
@@ -1128,7 +1128,7 @@ struct AgentDetailCard<Trailing: View, Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.system(size: 12))
                     .foregroundStyle(iconTint)
                 Text(title)
