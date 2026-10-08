@@ -149,8 +149,8 @@ struct AutoCompactionSettingsView: View {
         .navigationTitle(AppLocalized("Auto-Compact"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if showsDoneButton {
-                ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if showsDoneButton {
                     Button(AppLocalized("Done")) { dismiss() }
                 }
             }
