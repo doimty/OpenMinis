@@ -231,6 +231,7 @@ jobs:
           import json, os, subprocess
           from pathlib import Path
           out = Path(os.environ['RUNNER_TEMP']) / 'm1'
+          out.mkdir(parents=True, exist_ok=True)
           data = {
             'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
             'xcode': subprocess.check_output(['xcodebuild', '-version'], text=True).splitlines(),

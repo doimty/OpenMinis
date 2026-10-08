@@ -765,7 +765,14 @@ def check_native(ss, rep, runner, test_file, workdir, allow_std, name="native.su
     env["XDG_CACHE_HOME"] = str(workdir / "xdg")
     env["ACB_ALLOW_STANDARD_DEFAULTS"] = "1" if allow_std else "0"
 
-    cmd = [runner, "-parse-as-library", str(prod), str(test_file), "-o", str(exe)]
+    cmd = [runner, "-parse-as-library", "-swift-version", "5"]
+    if sys.platform == "darwin":
+        # Match the existing native policy runners: explicitly select the host
+        # SDK rather than deriving a target from the macos-26 runner alone.
+        sdk = subprocess.check_output(["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True).strip()
+        cmd += ["-target", os.uname().machine + "-apple-macosx13.0", "-sdk", sdk,
+                "-module-cache-path", str(workdir / "ModuleCache")]
+    cmd += [str(prod), str(test_file), "-o", str(exe)]
     try:
         comp = subprocess.run(cmd, capture_output=True, text=True, timeout=900, env=env, cwd=str(workdir))
     except subprocess.TimeoutExpired:
