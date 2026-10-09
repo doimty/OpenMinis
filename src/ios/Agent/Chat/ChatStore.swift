@@ -2262,12 +2262,14 @@ actor ChatStore {
     /// Extract a snippet around the first keyword match, up to maxLength characters.
     private static func keywordSnippet(from text: String, keywords: [String], maxLength: Int) -> String {
         guard !text.isEmpty else { return "" }
-        let lower = text.lowercased()
 
-        // Find earliest keyword match position
+        // Find earliest keyword match position.
+        // Search `text` itself: indices from a `lowercased()` copy are not valid
+        // for this string and trap once case folding changes lengths (e.g. the
+        // Turkish "İ" expands). `.caseInsensitive` keeps the range in bounds.
         var earliest = text.count
         for kw in keywords {
-            if let range = lower.range(of: kw.lowercased()) {
+            if let range = text.range(of: kw, options: [.caseInsensitive]) {
                 let pos = text.distance(from: text.startIndex, to: range.lowerBound)
                 earliest = min(earliest, pos)
             }
