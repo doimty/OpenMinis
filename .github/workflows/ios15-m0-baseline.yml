@@ -189,6 +189,9 @@ jobs:
           "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_auto_compaction_budget.py \
             --runner "$(xcrun --find swiftc)" \
             --json "$RUNNER_TEMP/auto-compaction-budget.json"
+          python3 scripts/test_keyword_snippet.py \
+            --runner "$(xcrun --find swiftc)" \
+            --json "$RUNNER_TEMP/keyword-snippet.json"
 
       - name: TrollStore IPA packager tests
         run: |

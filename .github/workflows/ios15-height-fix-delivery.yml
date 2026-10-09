@@ -112,6 +112,9 @@ jobs:
           "$RUNNER_TEMP/compaction-test-venv/bin/python" scripts/test_auto_compaction_budget.py \
             --runner "$(xcrun --find swiftc)" \
             --json "$RUNNER_TEMP/auto-compaction-budget.json"
+          python3 scripts/test_keyword_snippet.py \
+            --runner "$(xcrun --find swiftc)" \
+            --json "$RUNNER_TEMP/keyword-snippet.json"
           python3 scripts/test_ios15_composer_focus.py -v
 
       - name: Init pinned iSH
@@ -257,6 +260,7 @@ jobs:
             ${{ runner.temp }}/m1/versions.json
             ${{ runner.temp }}/candidate-source.json
             ${{ runner.temp }}/auto-compaction-budget.json
+            ${{ runner.temp }}/keyword-snippet.json
             ${{ runner.temp }}/height-policy/**
             ${{ runner.temp }}/reentry-collector/**
           if-no-files-found: warn
