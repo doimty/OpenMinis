@@ -17,6 +17,11 @@ private let logger = AppLogger(category: "AIChatVM")
 // The watchdog now throws `LLMError.transientError`, which walks straight into
 // that pipeline. Net behavior: one immediate retry on the same model; a second
 // stall falls back to the next model in the group; turn budget untouched.
+//
+// 2026-10-12 [T-stream-stall-guard]: the watchdog itself moved out of the
+// per-event task-group race into `StreamStallGuard` (one pumper + one watchdog
+// per stream — see below). Error type, retry pipeline and log fields are
+// unchanged; the per-event task churn and its cancel-resume pattern are gone.
 
 private final class StreamIteratorBox<T: Sendable>: @unchecked Sendable {
     private var iterator: AsyncThrowingStream<T, Error>.AsyncIterator
@@ -25,6 +30,139 @@ private final class StreamIteratorBox<T: Sendable>: @unchecked Sendable {
     }
     func next() async throws -> T? {
         try await iterator.next()
+    }
+}
+
+// MARK: - Stream Stall Guard
+//
+// [T-stream-stall-guard] Per-stream stall watchdog. Replaces the legacy
+// per-event task-group race (receive child + 120s `Task.sleep` child with
+// `group.cancelAll()` every iteration). That pattern churned two tasks per
+// event and cancel-resumed a suspended `next()` on the stall/stop paths;
+// field crash reports (2026-10-07, 2026-10-12) land in `swift_task_dealloc`
+// on the receive child's completion path. The guard keeps the same
+// observable semantics with two long-lived tasks per stream:
+//
+//   • pumper   — the ONLY consumer of the upstream iterator. Forwards events
+//                and records `lastEventAt` / `eventsThisStream` under a lock.
+//   • watchdog — polls every `pollInterval`; when no event has arrived for
+//                `stallTimeout` seconds it awaits `onStall` (caller logs
+//                `[StreamDiag][STALL]` and builds the retryable LLMError),
+//                then finishes the local stream *throwing* that error.
+//
+// Semantics preserved 1:1 with the legacy watchdog:
+//   • stall           → consumer's `next()` throws `onStall(...)`'s error
+//   • upstream error  → forwarded to the consumer unchanged
+//   • upstream finish → consumer sees `nil` (clean end)
+//   • consumer cancel → local `next()` resumes as `nil` (stdlib semantics);
+//                       the consumer's own `Task.checkCancellation()` decides
+//   • buffering stays unbounded, same as the upstream default
+//
+// Stdlib constraints this design keeps (do not weaken in refactors):
+//   • the upstream iterator is only ever driven by the single pumper task —
+//     `AsyncThrowingStream` hard-asserts concurrent `next()` calls
+//   • termination is explicit via `onTermination`; nothing relies on
+//     deinit-time cancellation (swift#40087 lifetime semantics are absent
+//     on the iOS 15.1.x runtime)
+//   • at most two tasks per stream: the pumper and the watchdog
+private enum StreamStallGuard {
+
+    /// Watchdog fire snapshot — mirrors the legacy [StreamDiag][STALL] fields.
+    struct Fire {
+        let nominal: TimeInterval
+        let firedAt: Date
+        let iterStart: Date
+        let measured: TimeInterval
+        let sinceLastEvent: TimeInterval
+        let eventsThisStream: Int
+    }
+
+    static func wrap<Element: Sendable>(
+        _ upstream: AsyncThrowingStream<Element, Error>,
+        stallTimeout: TimeInterval,
+        pollInterval: TimeInterval = 1.0,
+        onStall: @escaping @Sendable (Fire) async -> Error
+    ) -> AsyncThrowingStream<Element, Error> {
+        let sync = Sync()
+        return AsyncThrowingStream { cont in
+            let pumper = Task {
+                var iterator = upstream.makeAsyncIterator()
+                while true {
+                    sync.beginWait()
+                    do {
+                        guard let element = try await iterator.next() else {
+                            if sync.beginFinish() { cont.finish() }
+                            return
+                        }
+                        sync.noteEvent()
+                        cont.yield(element)
+                    } catch {
+                        if sync.beginFinish() { cont.finish(throwing: error) }
+                        return
+                    }
+                }
+            }
+            let watchdog = Task {
+                while true {
+                    try await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
+                    guard let fire = sync.stallSnapshot(stallTimeout: stallTimeout) else { continue }
+                    if sync.beginFinish() {
+                        let error = await onStall(fire)
+                        cont.finish(throwing: error)
+                    }
+                    return
+                }
+            }
+            cont.onTermination = { _ in
+                pumper.cancel()
+                watchdog.cancel()
+            }
+        }
+    }
+
+    /// Lock-protected bookkeeping shared by the pumper and the watchdog.
+    private final class Sync: @unchecked Sendable {
+        private let lock = NSLock()
+        private var lastEventAt = Date()
+        private var iterStart = Date()
+        private var events = 0
+        private var finished = false
+
+        func beginWait() {
+            lock.lock()
+            iterStart = Date()
+            lock.unlock()
+        }
+
+        func noteEvent() {
+            lock.lock()
+            lastEventAt = Date()
+            events += 1
+            lock.unlock()
+        }
+
+        func stallSnapshot(stallTimeout: TimeInterval) -> Fire? {
+            lock.lock()
+            defer { lock.unlock() }
+            guard !finished else { return nil }
+            let now = Date()
+            guard now.timeIntervalSince(lastEventAt) >= stallTimeout else { return nil }
+            return Fire(nominal: stallTimeout,
+                        firedAt: now,
+                        iterStart: iterStart,
+                        measured: now.timeIntervalSince(iterStart),
+                        sinceLastEvent: now.timeIntervalSince(lastEventAt),
+                        eventsThisStream: events)
+        }
+
+        /// First finisher wins (pumper completion / pumper error / watchdog).
+        func beginFinish() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            if finished { return false }
+            finished = true
+            return true
+        }
     }
 }
 
@@ -324,7 +462,6 @@ extension AIChatViewModel {
 
         let stallTimeoutSeconds: TimeInterval = 120
         var _streamError: Error? = nil
-        let iterBox = StreamIteratorBox(stream)
         // [StreamDiag] (#181) Diagnostics for the "No response from the server
         // for 120 seconds" stall. Three hypotheses are still live and this
         // instrumentation is what separates them:
@@ -348,37 +485,41 @@ extension AIChatViewModel {
         let streamDiagModel = provider.model.id
         var lastEventAt = Date()
         var eventSeq = 0
-        logger.info("[StreamDiag] stream open session=\(streamDiagSession) provider=\(provider.name) model=\(streamDiagModel) at=\(Self.diagTimestamp(Date()))")
+        let streamDiagProvider = provider.name
+        logger.info("[StreamDiag] stream open session=\(streamDiagSession) provider=\(streamDiagProvider) model=\(streamDiagModel) at=\(Self.diagTimestamp(Date()))")
+        // [T-stream-stall-guard] Per-stream watchdog (one pumper + one
+        // watchdog per stream) replaces the per-event task-group race.
+        // Semantics preserved 1:1: stall → same retryable LLMError and the
+        // same [StreamDiag][STALL] fields; upstream error → passthrough;
+        // clean end → nil. See StreamStallGuard at the top of this file.
+        let guardedStream = StreamStallGuard.wrap(
+            stream,
+            stallTimeout: stallTimeoutSeconds,
+            onStall: { fire in
+                // Measured elapsed vs the nominal timeout: a gap far above
+                // 120s means the sleep was stretched (candidate 3); a gap
+                // very close to 120s rules that out and points at a genuine
+                // silent stream (candidate 2).
+                let appState = await MainActor.run { Self.diagAppStateName() }
+                logger.error(
+                    "[StreamDiag][STALL] watchdog fired session=\(streamDiagSession) provider=\(streamDiagProvider) model=\(streamDiagModel) "
+                    + "nominal=\(Int(fire.nominal))s measured=\(String(format: "%.1f", fire.measured))s "
+                    + "sinceLastEvent=\(String(format: "%.1f", fire.sinceLastEvent))s eventsThisStream=\(fire.eventsThisStream) "
+                    + "appState=\(appState) iterStart=\(Self.diagTimestamp(fire.iterStart)) firedAt=\(Self.diagTimestamp(fire.firedAt))"
+                )
+                // [T-ios-stream-stall-no-retry] An LLMError so the agent
+                // loop's retryable-error gate catches it — see the header
+                // comment at the top of this file.
+                return LLMError.transientError(message: "No response from the server for \(Int(fire.nominal)) seconds — the stream stalled mid-generation")
+            }
+        )
+        let iterBox = StreamIteratorBox(guardedStream)
         do {
         while true {
-            let iterationStartedAt = Date()
-            let maybeEvent: AgentStreamEvent? = try await withThrowingTaskGroup(of: AgentStreamEvent?.self) { group in
-                group.addTask { try await iterBox.next() }
-                group.addTask {
-                    try await Task.sleep(nanoseconds: UInt64(stallTimeoutSeconds * 1_000_000_000))
-                    // Measured elapsed vs the nominal timeout: a gap far above
-                    // 120s means the sleep was stretched (candidate 3); a gap
-                    // very close to 120s rules that out and points at a genuine
-                    // silent stream (candidate 2).
-                    let firedAt = Date()
-                    let measured = firedAt.timeIntervalSince(iterationStartedAt)
-                    let sinceLastEvent = firedAt.timeIntervalSince(lastEventAt)
-                    let appState = await MainActor.run { Self.diagAppStateName() }
-                    logger.error(
-                        "[StreamDiag][STALL] watchdog fired session=\(streamDiagSession) provider=\(provider.name) model=\(streamDiagModel) "
-                        + "nominal=\(Int(stallTimeoutSeconds))s measured=\(String(format: "%.1f", measured))s "
-                        + "sinceLastEvent=\(String(format: "%.1f", sinceLastEvent))s eventsThisStream=\(eventSeq) "
-                        + "appState=\(appState) iterStart=\(Self.diagTimestamp(iterationStartedAt)) firedAt=\(Self.diagTimestamp(firedAt))"
-                    )
-                    // [T-ios-stream-stall-no-retry] An LLMError so the agent
-                    // loop's retryable-error gate catches it — see the header
-                    // comment at the top of this file.
-                    throw LLMError.transientError(message: "No response from the server for \(Int(stallTimeoutSeconds)) seconds — the stream stalled mid-generation")
-                }
-                let result = try await group.next()!
-                group.cancelAll()
-                return result
-            }
+            // [T-stream-stall-guard] Single consumer: one sequential next()
+            // per iteration on the guarded stream; the stall watchdog lives
+            // inside the guard, not per event.
+            let maybeEvent: AgentStreamEvent? = try await iterBox.next()
             guard let event = maybeEvent else { break }
             try Task.checkCancellation()
             // [StreamDiag] Per-event timeline. Throttled: the first 5 events of
