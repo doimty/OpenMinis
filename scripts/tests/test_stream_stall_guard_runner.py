@@ -107,6 +107,14 @@ class RunnerTests(unittest.TestCase):
             r = json.loads(Path(td, 'out.json').read_text())
             self.assertGreater(r['summary']['FAIL'], 0)
 
+    def test_18_native_case_results_are_json_safe(self):
+        # CI-only path: with swiftc the report embeds native() results; once a
+        # raw set leaked into json.dumps there. case_result must keep it a list.
+        report = {'native': {'cases': {c: G.case_result(c, 0, self.output(c)) for c in G.NATIVE_IDS}}}
+        json.dumps(report)  # must not raise
+        name = 'stall.snapshot_fields'
+        self.assertEqual(G.case_result('stall', 1, self.output('stall', [name])), [name])
+
 
 if __name__ == '__main__':
     unittest.main()

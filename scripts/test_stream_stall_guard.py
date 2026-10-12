@@ -210,6 +210,13 @@ def protocol(case, rc, stdout):
     return failures
 
 
+def case_result(case, rc, stdout):
+    """JSON-safe per-case failure list. Sets are not serializable and this is a
+    CI-only path (native SKIPs without swiftc), so keep the conversion here —
+    the runner self-test pins it."""
+    return sorted(protocol(case, rc, stdout))
+
+
 def native(units, fixture, work, runner, cases):
     work.mkdir(parents=True, exist_ok=True)
     prod = work / "production_wrapper.swift"
@@ -237,7 +244,7 @@ def native(units, fixture, work, runner, cases):
         (work / (case + ".stderr.txt")).write_text(proc.stderr)
         if proc.stderr.strip():
             raise ValueError("unexpected native stderr (not a semantic rejection)")
-        results["cases"][case] = protocol(case, proc.returncode, proc.stdout)
+        results["cases"][case] = case_result(case, proc.returncode, proc.stdout)
     return results
 
 
