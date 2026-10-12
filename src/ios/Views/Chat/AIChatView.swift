@@ -1432,7 +1432,9 @@ struct AIChatView: View {
         .onChange(of: vm.sessionId) { _ in
             refreshTitlePillSession()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)) { note in
+        // [T-ios15-hang-boundaries] ChatStore posts from its background executor.
+        .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)
+            .receive(on: DispatchQueue.main)) { note in
             guard let sid = vm.sessionId,
                   let updatedId = note.object as? String,
                   updatedId == sid else { return }

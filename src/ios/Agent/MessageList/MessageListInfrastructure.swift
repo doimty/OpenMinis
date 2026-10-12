@@ -919,7 +919,17 @@ final class NoAnimationCollectionView: UICollectionView {
     /// of snapping. Kept as a flag so it can be flipped off instantly if it
     /// regresses the streaming stability this NoAnimation collection view was
     /// built to guarantee.
-    var streamingGrowAnimationEnabled = true
+    /// [T-ios15-hang-boundaries] The legacy host keeps the existing non-animated
+    /// layout and coordinator pinning path, without starting an offset animation
+    /// inside layoutSubviews. iOS 16+ keeps the previous default. This is an
+    /// iOS 15 stability candidate; the CoreAnimation lock-cycle still needs A/B.
+    var streamingGrowAnimationEnabled: Bool = {
+        if #available(iOS 16.0, *) {
+            return true
+        } else {
+            return false
+        }
+    }()
 
     /// [T-ios-stream-grow-anim] Reentrancy guard: the grow path calls
     /// `setContentOffset`, which can synchronously re-enter `layoutSubviews`.

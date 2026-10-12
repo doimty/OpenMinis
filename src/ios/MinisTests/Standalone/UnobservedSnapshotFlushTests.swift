@@ -62,12 +62,13 @@ final class Coordinator {
         snapshotGeneration = messages.map(\.id)
         snapshotItems = messages.reduce(0) { $0 + $1.blocks.count }
     }
-    /// flushPendingSnapshotIfNeeded(caller:) — L2536
+    /// flushPendingSnapshotIfNeeded(caller:) — [T-ios15-hang-boundaries]
     func flushPendingSnapshotIfNeeded(caller: String) {
-        guard hasPendingSnapshot else { return }
+        guard hasPendingSnapshot, let vm,
+              !vm.isLoadingSession, !vm.streamingUIUpdatesSuspended else { return }
         hasPendingSnapshot = false
         flushCallers.append(caller)
-        if let msgs = vm?.messages { applySnapshot(messages: msgs, caller: "flushPending(\(caller))") }
+        applySnapshot(messages: vm.messages, caller: "flushPending(\(caller))")
     }
     /// bind4b — lastMessageBlockCountSub sink (~L2520)
     func blockCountChanged() {
@@ -109,6 +110,7 @@ final class VM {
     var messages: [Message] = []
     var agentHistoryParts = 0                          // what the DB / model-facing history holds
     private(set) var streamingUIUpdatesSuspended = false
+    var isLoadingSession = false
     var transitionSuspended = false
     var appActive = true
     var isProcessing = false { didSet { if oldValue == true && isProcessing == false { loopEndDidSet() } } }
@@ -373,6 +375,40 @@ do {
     check("…and clears the flag", !b.needsSnapshotReloadOnResume)
 }
 
+// [T-ios15-hang-boundaries] A resume before loading finishes must leave the
+// snapshot queued. This is the documented model, not native UIKit evidence;
+// the standalone boundary runner separately extracts the production helper.
+do {
+    let v = VM(sessionId: "GATE"); let c = bind(v)
+    newRun(v)
+    v.setStreamingUIUpdatesSuspended(true)
+    v.appendBlock("first")
+    c.flushPendingSnapshotIfNeeded(caller: "flushStreamingLayout")
+    check("paused flush keeps pending", c.hasPendingSnapshot)
+    checkEq("paused flush performs no apply", c.snapshotItems, 0)
+    v.isLoadingSession = true
+    v.setStreamingUIUpdatesSuspended(false)
+    check("resume during load keeps pending", c.hasPendingSnapshot)
+    checkEq("resume during load performs no apply", c.snapshotItems, 0)
+    v.messages.last?.blocks.append("latest")
+    v.isLoadingSession = false
+    c.flushPendingSnapshotIfNeeded(caller: "load-end")
+    check("safe replay consumes pending", !c.hasPendingSnapshot)
+    checkEq("safe replay uses latest blocks", c.snapshotItems, 2)
+    check("safe replay also works mid-stream", v.isProcessing)
+    checkEq("safe replay applies exactly once", c.flushCallers.count, 1)
+    c.flushPendingSnapshotIfNeeded(caller: "settle")
+    checkEq("duplicate replay is a no-op", c.flushCallers.count, 1)
+    v.setStreamingUIUpdatesSuspended(true)
+    v.appendBlock("after")
+    c.vm = nil
+    c.flushPendingSnapshotIfNeeded(caller: "no-vm")
+    check("missing VM leaves pending", c.hasPendingSnapshot)
+    c.vm = v
+    v.setStreamingUIUpdatesSuspended(false)
+    checkEq("reattached VM replays newest content", c.snapshotItems, 3)
+}
+
 // MARK: - [4] Source-grep guard: every trigger site still calls into the funnel
 
 print("\n[4] Shipping sources: each known trigger site still reaches the flush funnel")
@@ -423,8 +459,14 @@ if vmSrc.isEmpty || cv3.isEmpty || comp.isEmpty {
               !hook.contains("isProcessing == false") && !hook.contains("!vm.isProcessing") && !hook.contains("isProcessing != true") && !hook.contains("guard !"))
     } else { check("resume hook located", false) }
     check("retrySnapshotReloadSignal rebuilds the snapshot", cv3.contains("self.applySnapshot(messages: msgs, caller: \"retrySnapshotReload\")"))
-    check("flushPendingSnapshotIfNeeded is the single apply funnel for deferred snapshots",
-          cv3.contains("fileprivate func flushPendingSnapshotIfNeeded(caller: String = \"?\") {\n            guard hasPendingSnapshot else { return }\n            hasPendingSnapshot = false"))
+    if let start = cv3.range(of: "fileprivate func flushPendingSnapshotIfNeeded(caller: String = \"?\") {")?.lowerBound,
+       let end = cv3.range(of: "private func flushStreamingLayout()", range: start..<cv3.endIndex)?.lowerBound {
+        let flush = String(cv3[start..<end])
+        check("flush validates pending, VM, loading and suspend before consumption",
+              flush.contains("guard hasPendingSnapshot, let vm,\n                  !vm.isLoadingSession,\n                  !vm.streamingUIUpdatesSuspended else { return }\n            hasPendingSnapshot = false"))
+        check("deferred snapshot uses the current VM messages",
+              flush.contains("applySnapshot(messages: vm.messages, caller: \"flushPending(\\(caller))\")"))
+    } else { check("deferred snapshot apply funnel is present", false) }
     for caller in ["sheetDismiss", "settle", "stream-end", "suspend-resume", "updateUIVC-backstop", "flushStreamingLayout"] {
         check("flush caller \"\(caller)\" still exists", cv3.contains("flushPendingSnapshotIfNeeded(caller: \"\(caller)\")"))
     }

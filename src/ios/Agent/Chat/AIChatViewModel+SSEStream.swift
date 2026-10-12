@@ -591,9 +591,10 @@ extension AIChatViewModel {
                     // animation layer's fixed stagger window (see TextFadeAnimator),
                     // NOT from flushing more often — a faster flush here just
                     // re-introduced the SwiftUI ForEach-diff main-thread hang.
-                    // First tier matches the streaming-grow layout animation
-                    // duration (0.2s) so each flushed batch glides over exactly
-                    // one animation window. [T-ios-stream-grow-anim]
+                    // First tier matches the optional streaming-grow animation's
+                    // 0.2s window on iOS 16+. iOS 15 disables that offset animation
+                    // but keeps this pacing and the final flush unchanged.
+                    // [T-ios-stream-grow-anim] [T-ios15-hang-boundaries]
                     let throttle: TimeInterval = len < 500 ? 0.20
                                                 : len < 2000 ? 0.30
                                                 : len < 32_000 ? 0.50

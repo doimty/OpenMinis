@@ -2634,15 +2634,20 @@ extension CollectionViewMessageListV3 {
         // fileprivate so updateUIViewController (struct, same file) can use it as
         // a backstop flush. [T-message-list-empty-on-foreground]
         fileprivate func flushPendingSnapshotIfNeeded(caller: String = "?") {
-            guard hasPendingSnapshot else { return }
+            // [T-ios15-hang-boundaries] A deferral is consumed only when it can
+            // be applied. Loading/suspend/resume callbacks may reach this helper
+            // before the UI is ready; keep the pending flag for their next replay.
+            guard hasPendingSnapshot, let vm,
+                  !vm.isLoadingSession,
+                  !vm.streamingUIUpdatesSuspended else { return }
             hasPendingSnapshot = false
-            let blocks = vm?.messages.last(where: { $0.role == .assistant })?.blocks.count ?? -1
+            let blocks = vm.messages.last(where: { $0.role == .assistant })?.blocks.count ?? -1
             // [T-ios-scroll-suspend-leak] Include blockCount + isProcessing so a
             // FLUSH can be matched against the DEFER that queued it — a DEFER with
             // no corresponding FLUSH (see the [SessionLoad] stale-suspend clear) is
             // the leak signature.
-            AppLogger(category: "PendingSnap").info("[PendingSnap] FLUSH caller=\(caller) blockCount=\(blocks) isProcessing=\(vm?.isProcessing == true) — applying deferred snapshot")
-            if let msgs = vm?.messages { applySnapshot(messages: msgs, caller: "flushPending(\(caller))") }
+            AppLogger(category: "PendingSnap").info("[PendingSnap] FLUSH caller=\(caller) blockCount=\(blocks) isProcessing=\(vm.isProcessing) — applying deferred snapshot")
+            applySnapshot(messages: vm.messages, caller: "flushPending(\(caller))")
         }
 
         private func flushStreamingLayout() {

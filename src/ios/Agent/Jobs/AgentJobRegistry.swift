@@ -350,11 +350,18 @@ final class AgentJobRegistry: ObservableObject {
     private var activityObserver: Any?
 
     private init() {
+        // [T-ios15-hang-boundaries] These callbacks only enqueue MainActor work.
+        // Deliver inline (queue: nil): the queue-based observer form adds a
+        // scheduling dependency from a background DB write to the main queue
+        // (corelibs Foundation even blocks the poster in
+        // waitUntilAllOperationsAreFinished), with no state benefit here.
+        // State changes stay on MainActor; @Sendable keeps the closure from
+        // inheriting this initializer's MainActor isolation.
         // Every AIChatViewModel posts this when a loop finishes on a vm that
         // is not the one on screen — which is exactly every headless run.
         loopEndObserver = NotificationCenter.default.addObserver(
-            forName: .sessionAgentLoopDidEnd, object: nil, queue: .main
-        ) { [weak self] note in
+            forName: .sessionAgentLoopDidEnd, object: nil, queue: nil
+        ) { @Sendable [weak self] note in
             guard let sid = note.object as? String else { return }
             Task { @MainActor [weak self] in self?.sessionLoopDidEnd(sid) }
         }
@@ -367,8 +374,8 @@ final class AgentJobRegistry: ObservableObject {
         // could not cover a job that never reached it. `drainIfStalled`
         // returns immediately unless a slot is free AND work is waiting.
         activityObserver = NotificationCenter.default.addObserver(
-            forName: .sessionDidUpdate, object: nil, queue: .main
-        ) { [weak self] _ in
+            forName: .sessionDidUpdate, object: nil, queue: nil
+        ) { @Sendable [weak self] _ in
             Task { @MainActor [weak self] in self?.drainIfStalled() }
         }
     }
