@@ -10,6 +10,7 @@ shared="$root/src/ios/Shared"
 production=(
   "$shared/SwiftUICompatibility.swift"
   "$shared/CompatNavigationPath.swift"
+  "$shared/AppLogger.swift"
   "$shared/CompatPhotoPicker.swift"
   "$shared/CompatGeometry.swift"
   "$shared/LegacyHostingContent.swift"
