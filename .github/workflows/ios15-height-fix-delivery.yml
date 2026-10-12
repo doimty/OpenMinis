@@ -115,7 +115,7 @@ jobs:
           python3 scripts/test_keyword_snippet.py \
             --runner "$(xcrun --find swiftc)" \
             --json "$RUNNER_TEMP/keyword-snippet.json"
-          python3 scripts/test_ios15_hang_boundaries.py \
+          "$RUNNER_TEMP/compaction-test-venv/bin/python" scripts/test_ios15_hang_boundaries.py \
             --runner "$(xcrun --find swiftc)" \
             --json "$RUNNER_TEMP/hang-boundaries.json"
           python3 scripts/test_ios15_composer_focus.py -v
