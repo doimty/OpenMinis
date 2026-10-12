@@ -7,7 +7,7 @@ name: ios15-m0-baseline
 on:
   workflow_dispatch:
   push:
-    branches: [compat/ios15, fix/ios15-sf-symbols, fix/ios15-input-prompts, fix/ios15-retry-hit, fix/ios15-cell-hit-region, fix/ios15-hang-boundaries]
+    branches: [compat/ios15, fix/ios15-sf-symbols, fix/ios15-input-prompts, fix/ios15-retry-hit, fix/ios15-cell-hit-region, fix/ios15-hang-boundaries, fix/stream-stall-guard]
 
 permissions:
   contents: read
@@ -195,6 +195,9 @@ jobs:
           "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_ios15_hang_boundaries.py \
             --runner "$(xcrun --find swiftc)" \
             --json "$RUNNER_TEMP/hang-boundaries.json"
+          "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_stream_stall_guard.py \
+            --runner "$(xcrun --find swiftc)" \
+            --json "$RUNNER_TEMP/stream-stall-guard.json"
 
       - name: TrollStore IPA packager tests
         run: |

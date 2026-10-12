@@ -118,6 +118,9 @@ jobs:
           "$RUNNER_TEMP/compaction-test-venv/bin/python" scripts/test_ios15_hang_boundaries.py \
             --runner "$(xcrun --find swiftc)" \
             --json "$RUNNER_TEMP/hang-boundaries.json"
+          "$RUNNER_TEMP/compaction-test-venv/bin/python" scripts/test_stream_stall_guard.py \
+            --runner "$(xcrun --find swiftc)" \
+            --json "$RUNNER_TEMP/stream-stall-guard.json"
           python3 scripts/test_ios15_composer_focus.py -v
 
       - name: Init pinned iSH
