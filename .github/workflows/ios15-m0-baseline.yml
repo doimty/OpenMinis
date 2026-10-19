@@ -7,7 +7,7 @@ name: ios15-m0-baseline
 on:
   workflow_dispatch:
   push:
-    branches: [compat/ios15, fix/ios15-sf-symbols, fix/ios15-input-prompts, fix/ios15-retry-hit, fix/ios15-cell-hit-region, fix/ios15-hang-boundaries, fix/stream-stall-guard]
+    branches: [compat/ios15, fix/ios15-sf-symbols, fix/ios15-input-prompts, fix/ios15-retry-hit, fix/ios15-cell-hit-region, fix/ios15-hang-boundaries, fix/stream-stall-guard, fix/responses-api-args-recovery]
 
 permissions:
   contents: read
@@ -239,6 +239,45 @@ jobs:
           # so the availability list is not mistaken for a passing iOS 15 build.
           exit "$status"
 
+      - name: Responses API arguments XCTest
+        if: github.ref == 'refs/heads/fix/responses-api-args-recovery'
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/responses-api-args"
+          mkdir -p "$out"
+          simulator_id="$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          candidates = []
+          for runtime, devices in data.get("devices", {}).items():
+              try:
+                  version = tuple(map(int, runtime.rsplit(".iOS-", 1)[1].split("-")[:2]))
+              except (IndexError, ValueError):
+                  continue
+              if version < (26, 2):
+                  continue
+              for device in devices:
+                  if device.get("isAvailable") and device.get("name", "").startswith("iPhone"):
+                      candidates.append((version, device["name"], device["udid"]))
+          if not candidates:
+              raise SystemExit("No available iPhone Simulator with iOS 26.2 or later")
+          print(min(candidates)[2])
+          ')"
+          printf 'Selected iOS Simulator UDID: %s\n' "$simulator_id"
+          xcodebuild \
+            -project src/ios/Minis.xcodeproj \
+            -scheme Minis \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$simulator_id" \
+            -derivedDataPath "$out/DerivedData" \
+            -resultBundlePath "$out/ToolPreflightTests.xcresult" \
+            -parallel-testing-enabled NO \
+            -only-testing:MinisTests/ToolPreflightTests \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=NO \
+            test 2>&1 | tee "$out/xcodebuild-test.log"
+
       - name: Package TrollStore IPA
         run: |
           set -euo pipefail
@@ -311,5 +350,6 @@ jobs:
             ${{ runner.temp }}/sf-symbols/*.log
             ${{ runner.temp }}/input-prompts/**
             ${{ runner.temp }}/retry-probe/**
+            ${{ runner.temp }}/responses-api-args/**
           if-no-files-found: warn
           retention-days: 14

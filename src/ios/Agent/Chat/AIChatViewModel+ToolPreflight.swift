@@ -226,6 +226,37 @@ extension AIChatViewModel {
         preflightEmptyStringAllowedFields[tool]?.contains(field) ?? false
     }
 
+    /// Reject Responses argument payloads that were absent, malformed, not a
+    /// JSON object, or contradictory. The one recovery exception is an explicit
+    /// truncation repair of malformed JSON for a tool with at least one enforced
+    /// required field; a nonblocking-only tool such as memory_get must never
+    /// turn a guessed `{}` into a full default-scope read.
+    nonisolated static func toolArgumentsStateError(
+        state: ToolArgumentsState?,
+        truncationWasRepaired: Bool,
+        toolName: String,
+        tools: [AgentToolDefinition]
+    ) -> String? {
+        guard let state, state != .valid else { return nil }
+        let enforced = tools.first(where: { $0.name == toolName })?.required
+            .filter { !Self.preflightNonBlockingFields.contains($0) } ?? []
+        if state == .malformedJSON, truncationWasRepaired, !enforced.isEmpty {
+            return nil
+        }
+        switch state {
+        case .valid:
+            return nil
+        case .missing:
+            return "Tool '\(toolName)' was rejected because its argument payload was missing."
+        case .malformedJSON:
+            return "Tool '\(toolName)' was rejected because its argument JSON was malformed."
+        case .nonObjectJSON:
+            return "Tool '\(toolName)' was rejected because arguments must be a JSON object."
+        case .conflictingFinalValues:
+            return "Tool '\(toolName)' was rejected because the provider sent conflicting final argument values."
+        }
+    }
+
     nonisolated static func preflightValidateToolCall(name: String,
                                                       args: [String: Any],
                                                       tools: [AgentToolDefinition]) -> String? {

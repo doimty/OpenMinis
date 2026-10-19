@@ -175,6 +175,10 @@ extension AIChatViewModel {
         // JSON Repair (T-tool-json-repair b2c4f8a6).
         var toolArgs: [String: Any] = tu.args
         let needsRepair: Bool = {
+            if let state = tu.metadata?.argumentsState {
+                if state == .malformedJSON { return true }
+                if state != .valid { return false }
+            }
             guard let toolDef = tools.first(where: { $0.name == tu.name }) else { return false }
             if tu.args.isEmpty && !toolDef.required.isEmpty { return true }
             for field in toolDef.required {
@@ -191,13 +195,13 @@ extension AIChatViewModel {
         // Non-nil ⇒ the args are not what the model actually emitted.
         var truncationRepairTag: String? = nil
         if needsRepair {
-            let rawJoined = tu.inputChunkRing.joined()
+            let rawJoined = tu.metadata?.argumentsRawJSON ?? tu.inputChunkRing.joined()
             let repairOutcome = Self.repairToolArgs(
                 name: tu.name, args: tu.args, rawTail: rawJoined, tools: tools
             )
             if !repairOutcome.repairs.isEmpty {
                 AppLogger(category: "ToolPreflight").warning(
-                    "[ToolRepair] REPAIRED tool=\(tu.name) id=\(tu.id) strategies=[\(repairOutcome.repairs.joined(separator: ", "))] beforeKeys=[\(tu.args.keys.sorted().joined(separator: ","))] afterKeys=[\(repairOutcome.args.keys.sorted().joined(separator: ","))] rawJoined=<<<\(rawJoined.prefix(500))>>>"
+                    "[ToolRepair] REPAIRED tool=\(tu.name) id=\(tu.id) strategies=[\(repairOutcome.repairs.joined(separator: ", "))] beforeKeys=[\(tu.args.keys.sorted().joined(separator: ","))] afterKeys=[\(repairOutcome.args.keys.sorted().joined(separator: ","))] rawBytes=\(rawJoined.utf8.count)"
                 )
                 toolArgs = repairOutcome.args
                 // Only the truncation strategy means "the value itself was cut
@@ -330,11 +334,17 @@ extension AIChatViewModel {
             }
         }
 
-        // Preflight: reject empty / missing-required-field tool calls.
-        if let preflightError = Self.preflightValidateToolCall(name: tu.name, args: toolArgs, tools: tools) {
+        let argumentStateError = Self.toolArgumentsStateError(
+            state: tu.metadata?.argumentsState,
+            truncationWasRepaired: truncationRepairTag != nil,
+            toolName: tu.name,
+            tools: tools
+        )
+        if let preflightError = argumentStateError
+            ?? Self.preflightValidateToolCall(name: tu.name, args: toolArgs, tools: tools) {
             let chunkRing = tu.inputChunkRing
             AppLogger(category: "ToolPreflight").warning(
-                "[ToolPreflight] BLOCKED tool=\(tu.name) id=\(tu.id) reason=\"\(preflightError)\" argsKeys=[\(tu.args.keys.sorted().joined(separator: ","))] chunkCount=\(chunkRing.count) lastChunk=<<<\(chunkRing.last?.prefix(500) ?? "")>>>"
+                "[ToolPreflight] BLOCKED tool=\(tu.name) id=\(tu.id) reason=\"\(preflightError)\" argsKeys=[\(tu.args.keys.sorted().joined(separator: ","))] chunkCount=\(chunkRing.count) lastChunkBytes=\(chunkRing.last?.utf8.count ?? 0)"
             )
             let uiMessage = AppLocalized("Blocked invalid tool call")
             let modelMessage = "Error: Tool call rejected before execution. \(preflightError) The arguments your client sent were empty or missing required fields — re-issue the call with all required parameters filled in. Do not retry with the same empty arguments."

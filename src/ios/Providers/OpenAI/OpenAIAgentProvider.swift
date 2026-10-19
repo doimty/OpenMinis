@@ -679,8 +679,10 @@ final class OpenAIAgentProvider: AgentProvider {
             let task = Task {
                 var emittedTextStart = false
                 var hasToolCalls = false
-                // Track current function call items: [item_id: (call_id, name, accumulatedJSON)]
-                var functionCallAccum: [String: (callId: String, name: String, json: String)] = [:]
+                // Track current Responses function-call items and preserve each
+                // terminal snapshot separately until output_item.done.
+                var functionCallAccum: [String: (callId: String, name: String, json: String, finalArguments: String?)] = [:]
+                var completedFunctionCallItemIds: Set<String> = []
 
                 // Per-item streamed summary text. Keyed by reasoning item id.
                 // OpenAI Responses API can emit multiple reasoning items in a
@@ -745,6 +747,14 @@ final class OpenAIAgentProvider: AgentProvider {
                                 continuation.yield(.toolInputDelta(name: entry.name, accumulated: entry.json))
                             }
 
+                        case "response.function_call_arguments.done":
+                            if let itemId = event["item_id"] as? String,
+                               let arguments = event["arguments"] as? String,
+                               var entry = functionCallAccum[itemId] {
+                                entry.finalArguments = arguments
+                                functionCallAccum[itemId] = entry
+                            }
+
                         case "response.output_item.done":
                             if let item = event["item"] as? [String: Any],
                                let itemType = item["type"] as? String,
@@ -771,13 +781,25 @@ final class OpenAIAgentProvider: AgentProvider {
                                let itemId = item["id"] as? String,
                                let entry = functionCallAccum[itemId] {
                                 let combinedId = Self.combineResponsesAPIIds(callId: entry.callId, fcId: itemId)
-                                let args = Self.parseJsonToDict(entry.json)
-                                if args.isEmpty {
-                                    Self.diagEmptyToolArgs(rawJson: entry.json, toolName: entry.name, toolId: combinedId, model: self.model.id, source: "responsesAPI.outputItemDone")
+                                let resolved = ResponsesToolArgumentsResolver.resolve(
+                                    delta: entry.json,
+                                    argumentsDone: entry.finalArguments,
+                                    itemArguments: item["arguments"] as? String
+                                )
+                                if resolved.state != .valid {
+                                    Self.diagEmptyToolArgs(rawJson: resolved.rawJSON ?? "", toolName: entry.name, toolId: combinedId, model: self.model.id, source: "responsesAPI.outputItemDone")
                                 }
                                 continuation.yield(.toolCallComplete(
-                                    id: combinedId, name: entry.name, args: args, metadata: nil
+                                    id: combinedId,
+                                    name: entry.name,
+                                    args: resolved.args,
+                                    metadata: ToolCallMetadata(
+                                        thoughtSignature: nil,
+                                        argumentsState: resolved.state,
+                                        argumentsRawJSON: resolved.rawJSON
+                                    )
                                 ))
+                                completedFunctionCallItemIds.insert(itemId)
                                 functionCallAccum.removeValue(forKey: itemId)
                             }
 
@@ -799,11 +821,13 @@ final class OpenAIAgentProvider: AgentProvider {
                                itemType == "function_call",
                                let itemId = item["id"] as? String,
                                let callId = item["call_id"] as? String,
-                               let name = item["name"] as? String {
+                               let name = item["name"] as? String,
+                               functionCallAccum[itemId] == nil,
+                               !completedFunctionCallItemIds.contains(itemId) {
                                 emittedTextStart = false
                                 hasToolCalls = true
                                 let combinedId = Self.combineResponsesAPIIds(callId: callId, fcId: itemId)
-                                functionCallAccum[itemId] = (callId: callId, name: name, json: "")
+                                functionCallAccum[itemId] = (callId: callId, name: name, json: "", finalArguments: nil)
                                 continuation.yield(.contentBlockStart(.toolUse(id: combinedId, name: name)))
                             }
 
@@ -2441,15 +2465,9 @@ final class OpenAIAgentProvider: AgentProvider {
         let trimmedEmpty = rawJson.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let isLiteralEmptyObj = rawJson.trimmingCharacters(in: .whitespacesAndNewlines) == "{}"
         let parseOk = (try? JSONSerialization.jsonObject(with: Data(rawJson.utf8), options: [])) != nil
-        // Hex of the first 80 bytes is enough to spot BOMs / hidden chars
-        // when the raw text "looks" like "{}". The full raw payload below
-        // is intentionally UNTRUNCATED — empty-args bugs are rare so log
-        // volume is not a concern, and seeing the entire stream content is
-        // the only way to tell apart "no delta ever arrived" / "literal
-        // `{}`" / "truncated mid-stream" / "schema mismatch (other keys
-        // present, just no `command`)".
-        let hexPreview = rawJson.utf8.prefix(80).map { String(format: "%02x", $0) }.joined()
-        AppLogger(category: "ToolArgsProbe").warning("[ToolArgsProbe] EMPTY ARGS source=\(source) model=\(model) tool=\(toolName) id=\(toolId) bytes=\(utf8Bytes) trimmedEmpty=\(trimmedEmpty ? 1 : 0) literalEmptyObj=\(isLiteralEmptyObj ? 1 : 0) parseOk=\(parseOk ? 1 : 0) hex80=\(hexPreview) raw=<<<\(rawJson)>>>")
+        // Never log argument contents or reversible hex: tool payloads can
+        // contain commands, file contents, or user data.
+        AppLogger(category: "ToolArgsProbe").warning("[ToolArgsProbe] EMPTY ARGS source=\(source) model=\(model) tool=\(toolName) id=\(toolId) bytes=\(utf8Bytes) trimmedEmpty=\(trimmedEmpty ? 1 : 0) literalEmptyObj=\(isLiteralEmptyObj ? 1 : 0) parseOk=\(parseOk ? 1 : 0)")
     }
 
     // MARK: - Responses API Dual ID Helpers
