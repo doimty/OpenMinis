@@ -16,7 +16,16 @@ fi
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-"$compiler" -swift-version 6 \
+sdk_args=()
+if command -v xcrun >/dev/null 2>&1 && [[ -z "${SWIFTC:-}" ]]; then
+  sdk="$(xcrun --sdk macosx --show-sdk-path)"
+  target="$(xcrun --sdk macosx --show-sdk-platform-path)/Developer/usr/bin/swiftc"
+  if [[ -x "$target" ]]; then
+    compiler="$target"
+  fi
+  sdk_args=(-sdk "$sdk" -target arm64-apple-macosx14.0)
+fi
+"$compiler" -swift-version 6 "${sdk_args[@]}" \
   "$ROOT/src/ios/Providers/ResponsesToolArguments.swift" \
   "$ROOT/scripts/responses-api-args-tests/main.swift" \
   -o "$tmp/responses-api-args-tests"
