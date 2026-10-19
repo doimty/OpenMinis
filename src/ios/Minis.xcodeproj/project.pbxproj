@@ -142,6 +142,7 @@
 		E58000001 /* GeminiProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58000011 /* GeminiProvider.swift */; };
 		E58000002 /* GeminiModelsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58000012 /* GeminiModelsAPI.swift */; };
 		E58000003 /* GeminiOAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58000013 /* GeminiOAuthManager.swift */; };
+		F9A000000000000000000001 /* ResponsesToolArguments.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A000000000000000000002 /* ResponsesToolArguments.swift */; };
 		E59000001 /* AgentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59000011 /* AgentProvider.swift */; };
 		E59000002 /* AnthropicAgentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59000012 /* AnthropicAgentProvider.swift */; };
 		E59000003 /* GeminiAgentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59000013 /* GeminiAgentProvider.swift */; };
@@ -839,6 +840,7 @@
 		E58000011 /* GeminiProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProvider.swift; sourceTree = "<group>"; };
 		E58000012 /* GeminiModelsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiModelsAPI.swift; sourceTree = "<group>"; };
 		E58000013 /* GeminiOAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiOAuthManager.swift; sourceTree = "<group>"; };
+		F9A000000000000000000002 /* ResponsesToolArguments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResponsesToolArguments.swift; sourceTree = "<group>"; };
 		E59000011 /* AgentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProvider.swift; sourceTree = "<group>"; };
 		E59000012 /* AnthropicAgentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicAgentProvider.swift; sourceTree = "<group>"; };
 		E59000013 /* GeminiAgentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiAgentProvider.swift; sourceTree = "<group>"; };
@@ -1600,6 +1602,7 @@
 				E52000013 /* LLMProvider.swift */,
 				E5F00002 /* LLMProviderFactory.swift */,
 				E59000011 /* AgentProvider.swift */,
+				F9A000000000000000000002 /* ResponsesToolArguments.swift */,
 				E5D00011 /* ProviderTypes.swift */,
 				E5D00012 /* ProviderInstance.swift */,
 				E5D00013 /* ModelEntry.swift */,
@@ -3071,6 +3074,7 @@
 				E6A000003 /* AntigravityOAuthManager.swift in Sources */,
 				E6A000004 /* AntigravityAgentProvider.swift in Sources */,
 				E59000001 /* AgentProvider.swift in Sources */,
+				F9A000000000000000000001 /* ResponsesToolArguments.swift in Sources */,
 				E59000002 /* AnthropicAgentProvider.swift in Sources */,
 				E59000003 /* GeminiAgentProvider.swift in Sources */,
 				E5GWF0003 /* GeminiWireFormat.swift in Sources */,
