@@ -43,11 +43,16 @@ private func testHighlightMergesOverlaps() {
     expect(ranges[0].lowerBound == text.startIndex && ranges[0].upperBound == text.endIndex, "merged range spans both")
 }
 
-private func testHighlightHandlesAdjacentAndRepeated() {
+private func testHighlightCoalescesAdjacent() {
+    // "aa" twice over "aaaa": the two occurrences touch, so they merge into one
+    // run. Visually identical to two adjacent spans, and it keeps the renderer
+    // from emitting a zero-width seam between them.
     let text = "aaaa"
     let ranges = ChatSearchQuery.highlightRanges(in: text, keywords: ["aa"])
-    expect(ranges.count == 2, "non-overlapping repeats stay separate, got \(ranges.count)")
-    expect(ranges.map { String(text[$0]) } == ["aa", "aa"], "each range is one occurrence")
+    expect(ranges.count == 1, "adjacent occurrences coalesce, got \(ranges.count)")
+    expect(String(text[ranges[0]]) == "aaaa", "coalesced span covers the whole run")
+    let spaced = ChatSearchQuery.highlightRanges(in: "aa aa", keywords: ["aa"])
+    expect(spaced.count == 2, "separated occurrences stay separate, got \(spaced.count)")
 }
 
 private func testHighlightSurvivesCaseFoldingLengthChanges() {
@@ -87,7 +92,7 @@ let tests: [(String, () -> Void)] = [
     ("blank input", testParseEmpty),
     ("all occurrences", testHighlightFindsAllOccurrences),
     ("overlap merge", testHighlightMergesOverlaps),
-    ("adjacent repeats", testHighlightHandlesAdjacentAndRepeated),
+    ("adjacent repeats coalesce", testHighlightCoalescesAdjacent),
     ("case folding length change", testHighlightSurvivesCaseFoldingLengthChanges),
     ("empty inputs", testHighlightEmptyInputs),
     ("snippet normalization", testSnippetNormalization),
