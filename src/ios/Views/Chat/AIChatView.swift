@@ -328,6 +328,10 @@ struct AIChatView: View {
     // [T-p3-agent-callback-cell] Detail sheet for a tapped agent callback cell.
     @State private var agentCallbackDetail: AgentCallbackDetailTarget?
     @State private var showFileBrowser = false
+    // [T-chat-search] In-conversation search sheet + the jump it produces.
+    @State private var showChatSearch = false
+    @State private var chatJumpRequest: ChatJumpRequest?
+    @State private var chatJumpNonce = 0
     // [T-browser-download-ux-v2] Downloads panel + "Show in Files" locate target.
     @State private var showDownloadsPanel = false
     @State private var locateDownloadTarget: DownloadLocateTarget?
@@ -828,6 +832,16 @@ struct AIChatView: View {
                         rootLabel: "/var/minis/workspace",
                         highlightFileName: target.filename
                     )
+                }
+            }
+        }
+        // [T-chat-search] Search this conversation; picking a hit closes the
+        // sheet and asks the transcript to scroll to it.
+        .sheet(isPresented: $showChatSearch) {
+            if let sid = vm.sessionId {
+                ChatSearchView(sessionId: sid) { messageId in
+                    chatJumpNonce += 1
+                    chatJumpRequest = ChatJumpRequest(messageID: messageId, nonce: chatJumpNonce)
                 }
             }
         }
@@ -1993,6 +2007,7 @@ struct AIChatView: View {
             showFastModeToggle: activeModelSupportsFastMode,
             fastModeEnabled: codexFastModeEnabled,
             onNewChat: { requestNewChatFromMenu() },
+            onSearch: { showChatSearch = true },
             // [T-chat-menu-compact-entry] Same effect as the /compact slash
             // command (AIChatViewModel+SlashCommands case "compact").
             onCompact: { vm.compactAll() },
@@ -2816,7 +2831,8 @@ struct AIChatView: View {
                 },
                 maxContentWidth: maxContentWidth ?? 0,
                 floatingBarHeight: floatingBarHeight,
-                inputBarHeight: inputBarHeight
+                inputBarHeight: inputBarHeight,
+                jumpRequest: chatJumpRequest
             )
             // Empty/loading overlay for tap-to-dismiss-keyboard.
             // Placed BEFORE the directory timeline in the ZStack so the
@@ -5835,6 +5851,8 @@ private struct ChatTrailingMenuButton: UIViewRepresentable {
     let fastModeEnabled: Bool
 
     let onNewChat: () -> Void
+    /// [T-chat-search] Opens the in-conversation search sheet.
+    let onSearch: () -> Void
     let onCompact: () -> Void
     let onClearChat: () -> Void
     let onForceSync: () -> Void
@@ -5953,6 +5971,11 @@ private struct ChatTrailingMenuButton: UIViewRepresentable {
         groups.append(UIMenu(options: .displayInline, children: [
             UIAction(title: AppLocalized("New Chat"),
                      image: UIImage(systemName: "square.and.pencil")) { _ in coordinator.parent.onNewChat() },
+            UIAction(title: AppLocalized("Search in Chat"),
+                     image: UIImage(systemName: "magnifyingglass"),
+                     attributes: key.messagesEmpty ? UIMenuElement.Attributes.disabled : []) { _ in
+                coordinator.parent.onSearch()
+            },
         ]))
 
         // [T-chat-menu-compact-entry] Compact sits ABOVE Clear Chat in its own

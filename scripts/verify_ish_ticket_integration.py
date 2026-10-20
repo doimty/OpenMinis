@@ -13,7 +13,7 @@ def main():
  def check(name,ok):
   checks.append({'name':name,'ok':bool(ok)})
   if not ok:raise RuntimeError(name)
- swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift']
+ swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift']
  for fn in swift:
   raw=(P/fn).read_bytes();tree=parser.parse(raw)
   if fn.endswith('DebugJSONRPC.swift'):
@@ -57,6 +57,16 @@ def main():
  check('kernel releases an abandoned launch without running','launchTask->group->doing_group_exit = true' in hook and 'report(0, -4)' in hook)
  check('cancelled tokens outlive their cleanup pass','isTerminationRequestedForToken' in backend and 'rememberCancelledToken' in backend)
  check('terminal lifecycle is compiled source',project.count('A45020261020000000000003')==2 and project.count('A45020261020000000000004')==3)
+ searchview=(P/'src/ios/Views/Chat/ChatSearchView.swift').read_text();chatview=(P/'src/ios/Views/Chat/AIChatView.swift').read_text();searchquery=(P/'src/ios/Agent/Chat/ChatSearchQuery.swift').read_text();listv3=(P/'src/ios/Agent/MessageList/CollectionViewMessageListV3.swift').read_text()
+ check('chat search queries this conversation','ChatStore.shared.searchMessages' in searchview and 'sessionIds: [sessionId]' in searchview)
+ check('chat search debounces keystrokes','Task.sleep(nanoseconds: 250_000_000)' in searchview)
+ check('chat search jumps to the picked message','chatJumpRequest = ChatJumpRequest(messageID: messageId, nonce: chatJumpNonce)' in chatview)
+ check('chat search entry lives in the trailing menu','AppLocalized("Search in Chat")' in chatview and 'onSearch: { showChatSearch = true }' in chatview)
+ check('transcript jumps by message id','request.messageID' in listv3 and 'scrollToItem(at: indexPath, at: .centeredVertically' in listv3)
+ check('jump flash sits behind the cells','cv.insertSubview(marker, at: 0)' in listv3)
+ check('search keywords are bounded','static let maxKeywords = 6' in searchquery)
+ check('search files are compiled sources',project.count('A45020261020000000000005')==2 and project.count('A45020261020000000000007')==2)
+
 
  (out/'results.json').write_text(json.dumps({'scope':__doc__,'checks':checks,'swift_native':'NOT RUN','ios_build':'NOT RUN','ready_to_release':False},indent=2))
  print('STATIC_INTEGRATION_CHECKS',len(checks),'PASS; NOT native Swift or iOS')

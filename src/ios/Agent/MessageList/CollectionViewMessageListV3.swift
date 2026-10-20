@@ -36,6 +36,13 @@ extension Notification.Name {
 /// - **3-tier height resolution**: measured cache → precalc (NSAttributedString) → estimate
 /// - **2-state scroll model**: autoScrolling / userBrowsing (replaces V2's 6+ mechanisms)
 /// - **O(1) message lookup**: UUID index rebuilt on each snapshot
+/// A request to scroll to one message. `nonce` makes asking for the same
+/// message twice a second jump instead of a silent no-op.
+struct ChatJumpRequest: Equatable {
+    let messageID: UUID
+    let nonce: Int
+}
+
 struct CollectionViewMessageListV3: UIViewControllerRepresentable {
     @ObservedObject var vm: AIChatViewModel
     var inputFocused: Bool
@@ -60,6 +67,10 @@ struct CollectionViewMessageListV3: UIViewControllerRepresentable {
     var maxContentWidth: CGFloat
     var floatingBarHeight: CGFloat
     var inputBarHeight: CGFloat
+    /// Set when the user picks a search hit; the coordinator scrolls to that
+    /// message and flashes its row. Default keeps every other call site
+    /// unchanged.
+    var jumpRequest: ChatJumpRequest? = nil
 
     func makeUIViewController(context: Context) -> MessageListViewController {
         let vc = MessageListViewController()
@@ -86,6 +97,7 @@ struct CollectionViewMessageListV3: UIViewControllerRepresentable {
         // (device ring trace: coordinator vm read false at every sync while
         // the buttons stayed hidden at diff≈2700pt from the bottom).
         coord.rebindViewModelIfNeeded(vm)
+        coord.handleJumpRequest(jumpRequest)
         coord.onRetryMessage = onRetryMessage
         coord.onOpenSoulSettings = onOpenSoulSettings
         coord.onRetryLast = onRetryLast
@@ -4474,6 +4486,48 @@ extension CollectionViewMessageListV3 {
             let item = cv.numberOfItems(inSection: section) - 1
             guard item >= 0 else { return }
             cv.scrollToItem(at: IndexPath(item: item, section: section), at: .bottom, animated: animated)
+        }
+
+        // MARK: - Search jump
+
+        private var handledJumpNonce: Int?
+        private var jumpFlashView: UIView?
+
+        /// Scrolls to one message and flashes its row.
+        ///
+        /// Dedupe is by nonce, not by message id: tapping the same hit twice
+        /// must jump twice. Rendering stays untouched — the marker is a plain
+        /// subview behind the cells, so cell reuse cannot strand it.
+        func handleJumpRequest(_ request: ChatJumpRequest?) {
+            guard let request, request.nonce != handledJumpNonce else { return }
+            handledJumpNonce = request.nonce
+            guard let cv = viewController?.collectionView, let ds = dataSource else { return }
+            guard let item = ds.snapshot().itemIdentifiers.first(where: { $0.messageId == request.messageID }),
+                  let indexPath = ds.indexPath(for: item) else { return }
+            // The user asked for a specific message; leaving follow mode first
+            // keeps the next streaming update from snapping back to the bottom.
+            scrollMode = .userBrowsing
+            cv.layoutIfNeeded()
+            let frame = cv.layoutAttributesForItem(at: indexPath)?.frame
+            cv.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
+            if let frame { flashHighlight(at: frame) }
+        }
+
+        private func flashHighlight(at frame: CGRect) {
+            guard let cv = viewController?.collectionView, frame.height > 0 else { return }
+            jumpFlashView?.removeFromSuperview()
+            let marker = UIView(frame: frame.insetBy(dx: 6, dy: 3))
+            marker.backgroundColor = UIColor.tintColor.withAlphaComponent(0.16)
+            marker.layer.cornerRadius = 14
+            marker.isUserInteractionEnabled = false
+            cv.insertSubview(marker, at: 0)
+            jumpFlashView = marker
+            UIView.animate(withDuration: 0.8, delay: 1.0, options: [.curveEaseInOut]) {
+                marker.alpha = 0
+            } completion: { [weak self] _ in
+                marker.removeFromSuperview()
+                if self?.jumpFlashView === marker { self?.jumpFlashView = nil }
+            }
         }
 
         /// The user-message id the up-button last jumped to, so a repeated tap
