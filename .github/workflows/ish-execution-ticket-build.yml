@@ -18,6 +18,11 @@ env:
   EXPECTED_XCODE_BUILD: "Build version 17C52"
   EXPECTED_IOS_SDK: "26.2"
   EXPECTED_ISH: "e6521d9cfe9cd48f19917fc3b23aea622ba358b4"
+  NATIVE_CXX_SHA: 1648fc13a04a90521a2ef3887885ef2506208605
+  ONNX_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/onnxruntime.xcframework.zip
+  ONNX_SHA256: 498ba860229e0ce45e6983ce44478a836b0c0763451ed37a8b1f8e74a8a0dc1f
+  APM_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/webrtc_audio_processing.xcframework.zip
+  APM_SHA256: 3ee3d36e9207a09fa3133c405f08a49a0d023f173ee5b4a47c047362aba56856
 
 jobs:
   native-build:
@@ -45,6 +50,20 @@ jobs:
           set -euo pipefail
           git submodule update --init --recursive deps/ish
           test "$(git -C deps/ish rev-parse HEAD)" = "$EXPECTED_ISH"
+
+      - name: Native production lifecycle regression
+        run: |
+          set -euo pipefail
+          bash scripts/test_ish_command_lifecycle.sh 2>&1 | tee "$RUNNER_TEMP/ish-lifecycle-tests.log"
+
+      - name: Host production identity and cleanup-helper tests
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/test-venv"
+          "$RUNNER_TEMP/test-venv/bin/pip" install --disable-pip-version-check tree-sitter==0.25.2 tree-sitter-swift==0.7.3
+          mkdir -p "$RUNNER_TEMP/ish-ticket"
+          "$RUNNER_TEMP/test-venv/bin/python" scripts/test_ish_execution_identity.py --out "$RUNNER_TEMP/ish-ticket/backend"
+          "$RUNNER_TEMP/test-venv/bin/python" scripts/verify_ish_ticket_integration.py --out "$RUNNER_TEMP/ish-ticket/static"
 
       - name: Restore native build dependencies
         id: native-cache
@@ -106,20 +125,6 @@ jobs:
         run: |
           set -euo pipefail
           cp src/ios/Configs/ProviderCustomization.xcconfig.example src/ios/Configs/ProviderCustomization.xcconfig
-
-      - name: Native production lifecycle regression
-        run: |
-          set -euo pipefail
-          bash scripts/test_ish_command_lifecycle.sh 2>&1 | tee "$RUNNER_TEMP/ish-lifecycle-tests.log"
-
-      - name: Host production identity and cleanup-helper tests
-        run: |
-          set -euo pipefail
-          python3 -m venv "$RUNNER_TEMP/test-venv"
-          "$RUNNER_TEMP/test-venv/bin/pip" install --disable-pip-version-check tree-sitter==0.25.2 tree-sitter-swift==0.7.3
-          mkdir -p "$RUNNER_TEMP/ish-ticket"
-          "$RUNNER_TEMP/test-venv/bin/python" scripts/test_ish_execution_identity.py --out "$RUNNER_TEMP/ish-ticket/backend"
-          "$RUNNER_TEMP/test-venv/bin/python" scripts/verify_ish_ticket_integration.py --out "$RUNNER_TEMP/ish-ticket/static"
 
       - name: Build real Minis iOS app
         run: |
