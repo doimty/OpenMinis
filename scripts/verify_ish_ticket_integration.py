@@ -48,7 +48,7 @@ def main():
  check('deadline independent of kernel queue',re.search(r'DispatchQueue.global\([^\n]*\)\.asyncAfter',life) is not None)
  terminal=(P/'src/ios/Views/Rootfs/ISHTerminalView.swift').read_text();termlife=(P/'src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift').read_text()
  check('terminal shell launches under an execution identity','executionToken: token' in terminal and 'ISHKernel.shared.executeCommand(["/bin/sh", "-l"])' not in terminal)
- check('terminal shell is single flight','guard shellLifecycle.beginLaunch(token: token) else { return }' in terminal)
+ check('terminal shell is single flight','guard shellLifecycle.beginLaunch(token: token) else { return false }' in terminal)
  check('terminal stop reclaims by identity','requestStop()' in terminal and 'requestTermination(ticket, error: .cancelled)' in terminal)
  check('terminal launch watchdog abandons identity','isAwaitingPID(token: token)' in terminal and 'requestTermination(ticket, error: .timeout)' in terminal)
  check('terminal lifecycle rejects stale launch reports','guard case .launching(let expected) = phase, expected == token else { return false }' in termlife)

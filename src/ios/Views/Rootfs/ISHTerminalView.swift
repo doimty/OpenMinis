@@ -435,7 +435,7 @@ class ISHTerminalViewModel: ObservableObject {
         stepStart = CFAbsoluteTimeGetCurrent()
         // Start as login shell (-l) so /etc/profile and /etc/profile.d/*.sh
         // are sourced, enabling command history and line editing.
-        launchShell()
+        guard launchShell() else { return }
         logger.info("[StartShell] launchShell(/bin/sh -l): \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - stepStart) * 1000))ms")
 
         logger.info("[StartShell] TOTAL: \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - totalStart) * 1000))ms (sessionId=\(sessionId ?? "nil"))")
@@ -503,14 +503,15 @@ class ISHTerminalViewModel: ObservableObject {
     /// Must run on the main thread: it publishes UI state. The kernel launch
     /// itself stays asynchronous, so a guest process holding `pids_lock` can
     /// delay the prompt but never blocks the terminal UI.
-    private func launchShell() {
+    @discardableResult
+    private func launchShell() -> Bool {
         guard let ticket = ISHShellExecutor.makeTicket(fsContext: 0) else {
             feed("[Minis] Shell execution identity unavailable; nothing was launched.\r\n")
-            return
+            return false
         }
         let token = ticket.token
         // Single flight: repeated onAppear must not stack shells.
-        guard shellLifecycle.beginLaunch(token: token) else { return }
+        guard shellLifecycle.beginLaunch(token: token) else { return false }
         shellTicket = ticket
         publishShellState()
 
@@ -523,19 +524,22 @@ class ISHTerminalViewModel: ObservableObject {
         if rc < 0 {
             _ = shellLifecycle.failLaunch(token: token)
             shellTicket = nil
+            isShellStarted = false
             publishShellState()
             feed("Failed to start shell: \(rc)\r\n")
-            return
+            return false
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.shellLaunchDeadline) { [weak self] in
             self?.abandonStalledLaunch(token: token)
         }
+        return true
     }
 
     private func handleLaunchReport(token: UInt64, pid: Int32, error: Int32) {
         guard pid > 0 else {
             guard shellLifecycle.failLaunch(token: token) else { return }
             shellTicket = nil
+            isShellStarted = false
             publishShellState()
             feed("\r\n[Minis] Shell failed to start (error \(error)).\r\n")
             return
@@ -554,6 +558,7 @@ class ISHTerminalViewModel: ObservableObject {
         }
         _ = shellLifecycle.failLaunch(token: token)
         shellTicket = nil
+        isShellStarted = false
         publishShellState()
         logger.warning("[Shell] launch watchdog fired; token=\(token)")
         feed("\r\n[Minis] Shell did not start within \(Int(Self.shellLaunchDeadline))s; "
@@ -568,6 +573,9 @@ class ISHTerminalViewModel: ObservableObject {
             ISHShellExecutor.requestTermination(ticket, error: .cancelled)
         }
         shellTicket = nil
+        // A later onAppear may start a fresh shell; the cancelled identity
+        // still owns the old one, so the two can never be confused.
+        isShellStarted = false
         publishShellState()
         logger.info("[Shell] stop requested token=\(token)")
         feed("\r\n[Minis] Stop requested; this terminal's shell and its children are being reclaimed.\r\n")
