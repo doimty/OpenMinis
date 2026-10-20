@@ -14,6 +14,10 @@ extern NSNotificationName const ISHTerminalOutputNotification;
 
 typedef void (^ISHOutputCallback)(NSData *data);
 typedef void (^ISHCommandCompletionCallback)(NSString *output, NSError * _Nullable error);
+/// Delivery contract: main queue. pid > 0 means the guest task was started;
+/// pid == 0 with a negative error means no guest process is running for this
+/// launch. An abandoned launch never reports success.
+typedef void (^ISHKernelLaunchCallback)(int pid, int error);
 
 @interface ISHKernel : NSObject
 
@@ -39,6 +43,21 @@ typedef void (^ISHCommandCompletionCallback)(NSString *output, NSError * _Nullab
 /// @param command Command and arguments array, e.g. @[@"/bin/sh", @"-l"]
 /// @return 0 on success, negative error code on failure
 - (int)executeCommand:(NSArray<NSString *> *)command;
+
+/// Launch an interactive shell bound to an execution identity.
+///
+/// The token is stamped on the new task group's fs_context before exec, so
+/// identity-scoped cleanup reclaims exactly this shell and its descendants
+/// instead of scanning for whatever the terminal used to run. The launch stays
+/// asynchronous: this returns once the request is accepted.
+///
+/// `onLaunch` is delivered on the main queue. Success reports the guest PID
+/// with error 0; a launch that never reached exec reports pid 0 and a negative
+/// error. A token whose termination was requested before the kernel got to
+/// start it is released without ever running the command.
+- (int)executeCommand:(NSArray<NSString *> *)command
+       executionToken:(uint64_t)executionToken
+             onLaunch:(nullable ISHKernelLaunchCallback)onLaunch;
 
 /// Execute a command and wait for completion (detects prompt to know when done)
 /// @param commandString Command string to execute

@@ -79,6 +79,12 @@ typedef void (^ISHShellCompletionCallback)(ISHShellExecutionResult *result);
                               error:(ISHShellExecutorError)error
     NS_SWIFT_NAME(requestTermination(_:error:));
 
+/// YES once termination was requested for `token`, and still YES after the
+/// cleanup pass finished. A launch blocked on a kernel lock past the last
+/// cleanup attempt consults this before starting, so an abandoned execution
+/// cannot resurrect as an unowned guest process. Retained tokens are bounded.
++ (BOOL)isTerminationRequestedForToken:(uint64_t)token;
+
 /// Execute a shell command with line-by-line output callback
 /// @param command Shell command to execute (will be passed to /bin/sh -c)
 /// @param lineCallback Called for each line of output (on main queue), can be nil

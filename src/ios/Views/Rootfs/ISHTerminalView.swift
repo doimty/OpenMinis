@@ -104,6 +104,14 @@ struct ISHTerminalView: View {
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
+                if viewModel.shellActive {
+                    Button {
+                        viewModel.stopShell()
+                    } label: {
+                        Image(systemName: "stop.circle")
+                    }
+                    .accessibilityLabel(Text("Stop shell"))
+                }
                 Button {
                     viewModel.clearScreen()
                 } label: {
@@ -195,6 +203,19 @@ class ISHTerminalViewModel: ObservableObject {
 
     private var isShellStarted = false
 
+    /// Interactive shell ownership. The terminal is the one execution path
+    /// whose shell outlives a single call, so it carries its own execution
+    /// identity: Stop reclaims exactly this shell and its children, and a
+    /// launch abandoned while the kernel was busy can never resurrect as an
+    /// unowned guest process.
+    private var shellLifecycle = ISHTerminalShellLifecycle()
+    private var shellTicket: ISHShellExecutionTicket?
+    @Published private(set) var shellActive = false
+    /// A launch that has not reported a PID by this deadline is abandoned:
+    /// the kernel is stuck behind a guest lock and waiting longer only leaves
+    /// the user staring at a black screen.
+    private static let shellLaunchDeadline: TimeInterval = 10
+
     /// Monotonic token used to detect whether the currently installed global
     /// outputCallback still belongs to this VM instance. See `installedCallbackGeneration`.
     private static var generationCounter: Int = 0
@@ -215,6 +236,15 @@ class ISHTerminalViewModel: ObservableObject {
     }
 
     deinit {
+        // A launch still in flight has no output target any more; cancel its
+        // identity so the kernel releases it instead of starting an orphan
+        // shell. A shell that already reported a PID keeps running: closing the
+        // terminal has never killed work in progress.
+        if shellLifecycle.isActive, let ticket = shellTicket {
+            if case .launching = shellLifecycle.phase {
+                ISHShellExecutor.requestTermination(ticket, error: .cancelled)
+            }
+        }
         // Only clear the global callback if WE are the current owner. A newer
         // VM may have taken ownership already — in that case clearing it would
         // strand the new VM with no callback and cause the "second open hangs"
@@ -405,15 +435,8 @@ class ISHTerminalViewModel: ObservableObject {
         stepStart = CFAbsoluteTimeGetCurrent()
         // Start as login shell (-l) so /etc/profile and /etc/profile.d/*.sh
         // are sourced, enabling command history and line editing.
-        let err = ISHKernel.shared.executeCommand(["/bin/sh", "-l"])
-        logger.info("[StartShell] executeCommand(/bin/sh -l): \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - stepStart) * 1000))ms")
-        if err < 0 {
-            let msg = "Failed to start shell: \(err)\r\n"
-            if let data = msg.data(using: .utf8) {
-                emulator.feed(data)
-            }
-            return
-        }
+        launchShell()
+        logger.info("[StartShell] launchShell(/bin/sh -l): \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - stepStart) * 1000))ms")
 
         logger.info("[StartShell] TOTAL: \(String(format: "%.1f", (CFAbsoluteTimeGetCurrent() - totalStart) * 1000))ms (sessionId=\(sessionId ?? "nil"))")
 
@@ -471,6 +494,93 @@ class ISHTerminalViewModel: ObservableObject {
     func handleResize(cols: Int, rows: Int) {
         emulator.resize(cols: cols, rows: rows)
         ISHKernel.shared.setTerminalSize(Int32(cols), rows: Int32(rows))
+    }
+
+    // MARK: - Shell ownership
+
+    /// Starts the login shell under a fresh execution identity.
+    ///
+    /// Must run on the main thread: it publishes UI state. The kernel launch
+    /// itself stays asynchronous, so a guest process holding `pids_lock` can
+    /// delay the prompt but never blocks the terminal UI.
+    private func launchShell() {
+        guard let ticket = ISHShellExecutor.makeTicket(fsContext: 0) else {
+            feed("[Minis] Shell execution identity unavailable; nothing was launched.\r\n")
+            return
+        }
+        let token = ticket.token
+        // Single flight: repeated onAppear must not stack shells.
+        guard shellLifecycle.beginLaunch(token: token) else { return }
+        shellTicket = ticket
+        publishShellState()
+
+        let rc = ISHKernel.shared.executeCommand(["/bin/sh", "-l"], executionToken: token) { [weak self] pid, error in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                self.handleLaunchReport(token: token, pid: pid, error: error)
+            }
+        }
+        if rc < 0 {
+            _ = shellLifecycle.failLaunch(token: token)
+            shellTicket = nil
+            publishShellState()
+            feed("Failed to start shell: \(rc)\r\n")
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.shellLaunchDeadline) { [weak self] in
+            self?.abandonStalledLaunch(token: token)
+        }
+    }
+
+    private func handleLaunchReport(token: UInt64, pid: Int32, error: Int32) {
+        guard pid > 0 else {
+            guard shellLifecycle.failLaunch(token: token) else { return }
+            shellTicket = nil
+            publishShellState()
+            feed("\r\n[Minis] Shell failed to start (error \(error)).\r\n")
+            return
+        }
+        guard shellLifecycle.completeLaunch(token: token, pid: pid) else { return }
+        logger.info("[Shell] launched pid=\(pid) token=\(token)")
+        publishShellState()
+    }
+
+    /// The kernel never reported a PID. Cancel the identity so a launch still
+    /// queued behind a guest lock cannot start an unreachable shell later.
+    private func abandonStalledLaunch(token: UInt64) {
+        guard shellLifecycle.isAwaitingPID(token: token) else { return }
+        if let ticket = shellTicket {
+            ISHShellExecutor.requestTermination(ticket, error: .timeout)
+        }
+        _ = shellLifecycle.failLaunch(token: token)
+        shellTicket = nil
+        publishShellState()
+        logger.warning("[Shell] launch watchdog fired; token=\(token)")
+        feed("\r\n[Minis] Shell did not start within \(Int(Self.shellLaunchDeadline))s; "
+             + "the Linux kernel is busy. Close and reopen the terminal to retry.\r\n")
+    }
+
+    /// User-initiated Stop. Reclaims this terminal's shell and its children by
+    /// execution identity, without scanning or signalling anything else.
+    func stopShell() {
+        guard let token = shellLifecycle.requestStop() else { return }
+        if let ticket = shellTicket {
+            ISHShellExecutor.requestTermination(ticket, error: .cancelled)
+        }
+        shellTicket = nil
+        publishShellState()
+        logger.info("[Shell] stop requested token=\(token)")
+        feed("\r\n[Minis] Stop requested; this terminal's shell and its children are being reclaimed.\r\n")
+    }
+
+    private func publishShellState() {
+        let active = shellLifecycle.isActive
+        if shellActive != active { shellActive = active }
+    }
+
+    private func feed(_ text: String) {
+        guard let data = text.data(using: .utf8) else { return }
+        emulator.feed(data)
     }
 }
 

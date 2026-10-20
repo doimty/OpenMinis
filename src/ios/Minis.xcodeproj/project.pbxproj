@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A45020261020000000000001 /* ISHCommandLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45020261020000000000002 /* ISHCommandLifecycle.swift */; };
+		A45020261020000000000003 /* ISHTerminalShellLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45020261020000000000004 /* ISHTerminalShellLifecycle.swift */; };
 		21FED4B7BB6F6D9476C9992E /* VoiceProvider+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88993FC8E3F0199C6638F664 /* VoiceProvider+System.swift */; };
 		241D530017827D7F0EB604DE /* VoiceProviderFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2941B643B8A2F048A2B154E /* VoiceProviderFactory.swift */; };
 		2A4FD49F872431D703328384 /* VoiceOutputPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 424510790AF3FB2452D3CCE3 /* VoiceOutputPlayer.swift */; };
@@ -651,6 +652,7 @@
 
 /* Begin PBXFileReference section */
 		A45020261020000000000002 /* ISHCommandLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ISHCommandLifecycle.swift; sourceTree = "<group>"; };
+		A45020261020000000000004 /* ISHTerminalShellLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ISHTerminalShellLifecycle.swift; sourceTree = "<group>"; };
 		0ED149397BEA7E0408C92688 /* GroupVoiceModelsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupVoiceModelsView.swift; sourceTree = "<group>"; };
 		0F5379380323FA8C6477708C /* GroupSlotPicker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupSlotPicker.swift; sourceTree = "<group>"; };
 		16FF3462D09402F14B610CD6 /* VoiceWaveformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceWaveformView.swift; sourceTree = "<group>"; };
@@ -2242,6 +2244,7 @@
 			children = (
 				E5F000011 /* ISHExecutionCoordinator.swift */,
 				A45020261020000000000002 /* ISHCommandLifecycle.swift */,
+				A45020261020000000000004 /* ISHTerminalShellLifecycle.swift */,
 				E5F000012 /* MinisFsRouter.swift */,
 				E5CR00011 /* ShellCommandRingBuffer.swift */,
 			);
@@ -2987,6 +2990,7 @@
 				E5T00000B /* UserMessageEntity.swift in Sources */,
 				E5F000001 /* ISHExecutionCoordinator.swift in Sources */,
 				A45020261020000000000001 /* ISHCommandLifecycle.swift in Sources */,
+				A45020261020000000000003 /* ISHTerminalShellLifecycle.swift in Sources */,
 				E5F000002 /* MinisFsRouter.swift in Sources */,
 				E5CR00001 /* ShellCommandRingBuffer.swift in Sources */,
 				E5BRM0001 /* BrowserResourceMonitor.swift in Sources */,

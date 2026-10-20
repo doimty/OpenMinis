@@ -7,6 +7,8 @@
 
 #import "ISHKernel.h"
 #import "CurrentRoot.h"
+#import "ISHShellExecutor.h"
+#import "ISHExecutionIdentity.h"
 // [GH#175] For sizeof(sockaddr_un.sun_path) — the Darwin HOST limit that
 // iSH's unchecked sprintf in fs/sock.c writes into. Safe to include here:
 // this file does not pull in ish/fs/sock.h, so there is no clash with iSH's
@@ -15,6 +17,7 @@
 #include <mach/mach.h>
 #include "ish/kernel/init.h"
 #include "ish/kernel/task.h"
+#include "ish/kernel/signal.h"
 #include "ish/kernel/calls.h"
 #include "ish/kernel/fs.h"
 #include "ish/fs/fake.h"
@@ -1202,6 +1205,12 @@ static void handle_process_exit(struct task *task, int code) {
 }
 
 - (int)executeCommand:(NSArray<NSString *> *)command {
+    return [self executeCommand:command executionToken:0 onLaunch:nil];
+}
+
+- (int)executeCommand:(NSArray<NSString *> *)command
+       executionToken:(uint64_t)executionToken
+             onLaunch:(nullable ISHKernelLaunchCallback)onLaunch {
     if (command.count == 0) {
         NSLog(@"ISHKernel: Empty command");
         return -1;
@@ -1215,12 +1224,30 @@ static void handle_process_exit(struct task *task, int code) {
     // Spawn shell as a child of init process
     // This must be done in a background thread
     NSArray<NSString *> *commandCopy = [command copy];
+    void (^report)(int, int) = ^(int pid, int error) {
+        if (onLaunch == nil) return;
+        dispatch_async(dispatch_get_main_queue(), ^{ onLaunch(pid, error); });
+    };
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         // Create a new child process of init
         int err = become_new_init_child();
         if (err < 0) {
             NSLog(@"ISHKernel: become_new_init_child failed: %d", err);
+            report(0, err);
             return;
+        }
+        struct task *launchTask = current;
+        if (launchTask == NULL || launchTask->group == NULL) {
+            NSLog(@"ISHKernel: launch task has no group; cannot stamp identity");
+            report(0, -1);
+            return;
+        }
+        // Identity lives in the high word of the inherited fs_context. Route
+        // zero keeps the terminal on the global view it has always used.
+        if (executionToken != 0) {
+            lock(&pids_lock);
+            launchTask->group->fs_context = executionToken;
+            unlock(&pids_lock);
         }
 
         // Create a pseudo-terminal (PTY) for the shell session.
@@ -1230,6 +1257,7 @@ static void handle_process_exit(struct task *task, int code) {
         struct tty *tty = pty_open_fake(&ish_pty_driver);
         if (IS_ERR(tty)) {
             NSLog(@"ISHKernel: pty_open_fake failed: %ld", PTR_ERR(tty));
+            report(0, (int)PTR_ERR(tty));
             return;
         }
 
@@ -1246,6 +1274,7 @@ static void handle_process_exit(struct task *task, int code) {
         err = create_stdio(stdioFile.fileSystemRepresentation, TTY_PSEUDO_SLAVE_MAJOR, tty->num);
         if (err < 0) {
             NSLog(@"ISHKernel: create_stdio failed: %d", err);
+            report(0, err);
             return;
         }
 
@@ -1374,13 +1403,31 @@ static void handle_process_exit(struct task *task, int code) {
         err = do_execve(exec_path, exec_argc, argv, envp);
         if (err < 0) {
             NSLog(@"ISHKernel: do_execve failed: %d", err);
+            report(0, err);
             return;
         }
 
-        NSLog(@"ISHKernel: Starting shell process (PID %d)", current->pid);
+        // The cleanup pass may have exhausted its retries while this launch was
+        // blocked on the kernel lock. Release through a real do_exit instead of
+        // running an abandoned shell: task_run_current checks doing_group_exit
+        // before touching guest memory or JIT.
+        BOOL abandoned = executionToken != 0 &&
+            [ISHShellExecutor isTerminationRequestedForToken:executionToken];
+        if (abandoned) {
+            lock(&pids_lock);
+            launchTask->group->group_exit_code = SIGKILL_;
+            launchTask->group->doing_group_exit = true;
+            unlock(&pids_lock);
+            NSLog(@"ISHKernel: token=%llu abandoned before start; releasing pid=%d without running",
+                  (unsigned long long)executionToken, launchTask->pid);
+            report(0, -4);
+        } else {
+            NSLog(@"ISHKernel: Starting shell process (PID %d)", launchTask->pid);
+            report((int)launchTask->pid, 0);
+        }
 
         // Start task - this runs the emulator loop and doesn't return
-        task_start(current);
+        task_start(launchTask);
     });
 
     NSLog(@"ISHKernel: Shell launch initiated: %@", command[0]);

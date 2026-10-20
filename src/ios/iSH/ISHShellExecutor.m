@@ -263,8 +263,14 @@ static dispatch_source_t _sweepTimer;
 static _Atomic(uint64_t) _ticketGeneration = 0;
 static dispatch_queue_t _cleanupQueue;
 static NSMutableDictionary<NSNumber *, ISHShellCleanupRequest *> *_cleanupRequests;
+static NSMutableSet<NSNumber *> *_cancelledTokens;
+static NSMutableArray<NSNumber *> *_cancelledTokenOrder;
 static const NSUInteger ISHShellCleanupCapacity = 64;
 static const NSUInteger ISHShellCleanupMaxAttempts = 20;
+/// Cancelled tokens stay queryable after their cleanup pass finished. The cap
+/// only bounds memory; eviction is logged because a dropped token could let a
+/// launch that was stalled for a very long time start without an owner.
+static const NSUInteger ISHCancelledTokenCapacity = 256;
 
 /// Live reader threads across all executions. The leak this file exists to
 /// prevent shows up here as a number that only ever goes up: each stranded
@@ -280,6 +286,8 @@ static int32_t _sweptContexts = 0;
     if (self == [ISHShellExecutor class]) {
         _activeExecutions = [NSMutableDictionary dictionary];
         _cleanupRequests = [NSMutableDictionary dictionary];
+        _cancelledTokens = [NSMutableSet set];
+        _cancelledTokenOrder = [NSMutableArray array];
         _cleanupQueue = dispatch_queue_create("com.ish.shellexecutor.cleanup", DISPATCH_QUEUE_SERIAL);
         dispatch_once(&_onceToken, ^{
             _readerQueue = dispatch_queue_create("com.ish.shellexecutor.reader",
@@ -448,7 +456,32 @@ static int32_t _sweptContexts = 0;
     }
     // Neither finalization nor caller callbacks run with the registry held.
     [self finalizeContext:ctx exitCode:-1 error:error];
+    [self rememberCancelledToken:ticket.token];
     if (firstRequest) [self enqueueCleanupForToken:ticket.token];
+}
+
++ (void)rememberCancelledToken:(uint64_t)token {
+    if (!ISHExecutionIdentityIsValid(token)) return;
+    NSNumber *key = @(token);
+    @synchronized(_cleanupRequests) {
+        if ([_cancelledTokens containsObject:key]) return;
+        [_cancelledTokens addObject:key];
+        [_cancelledTokenOrder addObject:key];
+        if (_cancelledTokenOrder.count <= ISHCancelledTokenCapacity) return;
+        NSNumber *evicted = _cancelledTokenOrder.firstObject;
+        [_cancelledTokenOrder removeObjectAtIndex:0];
+        [_cancelledTokens removeObject:evicted];
+        NSLog(@"ISHShellExecutor[cancel]: token registry full; evicted token=%llu",
+              (unsigned long long)evicted.unsignedLongLongValue);
+    }
+}
+
++ (BOOL)isTerminationRequestedForToken:(uint64_t)token {
+    if (!ISHExecutionIdentityIsValid(token)) return NO;
+    NSNumber *key = @(token);
+    @synchronized(_cleanupRequests) {
+        return [_cancelledTokens containsObject:key];
+    }
 }
 
 #pragma mark - Public API

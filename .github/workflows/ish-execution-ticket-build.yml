@@ -56,6 +56,11 @@ jobs:
           set -euo pipefail
           bash scripts/test_ish_command_lifecycle.sh 2>&1 | tee "$RUNNER_TEMP/ish-lifecycle-tests.log"
 
+      - name: Native terminal shell lifecycle regression
+        run: |
+          set -euo pipefail
+          bash scripts/test_ish_terminal_shell.sh 2>&1 | tee "$RUNNER_TEMP/ish-terminal-tests.log"
+
       - name: Host production identity and cleanup-helper tests
         run: |
           set -euo pipefail
@@ -149,6 +154,7 @@ jobs:
           path: |
             ${{ runner.temp }}/xcode-version.txt
             ${{ runner.temp }}/ish-lifecycle-tests.log
+            ${{ runner.temp }}/ish-terminal-tests.log
             ${{ runner.temp }}/ish-ticket/**
             ${{ runner.temp }}/ios-build/xcodebuild.log
           if-no-files-found: warn
