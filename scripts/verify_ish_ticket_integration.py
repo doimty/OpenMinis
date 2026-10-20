@@ -63,7 +63,7 @@ def main():
  check('chat search jumps to the picked message','chatJumpRequest = ChatJumpRequest(messageID: messageId, nonce: chatJumpNonce)' in chatview)
  check('chat search entry lives in the trailing menu','AppLocalized("Search in Chat")' in chatview and 'onSearch: { showChatSearch = true }' in chatview)
  check('transcript jumps by message id','request.messageID' in listv3 and 'scrollToItem(at: indexPath, at: .centeredVertically' in listv3)
- check('jump flash sits behind the cells','cv.insertSubview(marker, at: 0)' in listv3)
+ check('jump flash is a non-intercepting ring','cv.addSubview(marker)' in listv3 and 'marker.isUserInteractionEnabled = false' in listv3)
  check('search keywords are bounded','static let maxKeywords = 6' in searchquery)
  check('search files are compiled sources',project.count('A45020261020000000000005')==2 and project.count('A45020261020000000000007')==2)
 

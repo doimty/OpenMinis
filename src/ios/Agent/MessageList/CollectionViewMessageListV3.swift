@@ -4516,11 +4516,16 @@ extension CollectionViewMessageListV3 {
         private func flashHighlight(at frame: CGRect) {
             guard let cv = viewController?.collectionView, frame.height > 0 else { return }
             jumpFlashView?.removeFromSuperview()
+            // A ring, not a fill: cells own their own backgrounds, and a wash
+            // behind them would be invisible on any opaque bubble. On top with
+            // hit-testing off keeps the text readable and always visible.
             let marker = UIView(frame: frame.insetBy(dx: 6, dy: 3))
-            marker.backgroundColor = UIColor.tintColor.withAlphaComponent(0.16)
+            marker.backgroundColor = UIColor.tintColor.withAlphaComponent(0.08)
+            marker.layer.borderColor = UIColor.tintColor.withAlphaComponent(0.55).cgColor
+            marker.layer.borderWidth = 2
             marker.layer.cornerRadius = 14
             marker.isUserInteractionEnabled = false
-            cv.insertSubview(marker, at: 0)
+            cv.addSubview(marker)
             jumpFlashView = marker
             UIView.animate(withDuration: 0.8, delay: 1.0, options: [.curveEaseInOut]) {
                 marker.alpha = 0
