@@ -48,7 +48,36 @@ typedef void (^ISHShellLineCallback)(NSString *line, BOOL isStdErr);
 /// @param result Execution result containing exit code and outputs
 typedef void (^ISHShellCompletionCallback)(ISHShellExecutionResult *result);
 
+/// Opaque, single-launch identity. The token is inherited by guest descendants;
+/// callers must not construct identities from PIDs or filesystem contexts.
+@interface ISHShellExecutionTicket : NSObject
+@property (nonatomic, readonly) uint64_t token;
+- (instancetype)init NS_UNAVAILABLE;
++ (instancetype)new NS_UNAVAILABLE;
+@end
+
 @interface ISHShellExecutor : NSObject
+
+/// Returns nil for a context outside the low 32-bit route space or exhaustion.
+/// Route zero still receives its own nonzero execution generation.
++ (nullable ISHShellExecutionTicket *)makeTicketWithFSContext:(uint64_t)context
+    NS_SWIFT_NAME(makeTicket(fsContext:));
+
+/// Execute once using a preallocated ticket; an already cancelled/used ticket
+/// returns -4. All line/completion callbacks are delivered on the main queue.
++ (int)executeExecutable:(NSString *)executable
+               arguments:(nullable NSArray<NSString *> *)arguments
+             environment:(nullable NSDictionary<NSString *, NSString *> *)environment
+               stdinData:(nullable NSData *)stdinData
+         executionTicket:(ISHShellExecutionTicket *)ticket
+            lineCallback:(nullable ISHShellLineCallback)lineCallback
+              completion:(nullable ISHShellCompletionCallback)completion;
+
+/// Claims terminal state without waiting for any kernel lock. Cleanup is
+/// bounded, asynchronous and identity-tagged; requested does not mean killed.
++ (void)requestTerminationForTicket:(ISHShellExecutionTicket *)ticket
+                              error:(ISHShellExecutorError)error
+    NS_SWIFT_NAME(requestTermination(_:error:));
 
 /// Execute a shell command with line-by-line output callback
 /// @param command Shell command to execute (will be passed to /bin/sh -c)

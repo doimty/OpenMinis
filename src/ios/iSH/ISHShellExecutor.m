@@ -9,6 +9,10 @@
 #import "ISHKernel.h"
 
 #include <poll.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#import "ISHExecutionIdentity.h"
 #include <libkern/OSAtomic.h>
 #include "ish/kernel/init.h"
 #include "ish/kernel/calls.h"
@@ -53,6 +57,26 @@ static const NSTimeInterval ISHShellExecutorStaleContextAge = 7200.0; // 2h
 
 #pragma mark - Execution Context
 
+@class ISHShellExecutionContext;
+
+@interface ISHShellExecutionTicket ()
+@property (nonatomic, readwrite) uint64_t token;
+@property (nonatomic, strong) ISHShellExecutionContext *context; // guarded by ticket
+@property (nonatomic) BOOL launchClaimed;
+@property (nonatomic) BOOL terminationRequested;
+@property (nonatomic) ISHShellExecutorError terminationError;
+@property (nonatomic) dispatch_semaphore_t waitSemaphore;
+@property (nonatomic, strong) ISHShellExecutionResult *completedResult;
+- (instancetype)initWithToken:(uint64_t)token;
+@end
+
+@implementation ISHShellExecutionTicket
+- (instancetype)initWithToken:(uint64_t)token {
+    if ((self = [super init])) _token = token;
+    return self;
+}
+@end
+
 @interface ISHShellExecutionContext : NSObject {
     int _stdoutPipe[2];
     int _stderrPipe[2];
@@ -65,6 +89,9 @@ static const NSTimeInterval ISHShellExecutorStaleContextAge = 7200.0; // 2h
     int32_t _liveReaders;
 }
 @property (nonatomic) int guestPid;
+@property (nonatomic) uint64_t ticketToken;
+// ticket owns context while live; this direction MUST stay weak.
+@property (nonatomic, weak) ISHShellExecutionTicket *ticket;
 @property (nonatomic) NSDate *startTime;
 @property (nonatomic, copy) ISHShellLineCallback lineCallback;
 @property (nonatomic, copy) ISHShellCompletionCallback completion;
@@ -176,6 +203,55 @@ static const NSTimeInterval ISHShellExecutorStaleContextAge = 7200.0; // 2h
 
 @end
 
+#pragma mark - Identity-scoped, bounded cleanup
+
+// Returns NO immediately when pids_lock is busy. A successful pass scans every
+// legal non-init PID slot (2..<MAX_PID); no root/pgid/parent/task-address
+// identity is consulted.
+// Remaining boundary: send_signal itself can wait on internal kernel locks.
+// Only the single serial cleanup worker may reach that boundary.
+static BOOL ISHSignalTasksForExecutionToken(uint64_t token, int signal) {
+    if (!ISHExecutionIdentityIsValid(token)) return YES;
+    if (trylock(&pids_lock) != 0) return NO;
+    struct siginfo_ info = SIGINFO_NIL;
+    for (int pid = 2; pid < MAX_PID; pid++) {
+        struct task *task = pid_get_task((dword_t)pid);
+        if (task != NULL && task->group != NULL &&
+            ISHExecutionIdentityEqual(token, task->group->fs_context)) {
+            send_signal(task, signal, info);
+        }
+    }
+    unlock(&pids_lock);
+    return YES;
+}
+
+// task_run_current checks doing_group_exit before touching guest memory/JIT,
+// so cancellation after task creation can release through real do_exit without
+// ever executing the command. pthread_create failure remains a kernel boundary.
+static int ISHStartCancelledTask(struct task *task, uint64_t token) {
+    if (task == NULL) return -1;
+    lock(&pids_lock);
+    BOOL owned = task->group != NULL &&
+        ISHExecutionIdentityEqual(token, task->group->fs_context);
+    if (owned) {
+        task->group->group_exit_code = SIGKILL_;
+        task->group->doing_group_exit = true;
+    }
+    unlock(&pids_lock);
+    if (!owned) return -1;
+    return task_start(task);
+}
+
+@interface ISHShellCleanupRequest : NSObject
+@property (nonatomic) uint64_t token;
+@property (nonatomic) NSUInteger revision; // guarded by cleanup registry
+@property (nonatomic) NSUInteger passRevision;
+@property (nonatomic) NSUInteger attempts;
+@property (nonatomic) BOOL killPhase;
+@end
+@implementation ISHShellCleanupRequest
+@end
+
 #pragma mark - Executor Implementation
 
 @implementation ISHShellExecutor
@@ -184,6 +260,11 @@ static NSMutableDictionary<NSNumber *, ISHShellExecutionContext *> *_activeExecu
 static dispatch_queue_t _readerQueue;
 static dispatch_once_t _onceToken;
 static dispatch_source_t _sweepTimer;
+static _Atomic(uint64_t) _ticketGeneration = 0;
+static dispatch_queue_t _cleanupQueue;
+static NSMutableDictionary<NSNumber *, ISHShellCleanupRequest *> *_cleanupRequests;
+static const NSUInteger ISHShellCleanupCapacity = 64;
+static const NSUInteger ISHShellCleanupMaxAttempts = 20;
 
 /// Live reader threads across all executions. The leak this file exists to
 /// prevent shows up here as a number that only ever goes up: each stranded
@@ -198,6 +279,8 @@ static int32_t _sweptContexts = 0;
 + (void)initialize {
     if (self == [ISHShellExecutor class]) {
         _activeExecutions = [NSMutableDictionary dictionary];
+        _cleanupRequests = [NSMutableDictionary dictionary];
+        _cleanupQueue = dispatch_queue_create("com.ish.shellexecutor.cleanup", DISPATCH_QUEUE_SERIAL);
         dispatch_once(&_onceToken, ^{
             _readerQueue = dispatch_queue_create("com.ish.shellexecutor.reader",
                                                  DISPATCH_QUEUE_CONCURRENT);
@@ -281,6 +364,93 @@ static int32_t _sweptContexts = 0;
             (unsigned long)active, _globalLiveReaders, _sweptContexts];
 }
 
+#pragma mark - Ticket lifecycle and cleanup queue
+
++ (ISHShellExecutionTicket *)makeTicketWithFSContext:(uint64_t)context {
+    uint64_t token = 0;
+    if (!ISHExecutionIdentityNext(&_ticketGeneration, context, &token)) return nil;
+    return [[ISHShellExecutionTicket alloc] initWithToken:token];
+}
+
++ (void)enqueueCleanupForToken:(uint64_t)token {
+    if (!ISHExecutionIdentityIsValid(token)) return;
+    ISHShellCleanupRequest *request;
+    @synchronized(_cleanupRequests) {
+        request = _cleanupRequests[@(token)];
+        if (request) {
+            // A launch finishing after an earlier cleanup requires another
+            // full pass, even if that earlier pass has already scanned it.
+            request.revision++;
+            return;
+        }
+        if (_cleanupRequests.count >= ISHShellCleanupCapacity) {
+            NSLog(@"ISHShellExecutor[cleanup]: capacity reached; token=%llu cleanup not queued",
+                  (unsigned long long)token);
+            return;
+        }
+        request = [[ISHShellCleanupRequest alloc] init];
+        request.token = token;
+        request.revision = request.passRevision = 1;
+        _cleanupRequests[@(token)] = request;
+    }
+    dispatch_async(_cleanupQueue, ^{ [self runCleanupRequest:request]; });
+}
+
++ (void)runCleanupRequest:(ISHShellCleanupRequest *)request {
+    BOOL acquired = ISHSignalTasksForExecutionToken(request.token,
+                                                   request.killPhase ? SIGKILL_ : SIGTERM_);
+    request.attempts++;
+    if (!acquired && request.attempts < ISHShellCleanupMaxAttempts) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 25 * NSEC_PER_MSEC),
+                       _cleanupQueue, ^{ [self runCleanupRequest:request]; });
+        return;
+    }
+    if (!acquired) {
+        NSLog(@"ISHShellExecutor[cleanup]: token=%llu pids_lock busy; phase=%@ exhausted",
+              (unsigned long long)request.token, request.killPhase ? @"KILL" : @"TERM");
+    }
+    if (!request.killPhase) {
+        request.killPhase = YES;
+        request.attempts = 0;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC),
+                       _cleanupQueue, ^{ [self runCleanupRequest:request]; });
+        return;
+    }
+    BOOL repeat = NO;
+    @synchronized(_cleanupRequests) {
+        if (request.revision != request.passRevision) {
+            request.passRevision = request.revision;
+            repeat = YES;
+        } else if (_cleanupRequests[@(request.token)] == request) {
+            [_cleanupRequests removeObjectForKey:@(request.token)];
+        }
+    }
+    if (repeat) {
+        request.killPhase = NO;
+        request.attempts = 0;
+        dispatch_async(_cleanupQueue, ^{ [self runCleanupRequest:request]; });
+    }
+}
+
++ (void)requestTerminationForTicket:(ISHShellExecutionTicket *)ticket
+                              error:(ISHShellExecutorError)error {
+    if (!ticket || !ISHExecutionIdentityIsValid(ticket.token)) return;
+    ISHShellExecutionContext *ctx;
+    BOOL firstRequest;
+    @synchronized(ticket) {
+        firstRequest = !ticket.terminationRequested;
+        if (firstRequest) {
+            ticket.terminationRequested = YES;
+            ticket.terminationError = error;
+        }
+        ctx = ticket.context;
+        error = ticket.terminationError;
+    }
+    // Neither finalization nor caller callbacks run with the registry held.
+    [self finalizeContext:ctx exitCode:-1 error:error];
+    if (firstRequest) [self enqueueCleanupForToken:ticket.token];
+}
+
 #pragma mark - Public API
 
 + (int)executeCommand:(NSString *)command
@@ -338,21 +508,56 @@ static int32_t _sweptContexts = 0;
                fsContext:(uint64_t)fsContext
             lineCallback:(ISHShellLineCallback)lineCallback
               completion:(ISHShellCompletionCallback)completion {
+    ISHShellExecutionTicket *ticket = [self makeTicketWithFSContext:fsContext];
+    if (!ticket) return ISHShellExecutorErrorProcessCreationFailed;
+    return [self executeExecutable:executable arguments:arguments environment:environment
+                        stdinData:stdinData executionTicket:ticket
+                     lineCallback:lineCallback completion:completion];
+}
 
-    // Bail out if the iSH kernel hasn't booted yet. become_new_init_child()
-    // calls pid_get_task(1) and then assert(init != NULL); on a non-booted
-    // kernel that assert fires and the process crashes (seen as a SIGABRT
-    // from __assert_rtn on a Caulk concurrent queue). Returning an error
-    // lets the caller surface the condition instead of taking down the app.
-    if (!ISHKernel.shared.isBooted) {
-        NSLog(@"ISHShellExecutor: kernel not booted — refusing to execute %@", executable);
++ (int)executeExecutable:(NSString *)executable
+               arguments:(NSArray<NSString *> *)arguments
+             environment:(NSDictionary<NSString *, NSString *> *)environment
+               stdinData:(NSData *)stdinData
+         executionTicket:(ISHShellExecutionTicket *)ticket
+            lineCallback:(ISHShellLineCallback)lineCallback
+              completion:(ISHShellCompletionCallback)completion {
+    if (!ticket || !ISHExecutionIdentityIsValid(ticket.token))
         return ISHShellExecutorErrorProcessCreationFailed;
-    }
-
     ISHShellExecutionContext *ctx = [[ISHShellExecutionContext alloc] init];
     ctx.lineCallback = lineCallback;
     ctx.completion = completion;
     ctx.startTime = [NSDate date];
+    ctx.ticketToken = ticket.token;
+    ctx.ticket = ticket;
+
+    // Startup owns every pipe until its @finally, even if cancellation wins
+    // while prepare is using those fds. Bind before touching the kernel.
+    [ctx retainReader];
+    struct task *saved_current = current;
+    struct task *preparedTask = NULL;
+    int stdinPipe[2] = {-1, -1};
+    BOOL launched = NO;
+    BOOL taskStartAttempted = NO;
+    BOOL attached = NO;
+    ISHShellExecutorError failure = ISHShellExecutorErrorProcessCreationFailed;
+    @try {
+        BOOL cancelled;
+        @synchronized(ticket) {
+            if (ticket.launchClaimed) return ISHShellExecutorErrorCancelled;
+            ticket.launchClaimed = YES;
+            cancelled = ticket.terminationRequested;
+            if (cancelled) failure = ticket.terminationError;
+            ticket.context = ctx;
+            ctx.waitSemaphore = ticket.waitSemaphore;
+            attached = YES;
+        }
+        if (cancelled) return ISHShellExecutorErrorCancelled;
+        // become_new_init_child asserts when init has not booted.
+        if (!ISHKernel.shared.isBooted) {
+            NSLog(@"ISHShellExecutor: kernel not booted — refusing to execute %@", executable);
+            return ISHShellExecutorErrorProcessCreationFailed;
+        }
 
     // Create pipes for stdout and stderr
     if (pipe([ctx stdoutPipe]) < 0 || pipe([ctx stderrPipe]) < 0) {
@@ -365,8 +570,10 @@ static int32_t _sweptContexts = 0;
     fcntl([ctx stdoutPipe][0], F_SETFL, O_NONBLOCK);
     fcntl([ctx stderrPipe][0], F_SETFL, O_NONBLOCK);
 
-    struct task *saved_current = current;
-
+    // Cancellation that already won before creation must not allocate a guest.
+    @synchronized(ticket) {
+        if (ticket.terminationRequested) return ISHShellExecutorErrorCancelled;
+    }
     // Create new process
     int err = become_new_init_child();
     if (err < 0) {
@@ -377,17 +584,22 @@ static int32_t _sweptContexts = 0;
     }
 
     struct task *task = current;
+    preparedTask = task;
 
-    // Stamp the new task group with the caller-provided fs_context so the
-    // fakefs path-translate hook can route this task's file operations
-    // independently of other concurrently-running task groups. Inherited
-    // verbatim by any process this task fork()s.
-    if (fsContext != 0 && task->group != NULL) {
-        task->group->fs_context = fsContext;
+    // Every execution, including global route zero, gets a nonzero inherited
+    // generation. Missing group means ownership cannot be established safely.
+    if (task->group == NULL) return ISHShellExecutorErrorProcessCreationFailed;
+    lock(&pids_lock);
+    task->group->fs_context = ctx.ticketToken;
+    unlock(&pids_lock);
+    BOOL cancelledAfterStamp;
+    @synchronized(ticket) { cancelledAfterStamp = ticket.terminationRequested; }
+    if (cancelledAfterStamp) {
+        // @finally starts this owned task exit-only, then repeats cleanup.
+        return ISHShellExecutorErrorCancelled;
     }
 
     // Setup stdin: pipe if stdinData provided, /dev/null otherwise
-    int stdinPipe[2] = {-1, -1};
     if (stdinData) {
         if (pipe(stdinPipe) < 0) {
             NSLog(@"ISHShellExecutor[stdin]: pipe() failed: %s", strerror(errno));
@@ -405,7 +617,10 @@ static int32_t _sweptContexts = 0;
         int real_fd = stdinData ? dup(stdinPipe[0]) : open("/dev/null", O_RDONLY);
         if (real_fd < 0) {
             NSLog(@"ISHShellExecutor[stdin]: fd creation failed: %s", strerror(errno));
-            if (stdinData) { close(stdinPipe[0]); close(stdinPipe[1]); }
+            if (stdinData) {
+                close(stdinPipe[0]); close(stdinPipe[1]);
+                stdinPipe[0] = stdinPipe[1] = -1;
+            }
             current = saved_current;
             [ctx cleanup];
             return ISHShellExecutorErrorProcessCreationFailed;
@@ -505,6 +720,7 @@ static int32_t _sweptContexts = 0;
                 current = saved_current;
                 [ctx cleanup];
                 NSLog(@"ISHShellExecutor: argv too long");
+                failure = ISHShellExecutorErrorExecFailed;
                 return ISHShellExecutorErrorExecFailed;
             }
             memcpy(argv_buf + pos, str, len);
@@ -593,19 +809,36 @@ static int32_t _sweptContexts = 0;
         current = saved_current;
         [ctx cleanup];
         NSLog(@"ISHShellExecutor: do_execve failed: %d", err);
+        failure = ISHShellExecutorErrorExecFailed;
         return ISHShellExecutorErrorExecFailed;
     }
 
-    // Get guest PID and start task
-    ctx.guestPid = task->pid;
-    ctx.result.pid = ctx.guestPid;
-    task_start(task);
-    current = saved_current;
-
-    // Register context
-    @synchronized(_activeExecutions) {
-        _activeExecutions[@(ctx.guestPid)] = ctx;
+    // Registration and both committed reader retains precede task_start:
+    // an immediate exit can no longer disappear before the registry exists.
+    @synchronized(ctx) {
+        if (ctx.didFinalize || ctx.isCompleted) return ISHShellExecutorErrorCancelled;
+        ctx.guestPid = task->pid;
+        ctx.result.pid = ctx.guestPid;
+        @synchronized(_activeExecutions) {
+            _activeExecutions[@(ctx.guestPid)] = ctx;
+        }
     }
+    [self startReaderForPipe:[ctx stdoutPipe][0] context:ctx isStdErr:NO];
+    [self startReaderForPipe:[ctx stderrPipe][0] context:ctx isStdErr:YES];
+    if (ctx.isCompleted) return ISHShellExecutorErrorCancelled;
+    taskStartAttempted = YES;
+    err = task_start(task);
+    current = saved_current;
+    if (err != 0) {
+        NSLog(@"ISHShellExecutor: task_start failed: %d", err);
+        return ISHShellExecutorErrorProcessCreationFailed;
+    }
+    launched = YES;
+    BOOL terminationRequested;
+    @synchronized(ticket) { terminationRequested = ticket.terminationRequested; }
+    // Cancellation may have swept before the task became runnable. Repeat by
+    // immutable token after successful start, never by a late root PID.
+    if (terminationRequested) [self enqueueCleanupForToken:ctx.ticketToken];
 
     // Write stdinData to pipe in background, then close write end
     if (stdinData && stdinPipe[1] >= 0) {
@@ -619,12 +852,23 @@ static int32_t _sweptContexts = 0;
             const uint8_t *bytes = dataToWrite.bytes;
             size_t remaining = dataToWrite.length;
             size_t totalWritten = 0;
-            while (remaining > 0) {
-                ssize_t written = write(writeFd, bytes, remaining);
-                if (written <= 0) {
-                    NSLog(@"ISHShellExecutor[stdin]: write returned %zd (errno=%d) for pid=%d, stopping", written, errno, guestPid);
+            int flags = fcntl(writeFd, F_GETFL, 0);
+            if (flags < 0 || fcntl(writeFd, F_SETFL, flags | O_NONBLOCK) < 0) {
+                close(writeFd);
+                return;
+            }
+            struct pollfd writer = { .fd = writeFd, .events = POLLOUT };
+            while (remaining > 0 && !ctx.isCompleted) {
+                int ready = poll(&writer, 1, 100);
+                if (ready < 0) {
+                    if (errno == EINTR) continue;
                     break;
                 }
+                if (ready == 0) continue;
+                if (ctx.isCompleted || (writer.revents & (POLLERR | POLLHUP | POLLNVAL))) break;
+                ssize_t written = write(writeFd, bytes, remaining);
+                if (written < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) continue;
+                if (written <= 0) break;
                 bytes += written;
                 remaining -= written;
                 totalWritten += written;
@@ -637,99 +881,68 @@ static int32_t _sweptContexts = 0;
         NSLog(@"ISHShellExecutor[stdin]: stdin is /dev/null for pid=%d", ctx.guestPid);
     }
 
-    // Start reader threads
-    [self startReaderForPipe:[ctx stdoutPipe][0] context:ctx isStdErr:NO];
-    [self startReaderForPipe:[ctx stderrPipe][0] context:ctx isStdErr:YES];
-
     return ctx.guestPid;
+    } @finally {
+        BOOL cancelledDuringPrepare;
+        @synchronized(ticket) { cancelledDuringPrepare = ticket.terminationRequested; }
+        if (!launched && !taskStartAttempted && preparedTask != NULL && cancelledDuringPrepare) {
+            taskStartAttempted = YES;
+            int exitStart = ISHStartCancelledTask(preparedTask, ctx.ticketToken);
+            if (exitStart != 0) {
+                NSLog(@"ISHShellExecutor: exit-only task_start failed: %d; kernel recovery pending", exitStart);
+            }
+            // A first cleanup may already have finished before this tag existed.
+            [self enqueueCleanupForToken:ctx.ticketToken];
+        }
+        current = saved_current;
+        if (stdinPipe[0] >= 0) close(stdinPipe[0]);
+        if (stdinPipe[1] >= 0) close(stdinPipe[1]);
+        if (!launched) {
+            if (attached) [self finalizeContext:ctx exitCode:-1 error:failure];
+            else [ctx cleanup];
+            // task_destroy's prepare-failure ABI is deliberately not guessed.
+            // An unstarted guest task may still require kernel-side recovery.
+        }
+        if ([ctx releaseReader] <= 0 && ctx.isCompleted) [ctx closePipesIfNoReaders];
+    }
 }
 
 + (ISHShellExecutionResult *)executeCommandSync:(NSString *)command
                                         timeout:(NSTimeInterval)timeout
                                    lineCallback:(ISHShellLineCallback)lineCallback {
 
-    ISHShellExecutionContext *ctx = [[ISHShellExecutionContext alloc] init];
-    ctx.lineCallback = lineCallback;
-    ctx.waitSemaphore = dispatch_semaphore_create(0);
-    ctx.startTime = [NSDate date];
-
-    __block ISHShellExecutionResult *result = nil;
-
-    int pid = [self executeCommand:command
-                      lineCallback:lineCallback
-                        completion:^(ISHShellExecutionResult *execResult) {
-        result = execResult;
-        dispatch_semaphore_signal(ctx.waitSemaphore);
-    }];
-
-    if (pid < 0) {
-        // Execution failed
+    // This legacy synchronous wrapper counts timeout only AFTER launch; a
+    // kernel stalled during prepare is still outside its deadline boundary.
+    ISHShellExecutionTicket *ticket = [self makeTicketWithFSContext:0];
+    if (!ticket) {
+        ISHShellExecutionResult *failure = [[ISHShellExecutionResult alloc] init];
+        failure.error = ISHShellExecutorErrorProcessCreationFailed;
+        failure.exitCode = -1;
+        failure.output = failure.errorOutput = @"";
+        return failure;
+    }
+    ticket.waitSemaphore = dispatch_semaphore_create(0);
+    NSString *normalized = [command hasSuffix:@"\n"] ? command : [command stringByAppendingString:@"\n"];
+    int pid = [self executeExecutable:@"/bin/sh" arguments:@[@"-c", normalized]
+                         environment:nil stdinData:nil executionTicket:ticket
+                        lineCallback:lineCallback completion:nil];
+    if (pid >= 0) {
+        dispatch_time_t waitTime = timeout > 0
+            ? dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC))
+            : DISPATCH_TIME_FOREVER;
+        if (dispatch_semaphore_wait(ticket.waitSemaphore, waitTime) != 0) {
+            [self requestTerminationForTicket:ticket error:ISHShellExecutorErrorTimeout];
+        }
+    }
+    ISHShellExecutionResult *result;
+    @synchronized(ticket) { result = ticket.completedResult; }
+    if (!result) {
         result = [[ISHShellExecutionResult alloc] init];
-        result.error = (ISHShellExecutorError)pid;
+        result.error = pid < 0 ? (ISHShellExecutorError)pid : ISHShellExecutorErrorTimeout;
         result.exitCode = -1;
-        return result;
+        result.pid = pid > 0 ? pid : 0;
+        result.output = result.errorOutput = @"";
     }
-
-    // Wait for completion or timeout
-    dispatch_time_t waitTime = timeout > 0
-        ? dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC))
-        : DISPATCH_TIME_FOREVER;
-
-    long waitResult = dispatch_semaphore_wait(ctx.waitSemaphore, waitTime);
-
-    if (waitResult != 0) {
-        // Timeout - kill the whole process group, not just the root pid.
-        // [T-ish-thread-leak] SIGKILL to root alone leaves children + their
-        // emu task threads spinning (gh-NNN leak). killProcessGroup sweeps the
-        // pgid + descendants and escalates SIGTERM→SIGKILL.
-        [self killProcessGroup:pid];
-
-        // Clean up HERE rather than waiting to be told the process died.
-        //
-        // [T-ish-shell-timeout-leak] This is the leak. The timeout path used
-        // to kill and return, leaving every teardown step to the
-        // ISHProcessExitedNotification that killProcessGroup was expected to
-        // provoke. When that notification does not arrive — a task already
-        // reaped as a zombie is skipped by the exit hook — nothing ever ran:
-        // the context stayed in _activeExecutions, isCompleted stayed NO, and
-        // both reader threads polled a dead pipe forever. Each timeout burned
-        // two threads of a DISPATCH_QUEUE_CONCURRENT pool permanently, and
-        // after roughly thirty of them no shell command could start at all,
-        // with a device restart the only way back.
-        //
-        // Waiting on the notification was always the wrong shape: it makes
-        // cleanup conditional on the cooperation of a process we have just
-        // decided to kill. Now the timeout owns its own teardown, and the
-        // notification (if it does arrive) is a no-op thanks to didFinalize.
-        //
-        // Killing first, finalising second is deliberate: the signals go out
-        // while the pipes are still open, so anything the command wrote before
-        // dying is still readable and lands in the result rather than being
-        // discarded with the fds.
-        NSLog(@"ISHShellExecutor[timeout]: pid=%d exceeded %.1fs — killed and cleaning up",
-              pid, timeout);
-
-        ISHShellExecutionContext *timedOutCtx;
-        @synchronized(_activeExecutions) {
-            timedOutCtx = _activeExecutions[@(pid)];
-        }
-        [self finalizeTimedOutPid:pid];
-
-        // Prefer the finalised result: it carries whatever output the command
-        // produced before the deadline. Only synthesise one if the context had
-        // already gone (a normal exit that raced this timeout by microseconds).
-        if (timedOutCtx.result) {
-            result = timedOutCtx.result;
-        } else {
-            result = [[ISHShellExecutionResult alloc] init];
-            result.error = ISHShellExecutorErrorTimeout;
-            result.pid = pid;
-            result.exitCode = -1;
-            result.output = @"";
-            result.errorOutput = @"";
-        }
-    }
-
     return result;
 }
 
@@ -878,9 +1091,21 @@ static BOOL ISHTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
                   error:(ISHShellExecutorError)error {
     if (!ctx) return;
 
+    // A cancellation claim precedes any racing prepare-failure finalization.
+    // Read it before taking ctx so ticket -> ctx lock ordering is never nested.
+    ISHShellExecutionTicket *owner = ctx.ticket;
+    if (owner) {
+        @synchronized(owner) {
+            if (owner.terminationRequested) {
+                error = owner.terminationError;
+                exitCode = -1;
+            }
+        }
+    }
     @synchronized(ctx) {
         if (ctx.didFinalize) return;
         ctx.didFinalize = YES;
+        ctx.isCompleted = YES;
     }
 
     // Tell readers to stop. Any that are mid-poll return within 500ms (the
@@ -903,17 +1128,28 @@ static BOOL ISHTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
     ctx.result.output = outCopy ?: @"";
     ctx.result.errorOutput = errCopy ?: @"";
 
-    [self unregisterContextForPid:ctx.guestPid];
+    @synchronized(_activeExecutions) {
+        NSNumber *key = @(ctx.guestPid);
+        if (_activeExecutions[key] == ctx) [_activeExecutions removeObjectForKey:key];
+    }
 
     // Closes now only if the readers have already gone; otherwise the last
     // reader out does it. Never closes an fd that is still being polled.
     [ctx closePipesIfNoReaders];
 
-    if (ctx.completion) {
-        ctx.completion(ctx.result);
+    ISHShellExecutionTicket *ticket = ctx.ticket;
+    if (ticket) {
+        @synchronized(ticket) {
+            ticket.completedResult = ctx.result;
+            if (ticket.context == ctx) ticket.context = nil;
+        }
     }
-    if (ctx.waitSemaphore) {
-        dispatch_semaphore_signal(ctx.waitSemaphore);
+    ISHShellCompletionCallback completion = ctx.completion;
+    ctx.completion = nil;
+    if (ctx.waitSemaphore) dispatch_semaphore_signal(ctx.waitSemaphore);
+    if (completion) {
+        ISHShellExecutionResult *result = ctx.result;
+        dispatch_async(dispatch_get_main_queue(), ^{ completion(result); });
     }
 }
 
@@ -932,23 +1168,21 @@ static BOOL ISHTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
     [self finalizeContext:ctx exitCode:-1 error:ISHShellExecutorErrorTimeout];
 }
 
-/// Drop a context from the registry. Safe to call for a pid that is not there.
-+ (void)unregisterContextForPid:(int)pid {
-    @synchronized(_activeExecutions) {
-        [_activeExecutions removeObjectForKey:@(pid)];
-    }
-}
-
 #pragma mark - Process Exit Handling
 
 + (void)processDidExit:(NSNotification *)notification {
     int pid = [notification.userInfo[@"pid"] intValue];
     int exitCode = [notification.userInfo[@"code"] intValue];
+    NSNumber *tokenValue = notification.userInfo[@"executionToken"];
+    uint64_t token = tokenValue.unsignedLongLongValue;
+    // Never interpret a PID-only legacy notification as this execution.
+    if (!tokenValue || !ISHExecutionIdentityIsValid(token)) return;
 
     ISHShellExecutionContext *ctx;
     @synchronized(_activeExecutions) {
         ctx = _activeExecutions[@(pid)];
-        if (!ctx) return;
+        if (!ctx || ctx.guestPid != pid ||
+            !ISHExecutionIdentityEqual(ctx.ticketToken, token)) return;
         // NOTE: intentionally NOT removed here. The removal now happens in
         // +finalizeContext:, after the drain window below. Removing it up
         // front left a ~200ms hole in which the sweeper could see no entry
@@ -1173,13 +1407,14 @@ static BOOL ISHTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
     }
 
     // Process any remaining partial line
-    if (lineBuffer.length > 0) {
+    if (!ctx.isCompleted && lineBuffer.length > 0) {
         @synchronized(outputBuffer) {
             [outputBuffer appendString:lineBuffer];
         }
 
         if (ctx.lineCallback) {
             dispatch_async(dispatch_get_main_queue(), ^{
+                if (ctx.didFinalize || ctx.isCompleted) return;
                 ctx.lineCallback([lineBuffer copy], isStdErr);
             });
         }
@@ -1191,7 +1426,7 @@ static BOOL ISHTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
         outputBuffer:(NSMutableString *)outputBuffer
             isStdErr:(BOOL)isStdErr {
 
-    while (YES) {
+    while (!ctx.isCompleted) {
         NSRange newlineRange = [lineBuffer rangeOfString:@"\n"];
         if (newlineRange.location == NSNotFound) {
             break;
@@ -1212,6 +1447,7 @@ static BOOL ISHTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
         // Call line callback
         if (ctx.lineCallback) {
             dispatch_async(dispatch_get_main_queue(), ^{
+                if (ctx.didFinalize || ctx.isCompleted) return;
                 ctx.lineCallback(line, isStdErr);
             });
         }

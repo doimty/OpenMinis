@@ -45,9 +45,11 @@ final class MinisFsRouter: @unchecked Sendable {
     func context(for sid: String) -> UInt64 {
         lock.lock(); defer { lock.unlock() }
         if let existing = sidToContext[sid] { return existing }
+        // High 32 bits of task fs_context belong to the execution identity.
+        // Never wrap/reuse a session route: 0 is an allocation failure.
+        guard nextContext <= UInt64(UInt32.max) else { return 0 }
         let ctx = nextContext
-        nextContext &+= 1
-        if nextContext == 0 { nextContext = 1 }   // never hand out 0 (= "no override")
+        nextContext += 1
         contextToSid[ctx] = sid
         sidToContext[sid] = ctx
         return ctx
@@ -56,9 +58,10 @@ final class MinisFsRouter: @unchecked Sendable {
     /// Reverse lookup. Returns nil if the token was never issued or has been
     /// freed. Hot-path: keep this branchless.
     func sid(for context: UInt64) -> String? {
-        if context == 0 { return nil }
+        let route = context & UInt64(UInt32.max)
+        guard route != 0 else { return nil }
         lock.lock(); defer { lock.unlock() }
-        return contextToSid[context]
+        return contextToSid[route]
     }
 
     /// Install the path-translate hook on ISHKernel. Idempotent; call once

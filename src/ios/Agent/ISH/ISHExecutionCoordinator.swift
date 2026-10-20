@@ -30,31 +30,13 @@ enum ISHCoordinatorError: Error, LocalizedError {
 /// pipes, and a per-process fs_context routing token. There is no
 /// shared PTY or shell instance to serialize behind.
 ///
-/// `perSessionInflight` is retained ONLY for stop / preempt bookkeeping
-/// (so the stop button can enumerate every live PID for the session and
-/// kill them). The historical FIFO wait-for-head logic was removed
+/// Stop uses execution identities, including launches with no PID yet.
+/// The historical FIFO wait-for-head logic was removed
 /// 2026-05-25 because it made concurrent tool dispatch (TaskGroup
 /// fan-out of N shell_execute calls) silently serialize at the
 /// coordinator, defeating the upper-layer parallelism.
 actor ISHExecutionCoordinator {
     static let shared = ISHExecutionCoordinator()
-
-    /// [T-ish-killpg-main-thread-watchdog] Every `killProcessGroup` runs here,
-    /// never on the main thread.
-    ///
-    /// That call takes iSH's kernel-wide `pids_lock` and then scans all
-    /// MAX_PID (32768) slots, signalling matches. Whenever a guest task already
-    /// holds `pids_lock` — which is routine while commands are running — the
-    /// caller blocks until it is released. Doing that on the main thread is a
-    /// 0x8BADF00D waiting to happen: the scene-update watchdog allows 10s of
-    /// WALL CLOCK time and does not care that the app is idle. The field crash
-    /// (1.14(17), iOS 27) caught exactly that — main stuck in
-    /// `__psynch_mutexwait` under `killProcessGroup`, with the app having burnt
-    /// 0.069s of CPU, i.e. purely blocked.
-    ///
-    /// Serial on purpose: concurrent sweeps would contend on the same kernel
-    /// lock and multiply the wait rather than shorten it.
-    static let killQueue = DispatchQueue(label: "com.openminis.ish.killpg", qos: .userInitiated)
 
     /// [T-ish-shell-timeout-preserve-output] Cap on the partial output a
     /// timed-out command may hand back.
@@ -82,19 +64,6 @@ actor ISHExecutionCoordinator {
         }
     }
 
-    /// Per-session ordered queue of in-flight execute() PIDs. The head is
-    /// the currently-running command for that session; the tail is the next
-    /// to run. A session can only have one shell at a time today; cross-
-    /// session commands run concurrently.
-    private struct InflightExec {
-        let id: UUID
-        var pid: Int32 = 0
-        let startTime: Date
-        var preempted: Bool = false
-        var waiterContinuation: CheckedContinuation<Void, Error>?
-    }
-    private var perSessionInflight: [String: [InflightExec]] = [:]
-
     /// Set of sessions for which the static (memory/skills/shared/external)
     /// mount layer has been initialized. The per-session 3 buckets are now
     /// handled by MinisFsRouter's hook, not by bind_mount; workspace is part
@@ -108,7 +77,6 @@ actor ISHExecutionCoordinator {
 
     // MARK: - Constants
 
-    private let preemptTimeout: TimeInterval = 600 // 10 minutes
 
     // MARK: - Public API
 
@@ -118,51 +86,87 @@ actor ISHExecutionCoordinator {
     /// process with its own pipes and fs_context token; there is no
     /// shared PTY to serialize behind.
     /// [T-concurrent-tools 2026-05-25]
-    func execute(
+    /// Deadline and Stop are installed before actor/mount/launch work begins.
+    /// A stuck kernel can exhaust the bounded launch capacity, but cannot own
+    /// the caller's continuation or make us spawn an unbounded set of workers.
+    nonisolated func execute(
         sessionId: String,
         command: String,
         timeout: TimeInterval?,
         lineCallback: @escaping (String) -> Void,
         pidCallback: @escaping (Int32) -> Void
     ) async throws -> ISHCommandResult {
-        guard ISHKernel.shared.isBooted else {
-            throw ISHCoordinatorError.kernelNotBooted
-        }
-
-        // Register ourselves in the in-flight table purely for
-        // stop/preempt visibility — we do NOT wait for prior entries.
-        let myId = UUID()
-        let head = InflightExec(id: myId, startTime: Date())
-        perSessionInflight[sessionId, default: []].append(head)
-        syncInflightPidSnapshot()
-
         try Task.checkCancellation()
+        guard !sessionId.isEmpty else { throw ISHCoordinatorError.noSession }
+        guard ISHKernel.shared.isBooted else { throw ISHCoordinatorError.kernelNotBooted }
+        let context = MinisFsRouter.shared.context(for: sessionId)
+        guard context != 0,
+              let ticket = ISHShellExecutor.makeTicket(fsContext: context) else {
+            return ISHCommandResult(output: "[Shell execution identity unavailable; nothing was launched.]", exitCode: -1)
+        }
+        let id = UUID()
+        let state = ISHCommandLifecycle(
+            timeout: timeout ?? 300,
+            maxPartialChars: Self.kMaxPartialOutputChars,
+            onPID: { pid in
+                // Share main-queue FIFO delivery with lineCallback at the
+                // production boundary. Never wait for this queue to terminate.
+                DispatchQueue.main.async {
+                    if pid > 0 && !Self.isExecutionLive(sessionId: sessionId, id: id) { return }
+                    pidCallback(pid)
+                }
+            },
+            requestCleanup: { timedOut in
+                ISHShellExecutor.requestTermination(ticket, error: timedOut ? .timeout : .cancelled)
+            }
+        )
+        guard Self.reserveExecution(state, sessionId: sessionId, id: id) else {
+            return ISHCommandResult(output: "[Shell execution capacity exhausted; earlier launches or cleanup may still be pending. Nothing was launched.]", exitCode: -1)
+        }
+        let (result, wasCancelled): (ISHCommandResult, Bool) = await withTaskCancellationHandler(operation: {
+            await withCheckedContinuation { continuation in
+                state.bindCompletion { outcome in
+                    Self.removeExecution(sessionId: sessionId, id: id)
+                    continuation.resume(returning: (
+                        ISHCommandResult(output: outcome.output, exitCode: outcome.exitCode),
+                        outcome.wasCancelled
+                    ))
+                }
+                state.armDeadline()
+                if Task.isCancelled { state.cancel() }
+                Task.detached(priority: .userInitiated) { [self] in
+                    defer { Self.pipelineFinished(id: id) }
+                    guard !state.isTerminal else { return }
+                    // A blocked mount may occupy this actor, not the deadline
+                    // or Stop path. The reservation remains held until this
+                    // pipeline REALLY ends, including after caller timeout.
+                    await prepareCommand(sessionId: sessionId, state: state)
+                    guard !state.isTerminal else { return }
+                    await withCheckedContinuation { (launched: CheckedContinuation<Void, Never>) in
+                        Self.launchQueue.addOperation {
+                            defer { launched.resume() }
+                            guard !state.isTerminal else { return }
+                            Self.launchCommand(command: command, ticket: ticket, state: state, lineCallback: lineCallback)
+                        }
+                    }
+                }
+            }
+        }, onCancel: {
+            state.cancel()
+        })
+        // Preserve the legacy throwing contract for Task cancellation, while
+        // keeping timeout/failure outcomes as values. A cancellation arriving
+        // after normal completion wins cannot replace that completed result.
+        if wasCancelled && Task.isCancelled { throw CancellationError() }
+        return result
+    }
 
+    private func prepareCommand(sessionId: String, state: ISHCommandLifecycle) {
+        guard !state.isTerminal else { return }
         mountedSessionId = sessionId
         ensureStaticMountsInitialized(for: sessionId)
-
-        let fsContext = MinisFsRouter.shared.context(for: sessionId)
-
-        defer {
-            // Dequeue self. No waiters to wake — concurrent dispatch.
-            if var queue = perSessionInflight[sessionId],
-               let idx = queue.firstIndex(where: { $0.id == myId }) {
-                queue.remove(at: idx)
-                perSessionInflight[sessionId] = queue.isEmpty ? nil : queue
-                syncInflightPidSnapshot()
-            }
-        }
-
-        return try await runCommand(
-            sessionId: sessionId,
-            myId: myId,
-            fsContext: fsContext,
-            command: command,
-            timeout: timeout,
-            lineCallback: lineCallback,
-            pidCallback: pidCallback
-        )
     }
+
 
     /// Called from loadSession() for UI readiness. Per-session buckets are
     /// routed by MinisFsRouter's hook now (no bind-mount swap needed), so
@@ -237,349 +241,78 @@ actor ISHExecutionCoordinator {
     /// Kill all currently-running commands across every session. Kept as the
     /// "broad stop" used by emergency cancel paths.
     func stopCurrentCommand() {
-        for (sid, queue) in perSessionInflight {
-            for entry in queue where entry.pid > 0 {
-                let pid = entry.pid
-                // [T-ish-killpg-main-thread-watchdog] Off the actor's executor:
-                // killProcessGroup can block on the kernel's pids_lock, and
-                // holding the coordinator actor for that stalls every other
-                // session's command dispatch behind it.
-                Self.killQueue.async {
-                    logger.info("Coordinator stopping command pid=\(pid) sid=\(sid)")
-                    ISHShellExecutor.killProcessGroup(pid)
-                }
-            }
-        }
+        Self.stopAllNonisolated()
     }
 
     /// Kill any in-flight command(s) for the given session only. Used by the
     /// per-session cancel path.
     func stopCurrentCommand(sessionId: String) {
-        guard let queue = perSessionInflight[sessionId] else { return }
-        for entry in queue where entry.pid > 0 {
-            let pid = entry.pid
-            // [T-ish-killpg-main-thread-watchdog] See stopCurrentCommand().
-            Self.killQueue.async {
-                logger.info("Coordinator stopping command pid=\(pid) sid=\(sessionId)")
-                ISHShellExecutor.killProcessGroup(pid)
-            }
-        }
+        Self.stopAllNonisolated(sessionId: sessionId)
     }
 
-    /// Drop in-flight state when a session is deleted/cleared. Does not kill
-    /// processes — the caller should stopCurrentCommand(sessionId:) first if
-    /// it wants a hard stop.
+    /// Cancel local executions when a session is deleted or cleared.
+    /// Process cleanup is requested separately and may still be pending.
     func sessionDidTerminate(sessionId: String) {
-        perSessionInflight[sessionId] = nil
-        syncInflightPidSnapshot()
+        Self.stopAllNonisolated(sessionId: sessionId)
         staticMountsInitialized.remove(sessionId)
         if mountedSessionId == sessionId { mountedSessionId = nil }
     }
 
     // MARK: - Private
 
-    /// Kill the head command in `sessionId`'s queue if it has exceeded the
-    /// preempt timeout AND has at least one waiter queued behind it.
-    @discardableResult
-    private func preemptIfNeeded(sessionId: String) -> Bool {
-        guard let queue = perSessionInflight[sessionId],
-              queue.count >= 2,
-              let head = queue.first,
-              head.pid > 0,
-              Date().timeIntervalSince(head.startTime) >= preemptTimeout
-        else { return false }
-        logger.warning("Preempting command (pid \(head.pid), sid \(sessionId)) — exceeded \(self.preemptTimeout)s with \(queue.count - 1) waiter(s)")
-        ISHShellExecutor.killProcess(head.pid, withSignal: 15)
-        return true
-    }
+    /// Host-only preparation/launch is isolated from the caller's deadline.
+    /// At most two jobs run here, with at most 32 reservations in total.
+    private static let launchQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "com.openminis.ish.launch"
+        queue.maxConcurrentOperationCount = 2
+        queue.qualityOfService = .userInitiated
+        return queue
+    }()
 
-    /// Remove a cancelled waiter from its session queue.
-    private func cancelInflightWaiter(sessionId: String, id: UUID) {
-        guard var queue = perSessionInflight[sessionId],
-              let idx = queue.firstIndex(where: { $0.id == id })
-        else { return }
-        let entry = queue.remove(at: idx)
-        perSessionInflight[sessionId] = queue.isEmpty ? nil : queue
-        syncInflightPidSnapshot()
-        entry.waiterContinuation?.resume(throwing: CancellationError())
-    }
-
-    /// Bridge ISHShellExecutor's callback API to async/await.
-    private func runCommand(
-        sessionId: String,
-        myId: UUID,
-        fsContext: UInt64,
+    private static func launchCommand(
         command: String,
-        timeout: TimeInterval?,
-        lineCallback: @escaping (String) -> Void,
-        pidCallback: @escaping (Int32) -> Void
-    ) async throws -> ISHCommandResult {
-        let effectiveTimeout = timeout ?? 300 // 5 minute default
-
-        // Load user-defined env vars (nonisolated, reads from disk + Keychain)
+        ticket: ISHShellExecutionTicket,
+        state: ISHCommandLifecycle,
+        lineCallback: @escaping (String) -> Void
+    ) {
+        guard !state.isTerminal else { return }
         let customEnv = EnvVarStore.shared.allAsDict()
-
-        // Feed the command as a script via stdin pipe to /bin/sh.
-        // This avoids shell quoting issues with multi-line or special-char commands.
-        // The command runs inside a subshell with stdin redirected to /dev/null,
-        // so child processes (e.g. stdio MCP servers) get immediate EOF instead of
-        // inheriting the spent pipe and hanging forever. Pipe input within the
-        // command (e.g. echo "data" | cmd) still works because the shell creates
-        // new pipes that override the subshell's fd 0.
-        //
-        // The `{ exec 0</dev/null; } 2>/dev/null` form only silences stderr for the
-        // exec builtin itself (in case /dev/null is missing from meta.db), without
-        // persistently redirecting the subshell's fd 2 — the command's own stderr
-        // must still reach us so `--help` text and error messages are captured.
-        // [T-heredoc-trailing-newline] The command is wrapped in a subshell and
-        // must be followed by a NEWLINE before the closing `)`. Without it, a
-        // command ending in a heredoc terminator (…\nEOF) becomes `…\nEOF)` —
-        // the `)` glued onto the terminator line, so ash never recognises the
-        // terminator and fails deterministically with
-        // `unexpected end of file (expecting ")")`. A newline puts the closing
-        // `)` on its own line; it is a no-op for every other command.
-        let scriptContent = "cd /root\n({ exec 0</dev/null; } 2>/dev/null || true; \(command)\n)\n"
-        let stdinData = scriptContent.data(using: .utf8)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            // [T-ish-continuation-double-resume] `resumed` is read and written
-            // from up to four different threads, so a bare `var` cannot guard
-            // the continuation: the check and the set are separate operations
-            // and two racers can both pass the check. Resuming a
-            // CheckedContinuation twice is a fatalError — the EXC_BREAKPOINT
-            // (SIGTRAP) crash reported 2026-08-14 21:26 on iOS 27 under
-            // "github triggered action", i.e. a long command finishing right at
-            // its timeout boundary.
-            //
-            // The racing paths and their queues:
-            //   completion  — main queue, via processDidExit's dispatch_after
-            //   completion  — GLOBAL UTILITY queue, via sweepStaleContexts →
-            //                 finalizeContext (ISHShellExecutor.m:246); this is
-            //                 why "both are on main" is not true
-            //   pid < 0     — the calling thread, synchronously
-            //   timeout     — main queue, via asyncAfter
-            //
-            // The lock covers ONLY the test-and-set. `continuation.resume` is
-            // deliberately called OUTSIDE it: that hands control back to the
-            // suspended async function, and running it under a lock is exactly
-            // the "arbitrary caller code while holding a lock" hazard that
-            // ISHShellExecutor's own sweeper documents. Both the lock and the
-            // flag are per-call locals, so there is no cross-command contention.
-            let resumeLock = NSLock()
-            var resumed = false
-            /// True for exactly one caller — the one that owns the resume.
-            func claimResume() -> Bool {
-                resumeLock.lock()
-                defer { resumeLock.unlock() }
-                if resumed { return false }
-                resumed = true
-                return true
+        guard !state.isTerminal else { return }
+        // Preserve /root cwd, subshell isolation, and a newline before the
+        // closing parenthesis so a final heredoc terminator stays on its line.
+        let script = "cd /root\n({ exec 0</dev/null; } 2>/dev/null || true; \(command)\n)\n"
+        guard let stdin = script.data(using: .utf8) else {
+            state.failToLaunch("The command could not be encoded as UTF-8.")
+            return
+        }
+        let pid = ISHShellExecutor.executeExecutable(
+            "/bin/sh", arguments: [], environment: customEnv,
+            stdinData: stdin, executionTicket: ticket,
+            lineCallback: { line, _ in
+                state.receiveLine(line) { delivered in
+                    // runRaw's client uses MainActor.assumeIsolated. Keep
+                    // the existing main-thread contract at this boundary,
+                    // and suppress callbacks queued before terminal.
+                    DispatchQueue.main.async {
+                        guard !state.isTerminal else { return }
+                        lineCallback(delivered)
+                    }
+                }
+            },
+            completion: { result in
+                state.finish(exitCode: Int(result.exitCode), stdout: result.output, stderr: result.errorOutput)
             }
-            var timeoutWork: DispatchWorkItem?
-
-            // [T-ish-shell-timeout-preserve-output] Mirror every line the
-            // command emits, so a timeout can hand back what it actually
-            // printed instead of only announcing that it died.
-            //
-            // The timeout path cannot read the executor's own buffer: its
-            // `ISHShellExecutionResult` is built by the completion callback,
-            // which by definition never runs for a command we killed. But the
-            // line callback has already delivered every one of those lines, so
-            // keeping a copy here costs one append per line and needs no new
-            // plumbing through ISHShellExecutor.
-            //
-            // Locked, not a bare `var`: lines arrive on the MAIN queue
-            // (ISHShellExecutor dispatches them there) while the timeout body
-            // runs on `killQueue`, so the two genuinely race. The lock is a
-            // per-call local, so there is no cross-command contention.
-            let partialLock = NSLock()
-            var partialLines: [String] = []
-            /// Index of the oldest line still kept. Lines before it have been
-            /// evicted; the array is compacted lazily so eviction stays O(1).
-            var partialHead = 0
-            /// Total characters mirrored, tracked separately so the cap can be
-            /// enforced without re-measuring the whole array on every line.
-            var partialChars = 0
-            /// True once the cap dropped at least one line.
-            var partialTruncated = false
-
-            func recordPartial(_ line: String) {
-                partialLock.lock()
-                defer { partialLock.unlock() }
-                // Bound the mirror. A runaway command (a tight loop printing
-                // for its whole timeout) would otherwise let this grow without
-                // limit in a path whose entire purpose is failure handling.
-                // The caller truncates for the model separately; this cap only
-                // stops the mirror itself becoming the problem.
-                //
-                // [T-ish-shell-timeout-keep-tail] Keep the TAIL, not the head.
-                // The line that explains a hang (the last error, the prompt it
-                // is waiting on) is printed right before it, so dropping new
-                // lines once full threw away exactly the part this mirror
-                // exists to preserve. Evict the oldest lines instead, always
-                // keeping at least the newest one.
-                partialLines.append(line)
-                partialChars += line.count + 1
-                while partialChars > Self.kMaxPartialOutputChars,
-                      partialLines.count - partialHead > 1 {
-                    partialChars -= partialLines[partialHead].count + 1
-                    partialHead += 1
-                    partialTruncated = true
-                }
-                if partialHead > 4096, partialHead * 2 > partialLines.count {
-                    partialLines.removeFirst(partialHead)
-                    partialHead = 0
-                }
-            }
-
-            /// Snapshot of the newest output the command printed before it
-            /// was killed.
-            func partialSnapshot() -> (text: String, truncated: Bool) {
-                partialLock.lock()
-                defer { partialLock.unlock() }
-                return (partialLines[partialHead...].joined(separator: "\n"), partialTruncated)
-            }
-
-            let pid = ISHShellExecutor.executeExecutable(
-                "/bin/sh",
-                arguments: nil,
-                environment: customEnv.isEmpty ? nil : customEnv,
-                stdinData: stdinData,
-                fsContext: fsContext,
-                lineCallback: { line, _ in
-                recordPartial(line)
-                lineCallback(line)
-            }, completion: { [weak self] result in
-                guard claimResume() else { return }
-                timeoutWork?.cancel()
-
-                Task { await self?.recordInflightPid(sessionId: sessionId, id: myId, pid: 0) }
-
-                var output = result.output
-                let errOutput = result.errorOutput
-                if !errOutput.isEmpty {
-                    output += (output.isEmpty ? "" : "\n") + errOutput
-                }
-
-                if result.exitCode != 0 && !output.contains("exit code") {
-                    output += "\n(exit code: \(result.exitCode))"
-                }
-
-                if output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    output = "(command completed with no output)"
-                }
-
-                logger.info("Command completed. Exit code: \(result.exitCode), output: \(output.count) chars")
-                continuation.resume(returning: ISHCommandResult(output: output, exitCode: Int(result.exitCode)))
-            })
-
-            if pid < 0 {
-                guard claimResume() else { return }
-                let errorMsg: String
-                switch ISHShellExecutorError(rawValue: Int(pid)) {
-                case .processCreationFailed:
-                    errorMsg = "Failed to create process"
-                case .execFailed:
-                    errorMsg = "Failed to execute command"
-                case .timeout:
-                    errorMsg = "Command timed out"
-                case .cancelled:
-                    errorMsg = "Command cancelled"
-                default:
-                    errorMsg = "Execution error (code: \(pid))"
-                }
-                logger.error("ISHShellExecutor failed: \(errorMsg)")
-                continuation.resume(returning: ISHCommandResult(output: "Error: \(errorMsg)", exitCode: -1))
-                return
-            }
-
-            // Track PID
-            Task { await self.recordInflightPid(sessionId: sessionId, id: myId, pid: pid) }
-            pidCallback(pid)
-
-            // Timeout safety net
-            let work = DispatchWorkItem { [weak self] in
-                guard claimResume() else { return }
-                // [T-ish-thread-leak] Reap the WHOLE process group, not just the
-                // root pid. A bare killProcess(pid, SIGTERM) leaves children +
-                // their emu task threads alive after the continuation resumes —
-                // they accumulate (gh-NNN threads, footprint climbs → jetsam).
-                // killProcessGroup sweeps pgid + descendants with a SIGTERM→
-                // SIGKILL escalation, so a hung/ignoring-SIGTERM tree still dies.
-                ISHShellExecutor.killProcessGroup(pid)
-                // [T-ish-shell-timeout-leak] Release the execution context
-                // ourselves instead of waiting for the exit notification that
-                // killProcessGroup is supposed to provoke. That notification
-                // never arrives when the task has already been reaped as a
-                // zombie, and the context then leaks with its two reader
-                // threads polling a dead pipe forever — about thirty timeouts
-                // exhaust the concurrent queue and no command can run again
-                // until the device is restarted.
-                //
-                // Called AFTER the kill so output written before the deadline
-                // is still readable, and it is a no-op if the command turned
-                // out to exit in time.
-                ISHShellExecutor.finalizeTimedOutPid(pid)
-                Task { await self?.recordInflightPid(sessionId: sessionId, id: myId, pid: 0) }
-                pidCallback(0)
-                // [T-ish-shell-timeout-preserve-output] Hand back what the
-                // command PRINTED, then say it timed out — instead of
-                // replacing its output with the announcement.
-                //
-                // The old line returned only "(command timed out after Ns)",
-                // discarding everything already written to stdout/stderr. For
-                // the model that is the worst possible answer: a build that
-                // logged 200 lines and then hung looks identical to one that
-                // hung instantly, so it cannot tell how far the command got,
-                // read the error that preceded the hang, or decide whether
-                // re-running is even useful. It has to guess or start over.
-                //
-                // The notice goes AFTER the output, not before: the model reads
-                // the transcript in order, and the last thing it should see is
-                // why the transcript stops.
-                let snapshot = partialSnapshot()
-                let notice = "[Command timed out after \(Int(effectiveTimeout))s"
-                    + (snapshot.text.isEmpty
-                        ? " with no output captured]"
-                        : " — above is partial output captured before the timeout]")
-                var timedOutput: String
-                if snapshot.text.isEmpty {
-                    timedOutput = notice
-                } else {
-                    // The dropped part is the OLDEST output, so say so where
-                    // it would have been: above what was kept.
-                    timedOutput = snapshot.truncated
-                        ? "[Earlier output beyond the last \(Self.kMaxPartialOutputChars) chars was dropped]\n\n" + snapshot.text
-                        : snapshot.text
-                    timedOutput += "\n\n" + notice
-                }
-                logger.warning("Command timed out after \(effectiveTimeout)s — killing process group pid=\(pid), preserving \(snapshot.text.count) chars of partial output")
-                continuation.resume(returning: ISHCommandResult(output: timedOutput, exitCode: -1))
-            }
-            timeoutWork = work
-            // [T-ish-killpg-main-thread-watchdog] Scheduled on killQueue, NOT
-            // the main queue. The body calls killProcessGroup, which can block
-            // on the kernel's pids_lock for an unbounded time; on the main
-            // queue that is a watchdog kill. Nothing in the body touches UI —
-            // it signals pids, finalizes the context and resumes a
-            // continuation — so it has no reason to be on main.
-            Self.killQueue.asyncAfter(
-                deadline: .now() + effectiveTimeout,
-                execute: work
-            )
+        )
+        if pid > 0 {
+            state.publishPID(pid)
+        } else {
+            state.failToLaunch("The shell could not be started (error \(pid)).")
         }
     }
 
-    private func recordInflightPid(sessionId: String, id: UUID, pid: Int32) {
-        guard var queue = perSessionInflight[sessionId],
-              let idx = queue.firstIndex(where: { $0.id == id })
-        else { return }
-        queue[idx].pid = pid
-        perSessionInflight[sessionId] = queue
-        // The pid is only known here, so this is the sync that actually makes
-        // a running command killable from the nonisolated stop path.
-        syncInflightPidSnapshot()
-    }
+
+
 
     // MARK: - Mount Logic
 
@@ -753,75 +486,57 @@ actor ISHExecutionCoordinator {
     private static let mountedSidLock = NSLock()
     nonisolated(unsafe) private static var mountedSidStorage: String?
 
-    /// [T-shell-stop-blocked-by-actor] Lock-protected mirror of the live PIDs
-    /// in `perSessionInflight`, so STOP can kill them without entering this
-    /// actor.
-    ///
-    /// The stop path used to be actor-isolated, which made it useless in the
-    /// exact situation it exists for: `Task { await stop… }` has to queue on
-    /// the coordinator, and when a guest process is wedged holding iSH's
-    /// global `pids_lock` the coordinator is precisely what is blocked. The
-    /// user pressed Stop and nothing happened — the field crash on
-    /// 2026-08-23 20:11 has no `Coordinator stopping command` line anywhere,
-    /// because the kill never got a turn to run.
-    ///
-    /// Killing is a plain `ISHShellExecutor` call that needs no actor state
-    /// beyond the pid, so it reads from here instead. Same rationale as
-    /// `mountedSidStorage` directly above.
-    private static let inflightPidLock = NSLock()
-    nonisolated(unsafe) private static var inflightPidStorage: [String: [Int32]] = [:]
+    /// Independent of the actor and kernel queues. Includes preparing commands
+    /// whose PID is not available yet, so Stop does not miss late launches.
+    private static let executionLock = NSLock()
+    nonisolated(unsafe) private static var executionStorage: [String: [UUID: ISHCommandLifecycle]] = [:]
+    // Bit 0: caller terminal. Bit 1: launch pipeline actually returned. A
+    // timed-out but wedged pipeline must keep its capacity reservation.
+    nonisolated(unsafe) private static var executionReservations: [UUID: UInt8] = [:]
+    private static let maxExecutionReservations = 32
 
-    /// Mirror the actor's in-flight table into the lock-protected snapshot.
-    /// Called from every site that mutates `perSessionInflight`.
-    private func syncInflightPidSnapshot() {
-        var snap: [String: [Int32]] = [:]
-        for (sid, queue) in perSessionInflight {
-            let pids = queue.map(\.pid).filter { $0 > 0 }
-            if !pids.isEmpty { snap[sid] = pids }
-        }
-        Self.inflightPidLock.lock()
-        Self.inflightPidStorage = snap
-        Self.inflightPidLock.unlock()
+    private static func reserveExecution(_ state: ISHCommandLifecycle, sessionId: String, id: UUID) -> Bool {
+        executionLock.lock()
+        defer { executionLock.unlock() }
+        guard executionReservations.count < maxExecutionReservations else { return false }
+        executionReservations[id] = 0
+        executionStorage[sessionId, default: [:]][id] = state
+        return true
     }
 
-    /// Kill every in-flight command, or just one session's, WITHOUT entering
-    /// the actor. Safe to call from any thread; returns how many pids it
-    /// signalled so the caller can log a real outcome.
+    private static func isExecutionLive(sessionId: String, id: UUID) -> Bool {
+        executionLock.lock()
+        let state = executionStorage[sessionId]?[id]
+        executionLock.unlock()
+        return state.map { !$0.isTerminal } ?? false
+    }
+
+    private static func removeExecution(sessionId: String, id: UUID) {
+        executionLock.lock()
+        defer { executionLock.unlock() }
+        executionStorage[sessionId]?[id] = nil
+        if executionStorage[sessionId]?.isEmpty == true { executionStorage[sessionId] = nil }
+        guard let bits = executionReservations[id] else { return }
+        if (bits | 1) == 3 { executionReservations[id] = nil }
+        else { executionReservations[id] = bits | 1 }
+    }
+
+    private static func pipelineFinished(id: UUID) {
+        executionLock.lock()
+        defer { executionLock.unlock() }
+        guard let bits = executionReservations[id] else { return }
+        if (bits | 2) == 3 { executionReservations[id] = nil }
+        else { executionReservations[id] = bits | 2 }
+    }
+
+    /// Count of local cancellation requests, NOT processes confirmed killed.
     @discardableResult
     nonisolated static func stopAllNonisolated(sessionId: String? = nil) -> Int {
-        inflightPidLock.lock()
-        let snapshot = inflightPidStorage
-        inflightPidLock.unlock()
-
-        var targets: [(sid: String, pid: Int32)] = []
-        for (sid, pids) in snapshot where sessionId == nil || sid == sessionId {
-            for pid in pids where pid > 0 { targets.append((sid, pid)) }
-        }
-
-        // [T-ish-killpg-main-thread-watchdog] The sweep itself is handed to
-        // killQueue instead of running on the caller.
-        //
-        // [T-shell-stop-blocked-by-actor] is still honoured: the point of that
-        // note is that the kill must not queue behind the COORDINATOR ACTOR,
-        // because the actor is exactly what a wedged guest process blocks. It
-        // does not require the main thread. The pids are already snapshotted
-        // above under their own lock, so everything the sweep needs is in hand
-        // and no actor is involved either way.
-        //
-        // Stop stays responsive for the opposite reason to before: killing can
-        // block on the kernel's pids_lock, and this caller is @MainActor
-        // (AIChatViewModel.stopCurrentCommand), so running it inline froze the
-        // UI for as long as the lock was held — up to a 10s watchdog kill.
-        // Async here means the tap returns immediately and the signals still go
-        // out in order on a serial queue.
-        for (sid, pid) in targets {
-            Self.killQueue.async {
-                logger.info("Coordinator stopping command pid=\(pid) sid=\(sid) (nonisolated)")
-                ISHShellExecutor.killProcessGroup(pid)
-            }
-        }
-        // Count of pids SIGNALLED (dispatched), which is what every caller
-        // logs; the sweep completes shortly after on killQueue.
+        executionLock.lock()
+        let targets = executionStorage.filter { sessionId == nil || $0.key == sessionId }
+            .flatMap { Array($0.value.values) }
+        executionLock.unlock()
+        for state in targets { state.cancel() }
         return targets.count
     }
 

@@ -2103,6 +2103,19 @@ final class DebugJSONRPC: @unchecked Sendable {
         // global view (fs_context = 0).
         let sessionId = params["sessionId"] as? String
         let fsContext: UInt64 = sessionId.map { MinisFsRouter.shared.context(for: $0) } ?? 0
+        // A supplied session whose route could not be allocated must never
+        // degrade silently to the global filesystem view.
+        if sessionId != nil && fsContext == 0 {
+            return [
+                "exitCode": -1,
+                "pid": 0,
+                "error": "processCreationFailed",
+                "stdout": "",
+                "stderr": "Unable to allocate the requested session filesystem context; nothing was launched.",
+                "duration": 0,
+                "timedOut": false,
+            ] as [String: Any]
+        }
 
         // Run off the main thread (blocks on semaphore).
         let (result, didTimeout): (ISHShellExecutionResult?, Bool) = await withCheckedContinuation { continuation in
@@ -2111,12 +2124,16 @@ final class DebugJSONRPC: @unchecked Sendable {
                     // Mirror agent path: sh with no argv, script via stdin.
                     let ctx = ISHShellExecutionContextBox()
                     let data = command.data(using: .utf8) ?? Data()
+                    guard let ticket = ISHShellExecutor.makeTicket(fsContext: fsContext) else {
+                        continuation.resume(returning: (nil, false))
+                        return
+                    }
                     let pid = ISHShellExecutor.executeExecutable(
                         "/bin/sh",
                         arguments: nil,
                         environment: env,
                         stdinData: data,
-                        fsContext: fsContext,
+                        executionTicket: ticket,
                         lineCallback: nil,
                         completion: { res in
                             ctx.result = res
@@ -2129,13 +2146,9 @@ final class DebugJSONRPC: @unchecked Sendable {
                     }
                     let waitResult = ctx.sem.wait(timeout: .now() + timeout)
                     if waitResult == .timedOut {
-                        ISHShellExecutor.killProcess(pid, withSignal: 9)
-                        // [T-ish-shell-timeout-leak] Same self-heal as the
-                        // agent path: don't leave teardown to an exit
-                        // notification that a zombie-reaped task never sends,
-                        // or this context and its reader threads leak for the
-                        // life of the process.
-                        ISHShellExecutor.finalizeTimedOutPid(pid)
+                        // Stop this execution's context; kernel cleanup is
+                        // requested by ticket and may still be pending.
+                        ISHShellExecutor.requestTermination(ticket, error: .timeout)
                         continuation.resume(returning: (ctx.result, true))
                         return
                     }
@@ -2155,11 +2168,11 @@ final class DebugJSONRPC: @unchecked Sendable {
             return [
                 "exitCode": -1,
                 "pid": 0,
-                "error": "processCreationFailed",
+                "error": didTimeout ? "timeout" : "processCreationFailed",
                 "stdout": "",
                 "stderr": "",
                 "duration": 0,
-                "timedOut": false,
+                "timedOut": didTimeout,
             ] as [String: Any]
         }
 

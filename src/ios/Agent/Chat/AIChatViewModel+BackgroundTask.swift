@@ -718,27 +718,19 @@ extension AIChatViewModel {
             // no `Coordinator stopping command` line at all — the user
             // pressed Stop and the code never ran.
             //
-            // Killing needs nothing from the actor but the pid, which is
-            // mirrored under a lock, so this runs right here on the caller.
-            // [T-p0-stop-scope] Only THIS session's pids. The coordinator has
-            // always keyed in-flight pids by session and accepted the filter;
-            // calling it unfiltered meant a Stop in one chat killed the shell
-            // commands of every other concurrently running chat. A vm with no
-            // session id yet cannot own a running command (commands run after
-            // ensureSession), so nil here is logged rather than widened.
-            let killed: Int
-            // [T-agent-wrapup-turn] Shell commands run under fsSessionId (the
-            // parent's id for an agent child, see the shared workspace) and the
-            // coordinator files in-flight pids under THAT id — so a child that
-            // scoped the kill to its own sessionId found 0 pids and its tool
-            // never stopped.
+            // Cancellation uses a lock-protected execution snapshot (including
+            // launches with no PID yet), independent of the coordinator actor.
+            // [T-p0-stop-scope] Only this session's executions are requested.
+            // A request is NOT confirmation that a process received a signal.
+            let cancellationRequests: Int
+            // Agent children launch under the parent's fsSessionId.
             if let sid = fsSessionId ?? sessionId {
-                killed = ISHExecutionCoordinator.stopAllNonisolated(sessionId: sid)
+                cancellationRequests = ISHExecutionCoordinator.stopAllNonisolated(sessionId: sid)
             } else {
-                logger.warning("⏹️ stopCurrentCommand — no sessionId on vm=\(self.vmInstanceId); nothing to scope the kill to")
-                killed = 0
+                logger.warning("⏹️ stopCurrentCommand — no sessionId on vm=\(self.vmInstanceId); no cancellation requested")
+                cancellationRequests = 0
             }
-            logger.info("⏹️ stopCurrentCommand — signalled \(killed) shell pid(s) sid=\(self.sessionId?.prefix(8) ?? "nil")")
+            logger.info("⏹️ stopCurrentCommand — requested cancellation for \(cancellationRequests) shell execution(s); process termination unconfirmed sid=\(self.sessionId?.prefix(8) ?? "nil")")
         }
         runningCommandPids.removeAll()
         commandStartTime = nil

@@ -140,54 +140,39 @@ check("toolUse stop, no entries, WITH reasoning → empty too (same stall)",
 check("regression guard: interleaved thinking with a real call is NOT empty",
       isEmptyResponse(R(entries: 1, reasoning: "read it", stop: .toolUse)), false)
 
-// MARK: - [3] Shell timeout partial output keeps the tail
+// MARK: - [3] Shell timeout partial output: actual production lifecycle
 
-print("\n▶️  3. timed-out shell output keeps the TAIL (3092a9c4b)")
-let kMax = 256_000
-check("source: mirror evicts the OLDEST lines once over the cap",
-      coordSrc.contains("while partialChars > Self.kMaxPartialOutputChars,\n                      partialLines.count - partialHead > 1 {"))
-check("source: snapshot reads from the head index",
-      coordSrc.contains("partialLines[partialHead...].joined(separator:"))
-/// Port of recordPartial / partialSnapshot.
-final class Mirror {
-    var store: [String] = []; var head = 0; var chars = 0; var truncated = false
-    var lines: [String] { Array(store[head...]) }
-    func record(_ line: String) {
-        store.append(line); chars += line.count + 1
-        while chars > kMax, store.count - head > 1 {
-            chars -= store[head].count + 1; head += 1; truncated = true
+print("\n▶️  3. production shell lifecycle regression")
+// Do not port the output policy into a second model or require the old unsafe
+// kill-before-finalize implementation. Compile/run the production controller.
+var lifecycleRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+var lifecycleRunner: URL?
+for _ in 0..<8 {
+    let candidate = lifecycleRoot.appendingPathComponent("scripts/test_ish_command_lifecycle.sh")
+    if FileManager.default.fileExists(atPath: candidate.path) { lifecycleRunner = candidate; break }
+    lifecycleRoot = lifecycleRoot.deletingLastPathComponent()
+}
+if let lifecycleRunner {
+    let child = Process()
+    child.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    child.arguments = ["bash", lifecycleRunner.path]
+    child.standardOutput = FileHandle.standardOutput
+    child.standardError = FileHandle.standardError
+    do {
+        try child.run()
+        child.waitUntilExit()
+        if child.terminationStatus == 77 {
+            print("SKIP: native production lifecycle tests unavailable; remaining standalone checks will still run")
+            warnings += 1
+        } else {
+            check("production lifecycle assertions pass", child.terminationStatus == 0)
         }
-        if head > 4096, head * 2 > store.count { store.removeFirst(head); head = 0 }
+    } catch {
+        check("production lifecycle runner launches: \(error)", false)
     }
+} else {
+    check("production lifecycle runner found", false)
 }
-do {
-    let m = Mirror()
-    for i in 0..<5_000 { m.record("progress line \(i) " + String(repeating: "x", count: 80)) }
-    m.record("FATAL: linker error in libfoo.a — hanging on retry")
-    let text = m.lines.joined(separator: "\n")
-    check("overflow was recorded", m.truncated)
-    check("the last line before the hang survives the cap", text.contains("FATAL: linker error"))
-    check("the oldest line was the one evicted", !text.contains("progress line 0 "))
-    check("kept text stays within the cap", text.count <= kMax)
-    check("kept lines are contiguous and end at the newest",
-          m.lines.last == "FATAL: linker error in libfoo.a — hanging on retry")
-}
-do {
-    // Edge: one line larger than the whole cap must still be kept (never an
-    // empty snapshot for a command that did print).
-    let m = Mirror()
-    m.record("a"); m.record(String(repeating: "y", count: kMax + 10))
-    check("a single oversized line is kept on its own", m.lines.count == 1 && m.lines[0].count == kMax + 10)
-    check("…and the drop is reported", m.truncated)
-}
-do {
-    // Edge: output under the cap is untouched and not flagged.
-    let m = Mirror()
-    for i in 0..<10 { m.record("l\(i)") }
-    check("small output is kept whole and not flagged", m.lines.count == 10 && !m.truncated)
-}
-check("notice says the EARLIER output was dropped and sits above the kept text",
-      coordSrc.contains("? \"[Earlier output beyond the last \\(Self.kMaxPartialOutputChars) chars was dropped]\\n\\n\" + snapshot.text"))
 
 // MARK: - [4] Responses pairing sanitize — known gaps
 

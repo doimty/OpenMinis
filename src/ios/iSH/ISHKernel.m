@@ -639,11 +639,14 @@ static void handle_process_exit(struct task *task, int code) {
         return;
 
     pid_t pid = task->pid;
+    // Copy while the task/group are still valid; never capture their pointers
+    // across dispatch, where the PID or task allocation may already be reused.
+    uint64_t executionToken = task->group != NULL ? task->group->fs_context : 0;
     dispatch_async(dispatch_get_main_queue(), ^{
         [[NSNotificationCenter defaultCenter]
             postNotificationName:ISHProcessExitedNotification
             object:nil
-            userInfo:@{@"pid": @(pid), @"code": @(code)}];
+            userInfo:@{@"pid": @(pid), @"code": @(code), @"executionToken": @(executionToken)}];
     });
 }
 
