@@ -113,6 +113,8 @@
 		A45020261020000000000009 /* AskUserPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4502026102000000000000A /* AskUserPrompt.swift */; };
 		A4502026102000000000000B /* AskUserManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4502026102000000000000C /* AskUserManager.swift */; };
 		A4502026102000000000000D /* AskUserSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4502026102000000000000E /* AskUserSheet.swift */; };
+		A4502026102000000000000F /* ChatPDFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45020261020000000000010 /* ChatPDFExporter.swift */; };
+		A45020261020000000000011 /* ChatPDFText.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45020261020000000000012 /* ChatPDFText.swift */; };
 		E53000005 /* UsageStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000015 /* UsageStatsView.swift */; };
 		E53000006 /* CacheKeepAliveManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000016 /* CacheKeepAliveManager.swift */; };
 		E54000001 /* DebugServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54000011 /* DebugServer.swift */; };
@@ -815,6 +817,8 @@
 		A4502026102000000000000A /* AskUserPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskUserPrompt.swift; sourceTree = "<group>"; };
 		A4502026102000000000000C /* AskUserManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskUserManager.swift; sourceTree = "<group>"; };
 		A4502026102000000000000E /* AskUserSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskUserSheet.swift; sourceTree = "<group>"; };
+		A45020261020000000000010 /* ChatPDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPDFExporter.swift; sourceTree = "<group>"; };
+		A45020261020000000000012 /* ChatPDFText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPDFText.swift; sourceTree = "<group>"; };
 		E53000015 /* UsageStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStatsView.swift; sourceTree = "<group>"; };
 		E53000016 /* CacheKeepAliveManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheKeepAliveManager.swift; sourceTree = "<group>"; };
 		E54000011 /* DebugServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugServer.swift; sourceTree = "<group>"; };
@@ -2337,6 +2341,8 @@
 				E53000012 /* AIChatView.swift */,
 				A45020261020000000000008 /* ChatSearchView.swift */,
 				A4502026102000000000000E /* AskUserSheet.swift */,
+				A45020261020000000000010 /* ChatPDFExporter.swift */,
+				A45020261020000000000012 /* ChatPDFText.swift */,
 				E5F200011 /* MarkdownPrepRegex.swift */,
 				E5F200012 /* MinisMediaViews.swift */,
 				E5F200013 /* AssistantBlockView.swift */,
@@ -2954,6 +2960,8 @@
 				E53000002 /* AIChatView.swift in Sources */,
 				A45020261020000000000007 /* ChatSearchView.swift in Sources */,
 				A4502026102000000000000D /* AskUserSheet.swift in Sources */,
+				A4502026102000000000000F /* ChatPDFExporter.swift in Sources */,
+				A45020261020000000000011 /* ChatPDFText.swift in Sources */,
 				E5CAL0001 /* CookieAuditLogger.swift in Sources */,
 				E5F200001 /* MarkdownPrepRegex.swift in Sources */,
 				E5F200002 /* MinisMediaViews.swift in Sources */,

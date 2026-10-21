@@ -506,6 +506,9 @@ struct AIChatView: View {
     @State private var previewHTMLFile: URL?
     @State private var previewDocumentFile: URL?
     @State private var shareFile: URL?
+    /// [T-chat-pdf-export] True while the transcript is being rendered.
+    @State private var isExportingPDF = false
+    @State private var pdfExportError: String?
     @State private var safariURL: URL?
     @State private var fullBrowserURL: URL?
     @State private var fullBrowserIsLocal = false
@@ -2008,6 +2011,7 @@ struct AIChatView: View {
             fastModeEnabled: codexFastModeEnabled,
             onNewChat: { requestNewChatFromMenu() },
             onSearch: { showChatSearch = true },
+            onExportPDF: { exportConversationPDF() },
             // [T-chat-menu-compact-entry] Same effect as the /compact slash
             // command (AIChatViewModel+SlashCommands case "compact").
             onCompact: { vm.compactAll() },
@@ -2937,6 +2941,62 @@ struct AIChatView: View {
         // rather than the screen root so it presents above the transcript
         // without fighting the sheets already attached to the body.
         .modifier(AskUserSheetModifier())
+        // [T-chat-pdf-export] Progress pill while the document is rendered
+        // off the main thread; the share sheet follows.
+        .overlay(alignment: .top) {
+            if isExportingPDF {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text(AppLocalized("Preparing PDF…"))
+                        .font(.footnote)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.top, 12)
+            }
+        }
+        .alert(AppLocalized("Export failed"), isPresented: Binding(
+            get: { pdfExportError != nil },
+            set: { if !$0 { pdfExportError = nil } }
+        )) {
+            Button(AppLocalized("OK"), role: .cancel) { pdfExportError = nil }
+        } message: {
+            Text(pdfExportError ?? "")
+        }
+    }
+
+    // MARK: - PDF export
+
+    /// [T-chat-pdf-export] Snapshot on the main actor, render off it, then
+    /// hand the file to the existing share sheet.
+    @MainActor
+    private func exportConversationPDF() {
+        guard !isExportingPDF else { return }
+        let sections = ChatPDFExporter.sections(from: vm.messages)
+        guard !sections.isEmpty else { return }
+        let title = ChatPDFText.suggestedTitle(from: sections,
+                                                  fallback: AppLocalized("Minis Chat"))
+        let date = Date()
+        isExportingPDF = true
+        Task { @MainActor in
+            let data = await Task.detached(priority: .userInitiated) {
+                ChatPDFExporter.render(title: title, sections: sections, date: date)
+            }.value
+            self.isExportingPDF = false
+            guard let data else {
+                self.pdfExportError = AppLocalized("Could not render this conversation as a PDF.")
+                return
+            }
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent(ChatPDFText.suggestedFilename(title: title, date: date))
+            do {
+                try data.write(to: url, options: .atomic)
+                self.shareFile = url
+            } catch {
+                self.pdfExportError = error.localizedDescription
+            }
+        }
     }
 
     /// Shared label style for the floating scroll buttons (up / down).
@@ -5857,6 +5917,8 @@ private struct ChatTrailingMenuButton: UIViewRepresentable {
     let onNewChat: () -> Void
     /// [T-chat-search] Opens the in-conversation search sheet.
     let onSearch: () -> Void
+    /// [T-chat-pdf-export] Writes a plain-text transcript PDF and shares it.
+    let onExportPDF: () -> Void
     let onCompact: () -> Void
     let onClearChat: () -> Void
     let onForceSync: () -> Void
@@ -5979,6 +6041,11 @@ private struct ChatTrailingMenuButton: UIViewRepresentable {
                      image: UIImage(systemName: "magnifyingglass"),
                      attributes: key.messagesEmpty ? UIMenuElement.Attributes.disabled : []) { _ in
                 coordinator.parent.onSearch()
+            },
+            UIAction(title: AppLocalized("Export as PDF"),
+                     image: UIImage(systemName: "doc.richtext"),
+                     attributes: key.messagesEmpty ? UIMenuElement.Attributes.disabled : []) { _ in
+                coordinator.parent.onExportPDF()
             },
         ]))
 

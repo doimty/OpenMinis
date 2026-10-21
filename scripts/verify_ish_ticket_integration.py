@@ -13,7 +13,7 @@ def main():
  def check(name,ok):
   checks.append({'name':name,'ok':bool(ok)})
   if not ok:raise RuntimeError(name)
- swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift','src/ios/Agent/Chat/AskUserPrompt.swift','scripts/ask-user-tests/main.swift']
+ swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift','src/ios/Agent/Chat/AskUserPrompt.swift','scripts/ask-user-tests/main.swift','src/ios/Views/Chat/ChatPDFExporter.swift','src/ios/Views/Chat/ChatPDFText.swift','scripts/chat-pdf-tests/main.swift']
  for fn in swift:
   raw=(P/fn).read_bytes();tree=parser.parse(raw)
   if fn.endswith('DebugJSONRPC.swift'):
@@ -76,6 +76,14 @@ def main():
  check('question card cannot be swiped away unanswered','interactiveDismissDisabled' in sheet and 'onDisappear' in sheet)
  check('ask_user options are bounded','static let maxOptions = 6' in prompt)
  check('ask_user files are compiled sources',all(project.count(x)==2 for x in ['A45020261020000000000009','A4502026102000000000000B','A4502026102000000000000D']))
+ pdf=(P/'src/ios/Views/Chat/ChatPDFExporter.swift').read_text()
+ check('PDF export is reachable from the chat menu','Export as PDF' in chatview and 'onExportPDF' in chatview)
+ check('PDF export paginates with CoreText','CTFramesetterCreateFrame' in pdf and 'CTFrameGetVisibleStringRange' in pdf)
+ check('PDF export shares the rendered file','self.shareFile = url' in chatview and 'ChatPDFExporter.render' in chatview)
+ check('PDF export drops thinking and summarizes tools','case .thinking:' in pdf and 'toolLine' in pdf)
+ check('PDF export file is a compiled source',project.count('A4502026102000000000000F')==2 and project.count('A45020261020000000000010')==3)
+ check('PDF naming helper is a compiled source',project.count('A45020261020000000000011')==2 and project.count('A45020261020000000000012')==3)
+
 
 
 

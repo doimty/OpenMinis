@@ -71,6 +71,11 @@ jobs:
           set -euo pipefail
           bash scripts/test_ask_user.sh 2>&1 | tee "$RUNNER_TEMP/ask-user-tests.log"
 
+      - name: Native chat PDF naming regression
+        run: |
+          set -euo pipefail
+          bash scripts/test_chat_pdf.sh 2>&1 | tee "$RUNNER_TEMP/chat-pdf-tests.log"
+
       - name: Host production identity and cleanup-helper tests
         run: |
           set -euo pipefail
@@ -167,6 +172,7 @@ jobs:
             ${{ runner.temp }}/ish-terminal-tests.log
             ${{ runner.temp }}/chat-search-tests.log
             ${{ runner.temp }}/ask-user-tests.log
+            ${{ runner.temp }}/chat-pdf-tests.log
             ${{ runner.temp }}/ish-ticket/**
             ${{ runner.temp }}/ios-build/xcodebuild.log
           if-no-files-found: warn
