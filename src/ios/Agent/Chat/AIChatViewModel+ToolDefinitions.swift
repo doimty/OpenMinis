@@ -156,6 +156,20 @@ extension AIChatViewModel {
             ))
         }
 
+        tools.append(AgentToolDefinition(
+            name: "ask_user",
+            description: "Ask the user a question and wait for their answer. Use it when a decision, missing detail or preference genuinely blocks progress and guessing would be wrong. Ask once, with concrete options, instead of several small questions. The turn pauses until the user answers, skips, or the question times out after ten minutes. Do not use it to confirm destructive shell commands — those already have their own prompt.",
+            parameters: [
+                "tool_title": AgentToolParam(type: .string, description: "A concise 5-10 word summary shown on the tool row (e.g. 'Ask which provider to use')."),
+                "question": AgentToolParam(type: .string, description: "The question itself, one or two sentences, in the user's language."),
+                "header": AgentToolParam(type: .string, description: "Optional short label above the question (2-4 words), e.g. 'Provider'."),
+                "options": AgentToolParam(type: .string, description: "Optional answer choices, one per line, 2-6 items, rendered as buttons in order. Free text is still offered only when allow_free_text is true."),
+                "allow_free_text": AgentToolParam(type: .boolean, description: "Whether the user may type an answer instead of picking an option. Defaults to true when no options are given."),
+            ],
+            required: ["tool_title", "question"],
+            propertyOrdering: ["tool_title", "question", "header", "options", "allow_free_text"]
+        ))
+
         // [T-ios-vision-group #182] Expose read_image when the model can see
         // images ITSELF, or when a Vision Group is configured to see them on its
         // behalf. Previously a text-only model simply never got this tool, so an

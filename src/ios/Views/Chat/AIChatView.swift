@@ -2933,6 +2933,10 @@ struct AIChatView: View {
             .padding(.bottom, inputBarHeight + (hasFloatingPreview ? 80 : 12) + 92)
             .animation(.easeInOut(duration: 0.2), value: hasFloatingPreview)
         }
+        // [T-ask-user] The model's question card. Attached to the message area
+        // rather than the screen root so it presents above the transcript
+        // without fighting the sheets already attached to the body.
+        .modifier(AskUserSheetModifier())
     }
 
     /// Shared label style for the floating scroll buttons (up / down).

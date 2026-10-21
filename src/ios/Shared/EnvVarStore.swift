@@ -13,21 +13,27 @@ struct EnvVarEntry: Identifiable, Codable {
     /// Optional human-readable description of what this variable is for. Empty
     /// string when omitted. Stored in the JSON metadata file; not secret.
     var note: String
+    /// Disabled entries keep their key, note and Keychain value but are not
+    /// injected into any shell environment. Lets a user park a key without
+    /// losing it (and without deleting it from Keychain).
+    var isEnabled: Bool
 
-    init(id: String = UUID().uuidString, key: String, createdAt: Date = Date(), note: String = "") {
+    init(id: String = UUID().uuidString, key: String, createdAt: Date = Date(), note: String = "", isEnabled: Bool = true) {
         self.id = id
         self.key = key
         self.createdAt = createdAt
         self.note = note
+        self.isEnabled = isEnabled
     }
 
-    // Custom decoder so older entries without a `note` field still load.
+    // Custom decoder so older entries without `note` / `isEnabled` still load.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decode(String.self, forKey: .id)
         self.key = try c.decode(String.self, forKey: .key)
         self.createdAt = try c.decode(Date.self, forKey: .createdAt)
         self.note = (try? c.decode(String.self, forKey: .note)) ?? ""
+        self.isEnabled = (try? c.decode(Bool.self, forKey: .isEnabled)) ?? true
     }
 }
 
@@ -377,6 +383,18 @@ final class EnvVarStore: ObservableObject {
     /// Keychain-stored value. Used by minis-config so the agent can
     /// annotate variables without ever seeing or overwriting the
     /// secret.
+    /// Park or restore a variable without touching its Keychain value.
+    /// Takes effect on the next shell / terminal launch, like every other
+    /// environment mutation.
+    func setEnabled(id: String, enabled: Bool) {
+        guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
+        guard entries[idx].isEnabled != enabled else { return }
+        entries[idx].isEnabled = enabled
+        saveEntries()
+        markEntryDirty(entryId: id, operation: "upsert")
+        logger.info("Env var \(entries[idx].key) \(enabled ? "enabled" : "disabled")")
+    }
+
     func updateNote(id: String, note: String) {
         guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
         entries[idx].note = note
@@ -488,7 +506,7 @@ final class EnvVarStore: ObservableObject {
               let entries = try? JSONDecoder().decode([EnvVarEntry].self, from: data) else {
             return dict
         }
-        for entry in entries {
+        for entry in entries where entry.isEnabled {
             if let val = Self.loadValue(forKey: entry.key) {
                 dict[entry.key] = val
             }

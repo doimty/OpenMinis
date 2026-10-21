@@ -13,7 +13,7 @@ def main():
  def check(name,ok):
   checks.append({'name':name,'ok':bool(ok)})
   if not ok:raise RuntimeError(name)
- swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift']
+ swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift','src/ios/Agent/Chat/AskUserPrompt.swift','scripts/ask-user-tests/main.swift']
  for fn in swift:
   raw=(P/fn).read_bytes();tree=parser.parse(raw)
   if fn.endswith('DebugJSONRPC.swift'):
@@ -66,6 +66,17 @@ def main():
  check('jump flash is a non-intercepting ring','cv.addSubview(marker)' in listv3 and 'marker.isUserInteractionEnabled = false' in listv3)
  check('search keywords are bounded','static let maxKeywords = 6' in searchquery)
  check('search files are compiled sources',project.count('A45020261020000000000005')==2 and project.count('A45020261020000000000007')==2)
+ tools=(P/'src/ios/Agent/Chat/AIChatViewModel+ToolDefinitions.swift').read_text();execsrc=(P/'src/ios/Agent/Chat/AIChatViewModel+ConcurrentTools.swift').read_text();mgr=(P/'src/ios/Agent/Chat/AskUserManager.swift').read_text();sheet=(P/'src/ios/Views/Chat/AskUserSheet.swift').read_text();prompt=(P/'src/ios/Agent/Chat/AskUserPrompt.swift').read_text()
+ check('ask_user tool is declared','name: "ask_user"' in tools and '"options"' in tools)
+ check('ask_user suspends the turn','await AskUserManager.shared.ask(prompt)' in execsrc)
+ check('ask_user result feeds the model','prompt.resultJSON(selected: selected, freeText: freeText)' in execsrc)
+ check('question can be cancelled and times out','withTaskCancellationHandler' in mgr and 'timeoutTask' in mgr)
+ check('question resumes exactly once','request.continuation.resume(returning:' in mgr)
+ check('question card is reachable from chat','.modifier(AskUserSheetModifier())' in chatview)
+ check('question card cannot be swiped away unanswered','interactiveDismissDisabled' in sheet and 'onDisappear' in sheet)
+ check('ask_user options are bounded','static let maxOptions = 6' in prompt)
+ check('ask_user files are compiled sources',all(project.count(x)==2 for x in ['A45020261020000000000009','A4502026102000000000000B','A4502026102000000000000D']))
+
 
 
  (out/'results.json').write_text(json.dumps({'scope':__doc__,'checks':checks,'swift_native':'NOT RUN','ios_build':'NOT RUN','ready_to_release':False},indent=2))

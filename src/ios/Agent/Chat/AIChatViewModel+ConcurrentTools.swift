@@ -913,6 +913,37 @@ extension AIChatViewModel {
                 toolSuccess = false
             }
 
+        case "ask_user":
+            // [T-ask-user] The tool call suspends here until the card is
+            // answered, cancelled, timed out, or the turn is stopped.
+            let parsedPrompt = AskUserPrompt.parse(
+                question: (toolArgs["question"] as? String) ?? "",
+                header: toolArgs["header"] as? String,
+                options: toolArgs["options"] as? String,
+                allowsFreeText: toolArgs["allow_free_text"] as? Bool
+            )
+            guard let prompt = parsedPrompt else {
+                toolOutput = "{\"ok\":false,\"error\":\"question is required\"}"
+                toolSuccess = false
+                break
+            }
+            if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
+                messages[msgIdx].blocks[blockIdx].content = "Waiting for your answer…"
+            }
+            let answer = await AskUserManager.shared.ask(prompt)
+            switch answer {
+            case .answered(let selected, let freeText):
+                toolOutput = prompt.resultJSON(selected: selected, freeText: freeText)
+                toolSuccess = true
+            case .busy:
+                toolOutput = "{\"ok\":false,\"error\":\"another question is already waiting for an answer\"}"
+                toolSuccess = false
+            case .cancelled:
+                toolOutput = AskUserPrompt.cancelledJSON
+                toolSuccess = false
+            }
+            break
+
         case "memory_write":
             let memResult = executeMemoryWrite(from: argsJson)
             if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {

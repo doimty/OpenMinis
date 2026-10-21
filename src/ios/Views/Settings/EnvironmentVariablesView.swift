@@ -156,7 +156,13 @@ struct EnvironmentVariablesView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if !entry.isEnabled {
+                    Text("Disabled — not injected into the shell")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
             }
+            .opacity(entry.isEnabled ? 1 : 0.5)
 
             Spacer()
 
@@ -191,6 +197,15 @@ struct EnvironmentVariablesView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             editingEntry = entry
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                store.setEnabled(id: entry.id, enabled: !entry.isEnabled)
+            } label: {
+                Label(entry.isEnabled ? AppLocalized("Disable") : AppLocalized("Enable"),
+                      systemImage: entry.isEnabled ? "pause.circle" : "play.circle")
+            }
+            .tint(entry.isEnabled ? .orange : .green)
         }
     }
 
