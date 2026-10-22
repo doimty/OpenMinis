@@ -36,7 +36,7 @@ echo "== baseline =="
 # on "unable to load standard library", which proves nothing about the tests.
 mutant_args=()
 for arg in "${sdk_args[@]}"; do
-  mutant_args+=(--swift-arg "$arg")
+  mutant_args+=("--swift-arg=$arg")
 done
 
 echo "== mutants =="

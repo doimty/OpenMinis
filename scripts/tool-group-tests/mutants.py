@@ -52,6 +52,10 @@ def main() -> int:
             failures.append(f"{name}: mutant did not compile")
             print(f"INVALID {name}: compile failed\n{build.stderr[:600]}")
             continue
+        if not binary.exists():
+            failures.append(f"{name}: compiler reported success but produced no binary")
+            print(f"INVALID {name}: no binary produced")
+            continue
         run = subprocess.run([str(binary)], capture_output=True, text=True)
         if run.returncode == 0:
             failures.append(f"{name}: survived")
