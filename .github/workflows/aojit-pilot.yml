@@ -36,11 +36,13 @@ jobs:
       - name: Install build tools
         run: |
           set -euo pipefail
-          brew install meson ninja libarchive pkg-config
+          brew install meson ninja libarchive pkg-config lld llvm
+          echo "/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin" >> "$GITHUB_PATH"
 
       - name: Build the ish CLI with the JIT enabled
         run: |
           set -euo pipefail
+          export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
           cd deps/ish
           meson setup build-cli \
             --buildtype=release \
