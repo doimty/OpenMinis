@@ -17,7 +17,7 @@ env:
   EXPECTED_XCODE: "Xcode 26.2"
   EXPECTED_XCODE_BUILD: "Build version 17C52"
   EXPECTED_IOS_SDK: "26.2"
-  EXPECTED_ISH: "e6521d9cfe9cd48f19917fc3b23aea622ba358b4"
+  EXPECTED_ISH: "c5c264da19148512167aa493d7bd4e50aae1b74e"
   NATIVE_CXX_SHA: 1648fc13a04a90521a2ef3887885ef2506208605
   ONNX_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/onnxruntime.xcframework.zip
   ONNX_SHA256: 498ba860229e0ce45e6983ce44478a836b0c0763451ed37a8b1f8e74a8a0dc1f
