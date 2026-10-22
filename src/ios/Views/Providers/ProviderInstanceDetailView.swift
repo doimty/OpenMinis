@@ -5,6 +5,8 @@ import SwiftUI
 struct ProviderInstanceDetailView: View {
     let instanceId: String
     @ObservedObject private var store = ProviderConfigStore.shared
+    /// [T-provider-balance] Singleton state machine; observed, not owned.
+    @ObservedObject private var balanceService = BalanceService.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var editingLabel = ""
@@ -235,6 +237,9 @@ struct ProviderInstanceDetailView: View {
                      : "OAuth tokens are stored per-instance in the iOS Keychain.")
             }
 
+            // MARK: Balance (only where the vendor publishes one)
+            balanceSection(instance)
+
             // MARK: Custom Base URL
             customBaseURLSection(instance)
 
@@ -454,6 +459,136 @@ struct ProviderInstanceDetailView: View {
                     .foregroundStyle(.secondary)
                     .compatPresentationDetents([.medium])
             }
+        }
+    }
+
+    // MARK: - Balance Section
+
+    /// Only API-key instances get a balance row: OAuth providers (Copilot,
+    /// Kimi Code, xAI) have no balance API, and a permanent dead row would be
+    /// noise. It is also not a token-usage figure — that lives in Usage Stats.
+    @ViewBuilder
+    private func balanceSection(_ instance: ProviderInstance) -> some View {
+        if instance.credentialType == .apiKey {
+            Section {
+                balanceRows(instance)
+            } header: {
+                Text("Balance")
+            } footer: {
+                balanceFooter(instance)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func balanceRows(_ instance: ProviderInstance) -> some View {
+        switch balanceService.state(for: instance.id) {
+        case .idle:
+            Button("Check Balance") {
+                balanceService.refresh(instance, force: true)
+            }
+            .onAppear { balanceService.refresh(instance) }
+
+        case .loading:
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Checking…")
+                    .foregroundStyle(.secondary)
+            }
+
+        case .ready(let report, let fetchedAt):
+            ForEach(Array(report.amounts.enumerated()), id: \.offset) { _, amount in
+                HStack {
+                    Text(Self.balanceLabel(amount.kind))
+                    Spacer()
+                    Text(Self.balanceValue(amount))
+                        .monospacedDigit()
+                }
+            }
+            HStack {
+                Text(Self.balanceTimestamp(fetchedAt))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Refresh") {
+                    balanceService.refresh(instance, force: true)
+                }
+                .font(.footnote)
+            }
+
+        case .missingCredential:
+            Text("Save an API key to check the balance.")
+                .foregroundStyle(.secondary)
+
+        case .unsupported(let reason):
+            Text(Self.balanceUnsupportedText(reason))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+        case .failed(let message):
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.red)
+            Button("Try Again") {
+                balanceService.refresh(instance, force: true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func balanceFooter(_ instance: ProviderInstance) -> some View {
+        switch balanceService.state(for: instance.id) {
+        case .ready(let report, _) where report.remainingIsDerived:
+            Text("Remaining is calculated from credits minus usage, not reported by the provider.")
+        case .unsupported(.customEndpoint):
+            Text("Custom endpoints are not queried: an API key is only sent to a provider's own host.")
+        case .unsupported(.noPublicEndpoint):
+            Text("This provider does not publish an account-balance API for API keys.")
+        default:
+            EmptyView()
+        }
+    }
+
+    static func balanceLabel(_ kind: BalanceAmountKind) -> String {
+        switch kind {
+        case .available: return AppLocalized("Available")
+        case .granted: return AppLocalized("Granted")
+        case .toppedUp: return AppLocalized("Topped up")
+        case .cash: return AppLocalized("Cash")
+        case .voucher: return AppLocalized("Voucher")
+        case .totalCredits: return AppLocalized("Credits purchased")
+        case .totalUsage: return AppLocalized("Usage")
+        case .remaining: return AppLocalized("Remaining (calculated)")
+        case .total: return AppLocalized("Total")
+        }
+    }
+
+    static func balanceValue(_ amount: BalanceAmount) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let number = formatter.string(from: NSNumber(value: amount.value)) ?? String(amount.value)
+        return amount.currency.isEmpty ? number : "\(amount.currency) \(number)"
+    }
+
+    static func balanceTimestamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return String(format: AppLocalized("Updated %@"), formatter.string(from: date))
+    }
+
+    static func balanceUnsupportedText(_ reason: BalanceUnsupportedReason) -> String {
+        switch reason {
+        case .noPublicEndpoint:
+            return AppLocalized("This provider does not publish an account-balance API for API keys.")
+        case .customEndpoint:
+            return AppLocalized("This is a custom or relay endpoint; the balance API is not known for it.")
+        case .oauthCredential:
+            return AppLocalized("OAuth sign-in has no account-balance API.")
+        case .insecureScheme:
+            return AppLocalized("The base URL must use HTTPS to query a balance.")
         }
     }
 

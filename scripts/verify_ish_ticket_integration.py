@@ -13,7 +13,7 @@ def main():
  def check(name,ok):
   checks.append({'name':name,'ok':bool(ok)})
   if not ok:raise RuntimeError(name)
- swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift','src/ios/Agent/Chat/AskUserPrompt.swift','scripts/ask-user-tests/main.swift','src/ios/Views/Chat/ChatPDFExporter.swift','src/ios/Views/Chat/ChatPDFText.swift','scripts/chat-pdf-tests/main.swift','src/ios/Agent/MessageList/ToolGroupProjection.swift','src/ios/Agent/MessageList/ToolGroupObserver.swift','src/ios/Views/Chat/ToolGroupRow.swift','scripts/tool-group-tests/main.swift']
+ swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift','src/ios/Agent/Chat/AskUserPrompt.swift','scripts/ask-user-tests/main.swift','src/ios/Views/Chat/ChatPDFExporter.swift','src/ios/Views/Chat/ChatPDFText.swift','scripts/chat-pdf-tests/main.swift','src/ios/Agent/MessageList/ToolGroupProjection.swift','src/ios/Agent/MessageList/ToolGroupObserver.swift','src/ios/Views/Chat/ToolGroupRow.swift','scripts/tool-group-tests/main.swift','src/ios/Providers/BalanceLookup.swift','src/ios/Providers/BalanceService.swift','scripts/balance-tests/main.swift']
  for fn in swift:
   raw=(P/fn).read_bytes();tree=parser.parse(raw)
   if fn.endswith('DebugJSONRPC.swift'):
@@ -96,6 +96,21 @@ def main():
  check('group owners drive search screenshot and live exclusion','expandedToolGroups.formUnion(matching)' in listv3 and 'ownerMessageIDs(groups: toolGroups)' in listv3)
  check('expansion is memory only and session scoped','expandedToolGroups.removeAll()' in listv3 and 'toolGroupSessionID' in listv3)
  check('expansion preserves the visible anchor','restoreToolGroupAnchor' in listv3 and 'preserveAnchor' in listv3)
+ bal=(P/'src/ios/Providers/BalanceLookup.swift').read_text();bsvc=(P/'src/ios/Providers/BalanceService.swift').read_text();pdetail=(P/'src/ios/Views/Providers/ProviderInstanceDetailView.swift').read_text()
+ check('balance lookup is Foundation only','import UIKit' not in bal and 'import SwiftUI' not in bal)
+ check('balance routing rebuilds from the origin','components.path = path' in bal and 'raw + path' not in bal)
+ check('balance refuses plain HTTP',"url.scheme?.lowercased() == \"https\"" in bal)
+ check('balance never queries unknown hosts','case .customEndpoint' in bal or '.customEndpoint' in bal)
+ check('balance distinguishes official unsupported hosts','"api.openai.com", "api.anthropic.com"' in bal)
+ check('balance maps auth and missing endpoints','case 401, 403:' in bal and 'case 404, 405:' in bal)
+ check('balance flags locally derived remainder','remainingIsDerived: derived' in bal)
+ check('balance never treats booleans as amounts','CFBooleanGetTypeID' in bal)
+ check('balance section is gated to API-key instances','if instance.credentialType == .apiKey {' in pdetail and 'balanceSection(instance)' in pdetail)
+ check('balance labels the derived remainder in the UI','not reported by the provider' in pdetail)
+ check('balance key is only placed in the request header',r'setValue("Bearer \(key)"' in bsvc and 'AppLogger' not in bsvc and 'print(' not in bsvc)
+ check('balance queries only on demand with a cache window','static let cacheLifetime: TimeInterval = 300' in bsvc and 'inFlight' in bsvc)
+ check('balance files are compiled sources',all(project.count(x)==2 for x in ['A45020261020000000000019','A4502026102000000000001B']) and all(project.count(x)==3 for x in ['A4502026102000000000001A','A4502026102000000000001C']))
+ check('balance regression runs in the native cloud job','bash scripts/test_balance.sh' in (P/'.github/workflows/ish-execution-ticket-build.yml').read_text())
  check('tool group regression runs in the native cloud job','bash scripts/test_tool_groups.sh' in (P/'.github/workflows/ish-execution-ticket-build.yml').read_text())
  check('tool group mutations are gated on compiled mutants','mutant did not compile' in (P/'scripts/tool-group-tests/mutants.py').read_text())
  lines=project.split('\n')

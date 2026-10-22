@@ -209,6 +209,8 @@
 		E5CR00003 /* CrashSignalHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = E5CR00013 /* CrashSignalHandler.m */; };
 		E5D00001 /* ProviderTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00011 /* ProviderTypes.swift */; };
 		E5D00002 /* ProviderInstance.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00012 /* ProviderInstance.swift */; };
+		A45020261020000000000019 /* BalanceLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4502026102000000000001A /* BalanceLookup.swift */; };
+		A4502026102000000000001B /* BalanceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4502026102000000000001C /* BalanceService.swift */; };
 		E5D00003 /* ModelEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00013 /* ModelEntry.swift */; };
 		E5D00004 /* ModelGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00014 /* ModelGroup.swift */; };
 		E5D00005 /* ProviderConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00015 /* ProviderConfigStore.swift */; };
@@ -919,6 +921,8 @@
 		E5CR00014 /* CrashSignalHandler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CrashSignalHandler.h; sourceTree = "<group>"; };
 		E5D00011 /* ProviderTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderTypes.swift; sourceTree = "<group>"; };
 		E5D00012 /* ProviderInstance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderInstance.swift; sourceTree = "<group>"; };
+		A4502026102000000000001A /* BalanceLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceLookup.swift; sourceTree = "<group>"; };
+		A4502026102000000000001C /* BalanceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BalanceService.swift; sourceTree = "<group>"; };
 		E5D00013 /* ModelEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelEntry.swift; sourceTree = "<group>"; };
 		E5D00014 /* ModelGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelGroup.swift; sourceTree = "<group>"; };
 		E5D00015 /* ProviderConfigStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigStore.swift; sourceTree = "<group>"; };
@@ -1629,6 +1633,8 @@
 				F9A000000000000000000002 /* ResponsesToolArguments.swift */,
 				E5D00011 /* ProviderTypes.swift */,
 				E5D00012 /* ProviderInstance.swift */,
+				A4502026102000000000001A /* BalanceLookup.swift */,
+				A4502026102000000000001C /* BalanceService.swift */,
 				E5D00013 /* ModelEntry.swift */,
 				E5D00014 /* ModelGroup.swift */,
 				E5TLC0002 /* ThinkingLevelCatalog.swift */,
@@ -3138,6 +3144,8 @@
 				E7A000002 /* OpenRouterOAuthManager.swift in Sources */,
 				E5D00001 /* ProviderTypes.swift in Sources */,
 				E5D00002 /* ProviderInstance.swift in Sources */,
+				A45020261020000000000019 /* BalanceLookup.swift in Sources */,
+				A4502026102000000000001B /* BalanceService.swift in Sources */,
 				E5D00003 /* ModelEntry.swift in Sources */,
 				E5D00004 /* ModelGroup.swift in Sources */,
 				E5TLC0001 /* ThinkingLevelCatalog.swift in Sources */,
