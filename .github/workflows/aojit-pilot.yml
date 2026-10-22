@@ -9,6 +9,8 @@ name: AOJIT busybox pilot (record one image)
 # three-way verification, device measurement) is a separate change.
 
 on:
+  push:
+    branches: [feat/aojit-pilot-20261022]
   workflow_dispatch:
 
 permissions:
