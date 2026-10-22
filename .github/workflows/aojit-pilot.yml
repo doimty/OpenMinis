@@ -1,0 +1,103 @@
+name: AOJIT busybox pilot (record one image)
+
+# Stage 2 of AOJIT: prove we can record an AOT image for OUR kernel abi and OUR
+# rootfs, then assemble it for iOS. This job does NOT change the app and does not
+# ship anything; it uploads the .S/.o plus the recording log for evaluation.
+#
+# Manual only, on its own branch, so a failure here cannot touch the mainline
+# build. Everything after this stage (link into the app, runtime fallback,
+# three-way verification, device measurement) is a separate change.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  record-busybox:
+    name: Record and assemble the busybox image
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - name: Checkout with the pinned kernel
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Assert the kernel pin
+        run: |
+          set -euo pipefail
+          test "$(git -C deps/ish rev-parse HEAD)" = "c5c264da19148512167aa493d7bd4e50aae1b74e"
+
+      - name: Install build tools
+        run: |
+          set -euo pipefail
+          brew install meson ninja libarchive pkg-config
+
+      - name: Build the ish CLI with the JIT enabled
+        run: |
+          set -euo pipefail
+          cd deps/ish
+          meson setup build-cli \
+            --buildtype=release \
+            -Dkernel=ish \
+            -Dengine=asbestos \
+            -Dguest_arch=arm64 \
+            -Djit=true
+          ninja -C build-cli ish
+          ./build-cli/ish -h 2>&1 | head -20 || true
+
+      - name: Prepare the arm64 rootfs
+        run: |
+          set -euo pipefail
+          ./deps/prepare_alpine_rootfs.sh
+          ls deps/resources
+
+      - name: Install the AOJIT guest suite
+        run: |
+          set -euo pipefail
+          ROOTFS="$(find deps/resources -maxdepth 1 -type d -name '*rootfs*' | head -1)"
+          test -n "$ROOTFS"
+          echo "ROOTFS=$ROOTFS" >> "$GITHUB_ENV"
+          sh benchmark/aojit/install.sh deps/ish/build-cli/ish "$ROOTFS"
+
+      - name: Record the busybox image for this abi
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          cat "$ROOTFS/etc/alpine-release" || true
+          RECORDING="$PWD/out/busybox_rec.jsonl" \
+            sh tools/jit_aot/record.sh \
+              deps/ish/build-cli/ish "$ROOTFS" \
+              /tmp/aojit/busybox/busybox_train.sh \
+              out/aot_busybox.S busybox
+          ls -la out
+
+      - name: Assemble the image for iOS
+        run: |
+          set -euo pipefail
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun --sdk iphoneos clang -arch arm64 -isysroot "$SDK" -O2 \
+            -c out/aot_busybox.S -o out/aot_busybox_ios.o
+          file out/aot_busybox_ios.o
+          ls -la out
+
+      - name: Note the ABI that produced the image
+        if: always()
+        run: |
+          set +e
+          if [[ -n "${ROOTFS:-}" && -f "$ROOTFS/proc/ish/jit" ]]; then cat "$ROOTFS/proc/ish/jit"; fi
+          grep -o 'jit_abi[^,)]*' deps/ish/asbestos/guest-arm64/jit.c | head -5
+          true
+
+      - name: Upload the image and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: aojit-busybox-pilot
+          path: |
+            out/**
+          if-no-files-found: warn
+          retention-days: 14
