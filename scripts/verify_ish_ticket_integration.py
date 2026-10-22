@@ -98,6 +98,14 @@ def main():
  check('expansion preserves the visible anchor','restoreToolGroupAnchor' in listv3 and 'preserveAnchor' in listv3)
  check('tool group regression runs in the native cloud job','bash scripts/test_tool_groups.sh' in (P/'.github/workflows/ish-execution-ticket-build.yml').read_text())
  check('tool group mutations are gated on compiled mutants','mutant did not compile' in (P/'scripts/tool-group-tests/mutants.py').read_text())
+ lines=project.split('\n')
+ def near(a,b,span=8):
+  ia=[i for i,l in enumerate(lines) if a in l]; ib=[i for i,l in enumerate(lines) if b in l]
+  return bool(ia and ib) and abs(ia[0]-ib[0])<=span
+ check('projection and observer sit in the MessageList group',
+       near('ToolGroupProjection.swift */,','CollectionViewMessageListV3.swift */,') and near('ToolGroupObserver.swift */,','CollectionViewMessageListV3.swift */,'))
+ check('group row sits with the other chat views',
+       near('ToolGroupRow.swift */,','ChatPDFText.swift */,'))
  check('tool group files are compiled sources',all(project.count(x)==2 for x in ['A45020261020000000000013','A45020261020000000000015','A45020261020000000000017']) and all(project.count(x)==3 for x in ['A45020261020000000000014','A45020261020000000000016','A45020261020000000000018']))
 
 

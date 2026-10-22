@@ -2207,6 +2207,7 @@
 			children = (
 				E5V300011 /* CollectionViewMessageListV3.swift */,
 				A45020261020000000000014 /* ToolGroupProjection.swift */,
+				A45020261020000000000016 /* ToolGroupObserver.swift */,
 				F1A00021 /* MessageListInfrastructure.swift */,
 				E5V100011 /* MessageListLayout.swift */,
 			);
@@ -2349,7 +2350,6 @@
 				A45020261020000000000008 /* ChatSearchView.swift */,
 				A4502026102000000000000E /* AskUserSheet.swift */,
 				A45020261020000000000010 /* ChatPDFExporter.swift */,
-				A45020261020000000000016 /* ToolGroupObserver.swift */,
 				A45020261020000000000018 /* ToolGroupRow.swift */,
 				A45020261020000000000012 /* ChatPDFText.swift */,
 				E5F200011 /* MarkdownPrepRegex.swift */,
