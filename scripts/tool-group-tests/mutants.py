@@ -27,6 +27,8 @@ def main() -> int:
     ap.add_argument("--source", required=True, type=pathlib.Path)
     ap.add_argument("--test", required=True, type=pathlib.Path)
     ap.add_argument("--work", required=True, type=pathlib.Path)
+    ap.add_argument("--swift-arg", action="append", default=[],
+                    help="extra swiftc argument, repeated in order (SDK/target)")
     args = ap.parse_args()
 
     original = args.source.read_text()
@@ -43,7 +45,8 @@ def main() -> int:
         mutated_path.write_text(original.replace(old, new, 1))
         binary = args.work / name
         build = subprocess.run(
-            [args.swiftc, "-swift-version", "5", str(mutated_path), str(args.test), "-o", str(binary)],
+            [args.swiftc, "-swift-version", "5", *args.swift_arg,
+             str(mutated_path), str(args.test), "-o", str(binary)],
             capture_output=True, text=True)
         if build.returncode != 0:
             failures.append(f"{name}: mutant did not compile")

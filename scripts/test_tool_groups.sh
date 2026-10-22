@@ -31,9 +31,18 @@ echo "== baseline =="
 "$compiler" -swift-version 5 "${sdk_args[@]}" "$PRODUCTION" "$TESTS" -o "$tmp/tool-group-tests"
 "$tmp/tool-group-tests"
 
+# Mutants must compile with the SAME SDK/target as the baseline. Without it the
+# compiler defaults to the runner's own deployment target and every mutant dies
+# on "unable to load standard library", which proves nothing about the tests.
+mutant_args=()
+for arg in "${sdk_args[@]}"; do
+  mutant_args+=(--swift-arg "$arg")
+done
+
 echo "== mutants =="
 python3 "$ROOT/scripts/tool-group-tests/mutants.py" \
   --swiftc "$compiler" \
   --source "$PRODUCTION" \
   --test "$TESTS" \
-  --work "$tmp/mutants"
+  --work "$tmp/mutants" \
+  "${mutant_args[@]}"
