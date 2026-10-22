@@ -13,7 +13,7 @@ def main():
  def check(name,ok):
   checks.append({'name':name,'ok':bool(ok)})
   if not ok:raise RuntimeError(name)
- swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift','src/ios/Agent/Chat/AskUserPrompt.swift','scripts/ask-user-tests/main.swift','src/ios/Views/Chat/ChatPDFExporter.swift','src/ios/Views/Chat/ChatPDFText.swift','scripts/chat-pdf-tests/main.swift']
+ swift=['src/ios/Agent/ISH/ISHExecutionCoordinator.swift','src/ios/Agent/ISH/ISHCommandLifecycle.swift','src/ios/Agent/ISH/ISHTerminalShellLifecycle.swift','src/ios/Agent/ISH/MinisFsRouter.swift','src/ios/Views/Rootfs/ISHTerminalView.swift','src/ios/Debug/DebugJSONRPC.swift','scripts/ish-lifecycle-tests/main.swift','scripts/ish-terminal-tests/main.swift','src/ios/Agent/Chat/ChatSearchQuery.swift','src/ios/Views/Chat/ChatSearchView.swift','scripts/chat-search-tests/main.swift','src/ios/Agent/Chat/AskUserPrompt.swift','scripts/ask-user-tests/main.swift','src/ios/Views/Chat/ChatPDFExporter.swift','src/ios/Views/Chat/ChatPDFText.swift','scripts/chat-pdf-tests/main.swift','src/ios/Agent/MessageList/ToolGroupProjection.swift','src/ios/Agent/MessageList/ToolGroupObserver.swift','src/ios/Views/Chat/ToolGroupRow.swift','scripts/tool-group-tests/main.swift']
  for fn in swift:
   raw=(P/fn).read_bytes();tree=parser.parse(raw)
   if fn.endswith('DebugJSONRPC.swift'):
@@ -83,6 +83,23 @@ def main():
  check('PDF export drops thinking and summarizes tools','case .thinking:' in pdf and 'toolLine' in pdf)
  check('PDF export file is a compiled source',project.count('A4502026102000000000000F')==2 and project.count('A45020261020000000000010')==3)
  check('PDF naming helper is a compiled source',project.count('A45020261020000000000011')==2 and project.count('A45020261020000000000012')==3)
+ group=(P/'src/ios/Agent/MessageList/ToolGroupProjection.swift').read_text();grow=(P/'src/ios/Views/Chat/ToolGroupRow.swift').read_text();gobs=(P/'src/ios/Agent/MessageList/ToolGroupObserver.swift').read_text()
+ check('tool groups fold only explicit tool kinds','case .shellTool, .fileReadTool, .fileWriteTool, .fileEditTool,' in listv3 and 'toolItems.insert(item)' in listv3)
+ check('tool group formation keeps the original ordered stream','ToolGroupProjection.build(items: newItems, toolItems: toolItems,' in listv3 and 'result.append(item)' in group)
+ check('single tool call never collapses','if run.count >= 2' in group and 'result.append(first.item)' in group)
+ check('group identity is anchored by the first block','let id = ToolGroupID(messageID: first.messageID, blockID: first.blockID)' in group)
+ check('descriptor change survives the snapshot fast path','previous[id] != groups[id]' in group and 'changedGroupRows.isEmpty' in listv3)
+ check('changed group is explicitly reconfigured','snapshot.reconfigureItems(changedGroupRows)' in listv3)
+ check('group row observes real tool status','block.$toolStatus' in gobs and 'ToolGroupSummary(phases:' in gobs)
+ check('group row keeps a reachable stop control','assistantToolGroupStop' in grow and 'Button(action: onStop)' in grow)
+ check('group row is a fixed single line','static let rowHeight: CGFloat = 44' in group and 'ToolGroupMetrics.rowHeight' in grow)
+ check('group owners drive search screenshot and live exclusion','expandedToolGroups.formUnion(matching)' in listv3 and 'ownerMessageIDs(groups: toolGroups)' in listv3)
+ check('expansion is memory only and session scoped','expandedToolGroups.removeAll()' in listv3 and 'toolGroupSessionID' in listv3)
+ check('expansion preserves the visible anchor','restoreToolGroupAnchor' in listv3 and 'preserveAnchor' in listv3)
+ check('tool group regression runs in the native cloud job','bash scripts/test_tool_groups.sh' in (P/'.github/workflows/ish-execution-ticket-build.yml').read_text())
+ check('tool group mutations are gated on compiled mutants','mutant did not compile' in (P/'scripts/tool-group-tests/mutants.py').read_text())
+ check('tool group files are compiled sources',all(project.count(x)==2 for x in ['A45020261020000000000013','A45020261020000000000015','A45020261020000000000017']) and all(project.count(x)==3 for x in ['A45020261020000000000014','A45020261020000000000016','A45020261020000000000018']))
+
 
 
 

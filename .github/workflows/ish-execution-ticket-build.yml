@@ -76,6 +76,11 @@ jobs:
           set -euo pipefail
           bash scripts/test_chat_pdf.sh 2>&1 | tee "$RUNNER_TEMP/chat-pdf-tests.log"
 
+      - name: Native tool group regression
+        run: |
+          set -euo pipefail
+          bash scripts/test_tool_groups.sh 2>&1 | tee "$RUNNER_TEMP/tool-group-tests.log"
+
       - name: Host production identity and cleanup-helper tests
         run: |
           set -euo pipefail
@@ -173,6 +178,7 @@ jobs:
             ${{ runner.temp }}/chat-search-tests.log
             ${{ runner.temp }}/ask-user-tests.log
             ${{ runner.temp }}/chat-pdf-tests.log
+            ${{ runner.temp }}/tool-group-tests.log
             ${{ runner.temp }}/ish-ticket/**
             ${{ runner.temp }}/ios-build/xcodebuild.log
           if-no-files-found: warn

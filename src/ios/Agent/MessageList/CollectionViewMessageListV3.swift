@@ -885,6 +885,7 @@ struct HeightLRU {
 private final class WholeMessageCellV3: SelfSizingCell {}
 private final class AssistantHeaderCellV3: SelfSizingCell {}
 private final class AssistantBlockCellV3: SelfSizingCell {}
+private final class AssistantToolGroupCellV3: SelfSizingCell {}
 private final class AssistantFooterCellV3: SelfSizingCell {}
 
 // MARK: - V3 Coordinator
@@ -985,6 +986,13 @@ extension CollectionViewMessageListV3 {
 
         // === Snapshot State ===
         private var previousSnapshotIds: [MessageListItem] = []
+        // Group membership is snapshot-locked, independent of diffable identity.
+        // Expansion is UI-only; never written to ChatMessage or tool execution.
+        private var toolGroups: [ToolGroupID: ToolGroupDescriptor] = [:]
+        private var expandedToolGroups: Set<ToolGroupID> = []
+        private var previouslyExpandedToolGroups: Set<ToolGroupID> = []
+        private var toolGroupSessionID: String?
+        private var toolGroupToggleGeneration: UInt = 0
 
         /// [T-ios-first-block-footer-gap] Per-message block count as of the last
         /// applied snapshot, used to detect the 0 -> >=1 edge that collapses the
@@ -1255,6 +1263,10 @@ extension CollectionViewMessageListV3 {
                 [weak self] cell, indexPath, item in
                 self?.configureCell(cell, item: item, indexPath: indexPath)
             }
+            let groupReg = UICollectionView.CellRegistration<AssistantToolGroupCellV3, MessageListItem> {
+                [weak self] cell, indexPath, item in
+                self?.configureCell(cell, item: item, indexPath: indexPath)
+            }
             let footerReg = UICollectionView.CellRegistration<AssistantFooterCellV3, MessageListItem> {
                 [weak self] cell, indexPath, item in
                 self?.configureCell(cell, item: item, indexPath: indexPath)
@@ -1270,6 +1282,8 @@ extension CollectionViewMessageListV3 {
                     return cv.dequeueConfiguredReusableCell(using: headerReg, for: indexPath, item: item)
                 case .assistantBlock:
                     return cv.dequeueConfiguredReusableCell(using: blockReg, for: indexPath, item: item)
+                case .assistantToolGroup:
+                    return cv.dequeueConfiguredReusableCell(using: groupReg, for: indexPath, item: item)
                 case .assistantFooter:
                     return cv.dequeueConfiguredReusableCell(using: footerReg, for: indexPath, item: item)
                 }
@@ -1489,6 +1503,30 @@ extension CollectionViewMessageListV3 {
                     .environmentObject(vm)
                 }
 
+            case .assistantToolGroup(let id):
+                guard let group = toolGroups[id] else { return }
+                let blocks = group.members.compactMap { member -> AssistantBlock? in
+                    guard let index = messageIndex[member.messageID], index < messages.count else { return nil }
+                    return messages[index].blocks.first(where: { $0.id == member.blockID })
+                }
+                let expanded = expandedToolGroups.contains(id)
+                // Reset the status observer when membership/expansion changes.
+                // A StateObject without this identity would retain old members.
+                let observerIdentity = ToolGroupObserverIdentity(
+                    members: blocks.map { ObjectIdentifier($0) }, expanded: expanded)
+                cell.backgroundColor = .clear
+                cell.applyHostedContent(parent: viewController) {
+                    ToolGroupRow(blocks: blocks, isExpanded: expanded,
+                                 onToggle: { [weak self] in self?.toggleToolGroup(id) },
+                                 onStop: { [weak self] in self?.onStop?() })
+                        .id(observerIdentity)
+                        .frame(maxWidth: width > 0 ? width : nil, alignment: .leading)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .transaction { $0.disablesAnimations = true }
+                        .environmentObject(vm)
+                }
+
             case .assistantFooter(let msgId):
                 guard let msgIdx = messageIndex[msgId], msgIdx < messages.count else { return }
                 let message = messages[msgIdx]
@@ -1574,8 +1612,9 @@ extension CollectionViewMessageListV3 {
                 let isLiveCompactRow: Bool = itemMsgId.flatMap { id in
                     messageIndex[id].map { messages[$0] }
                 }.map { $0.role == .systemInfo && $0.isCompactLoading } ?? false
+                let liveIDs = liveAssistantIds(in: messages, isProcessing: vm.isProcessing)
                 let isStreamingCell = isLiveCompactRow
-                    || (itemMsgId.map { liveAssistantIds(in: messages, isProcessing: vm.isProcessing).contains($0) } ?? false)
+                    || !item.ownerMessageIDs(groups: toolGroups).isDisjoint(with: liveIDs)
                 if isStreamingCell {
                     cell.contentKey = nil
                     layout.invalidateMemo(forKey: key)
@@ -2746,6 +2785,13 @@ extension CollectionViewMessageListV3 {
 
         private func applySnapshot(messages rawMessages: [ChatMessage], caller: String = "?") {
             guard let vm, !vm.isLoadingSession else { return }
+            if toolGroupSessionID != vm.sessionId {
+                toolGroupSessionID = vm.sessionId
+                expandedToolGroups.removeAll()
+                previouslyExpandedToolGroups.removeAll()
+                toolGroups.removeAll()
+                toolGroupToggleGeneration &+= 1
+            }
             // REENTRY-DIAG-BEGIN
             #if DEBUG
             reentryDiagnosticViewport("snapshot", phase: caller)
@@ -2935,8 +2981,10 @@ extension CollectionViewMessageListV3 {
             cellBridges = cellBridges.filter { currentIds.contains($0.key) }
             lastFooterShapeByMessage = lastFooterShapeByMessage.filter { currentIds.contains($0.key) }
 
-            // Build items
+            // Build the ORIGINAL ordered stream first; never collect tools
+            // separately and move them across text, callbacks or footer rows.
             var newItems: [MessageListItem] = []
+            var toolItems: Set<MessageListItem> = []
             // [T-ios-orphan-user-tail GH#262/#263] The Resume banner lives in
             // the assistant FOOTER cell, and a user row never gets one — so a
             // transcript ending on a user turn that never received a reply had
@@ -2984,7 +3032,15 @@ extension CollectionViewMessageListV3 {
                         // leaving a band of blank space. They now draw a real
                         // real tool capsule, so the cell has content matching
                         // its height and the gap cannot recur.
-                        newItems.append(.assistantBlock(message.id, block.id))
+                        let item = MessageListItem.assistantBlock(message.id, block.id)
+                        newItems.append(item)
+                        switch block.kind {
+                        case .shellTool, .fileReadTool, .fileWriteTool, .fileEditTool,
+                             .browserTool, .readImageTool, .memoryTool, .delegateTool:
+                            toolItems.insert(item)
+                        case .text, .thinking, .info:
+                            break
+                        }
                     }
                     // Only emit a footer cell when it will actually render
                     // content. A footer with zero visible content (no typing
@@ -3013,10 +3069,28 @@ extension CollectionViewMessageListV3 {
             // the first occurrence and log, so a data glitch costs one hidden
             // duplicate row instead of a crash.
             newItems = Self.uniqueItems(newItems, caller: caller)
+            let groupProjection = ToolGroupProjection.build(items: newItems, toolItems: toolItems,
+                                                            expanded: expandedToolGroups)
+            let changedGroups = groupProjection.changedGroups(comparedTo: toolGroups,
+                expanded: expandedToolGroups, previouslyExpanded: previouslyExpandedToolGroups)
+            let changedGroupRows = changedGroups.map { MessageListItem.assistantToolGroup($0) }
+            newItems = groupProjection.items
+            toolGroups = groupProjection.groups
+            expandedToolGroups.formIntersection(Set(toolGroups.keys))
+            previouslyExpandedToolGroups = expandedToolGroups
 
             // Remap height cache + set accurate estimates for ALL item types
             if let layout = viewController?.messageListLayout {
                 layout.updateCacheForSnapshot(oldIds: previousSnapshotIds, newIds: newItems)
+                // Membership changes keep the summary ID stable but must not
+                // keep an old cell/configuration or either layer of height cache.
+                for item in changedGroupRows {
+                    if let oldIndex = previousSnapshotIds.firstIndex(of: item) {
+                        let ip = IndexPath(item: oldIndex, section: 0)
+                        (viewController?.collectionView.cellForItem(at: ip) as? SelfSizingCell)?.clearCachedHeight()
+                    }
+                    if let index = newItems.firstIndex(of: item) { layout.invalidateHeight(at: index) }
+                }
 
                 // [T-ios-first-block-footer-gap] Collapse the footer the moment
                 // a turn's FIRST block appears.
@@ -3233,6 +3307,9 @@ extension CollectionViewMessageListV3 {
                             + "cached=\(layout.cachedHeight(at: i).map { String(format: "%.1f", $0) } ?? "-") "
                             + "precalc=\(layout.precalcHeight(at: i).map { String(format: "%.1f", $0) } ?? "-")")
                         #endif
+
+                    case .assistantToolGroup:
+                        layout.setEstimatedHeight(ToolGroupMetrics.rowHeight, at: i)
 
                     case .assistantBlock(let msgId, let blockId):
                         guard let msgIdx = messageIndex[msgId], msgIdx < messages.count else { continue }
@@ -3453,21 +3530,21 @@ extension CollectionViewMessageListV3 {
                 // still tested only `messages.last`), which is what let a
                 // growing earlier message be frozen at a stale height. One
                 // rule, one implementation.
-                let streamingIds = Array(Self.liveAssistantMessageIds(messages: messages,
-                                                                     isProcessing: true))
+                let streamingIds = Self.liveAssistantMessageIds(messages: messages, isProcessing: true)
                 var ranges: [Range<Int>] = []
-                for id in streamingIds {
-                    // [T-assistant-header-dedup] A message without its own
-                    // header starts at its first block.
-                    guard let start = newItems.firstIndex(where: {
-                        $0 == .assistantHeader(id) || Self.item($0, belongsTo: id)
-                    }) else { continue }
-                    var end = start + 1
-                    while end < newItems.count, Self.item(newItems[end], belongsTo: id) {
-                        end += 1
+                var rangeStart: Int?
+                // A cross-message group may sit BEFORE another owner's block
+                // cells when expanded. Scan ownership per row rather than
+                // assuming every message has a single contiguous item span.
+                for (index, item) in newItems.enumerated() {
+                    if !item.ownerMessageIDs(groups: toolGroups).isDisjoint(with: streamingIds) {
+                        if rangeStart == nil { rangeStart = index }
+                    } else if let start = rangeStart {
+                        ranges.append(start..<index)
+                        rangeStart = nil
                     }
-                    ranges.append(start..<end)
                 }
+                if let start = rangeStart { ranges.append(start..<newItems.count) }
 
                 // [T-ios-compacting-row-vanishes-on-scroll] The live
                 // "Compacting conversation… (N chars)" row counts as streaming
@@ -3519,7 +3596,7 @@ extension CollectionViewMessageListV3 {
             snapshotMessages = messages
             // Skip diffable-data-source apply when items haven't changed —
             // avoids expensive UIKit cell creation/layout on redundant snapshots.
-            if newItems == previousSnapshotIds {
+            if newItems == previousSnapshotIds && changedGroupRows.isEmpty {
                 AppLogger(category: "SnapshotDiag").info("[SnapshotDiag] SKIP caller=\(caller) items unchanged (count=\(newItems.count)) — no re-apply")
                 // [T-ios-bg-resume-collapse] …but a SKIP is exactly wrong for a
                 // flush that was DEFERRED across a suspend window. While
@@ -3605,6 +3682,7 @@ extension CollectionViewMessageListV3 {
             var snapshot = NSDiffableDataSourceSnapshot<Section, MessageListItem>()
             snapshot.appendSections([.main])
             snapshot.appendItems(newItems, toSection: .main)
+            if !changedGroupRows.isEmpty { snapshot.reconfigureItems(changedGroupRows) }
             // Suppress contentOffsetAdjustment during snapshot application so that
             // rapid cell self-sizing doesn't cause visible content jumps. After layout
             // settles, pin to bottom if autoScrolling.
@@ -3722,9 +3800,13 @@ extension CollectionViewMessageListV3 {
                 // would add main-thread hosting-graph re-entries and cut against
                 // the FB13213926 series (b4268586 / 81e43b58 / e9d167c2).
                 var footerDirtyMessageIds = Set<UUID>()
-                for item in inserted {
-                    if case .assistantBlock(let msgId, _) = item {
+                for item in inserted + changedGroupRows {
+                    switch item {
+                    case .assistantBlock(let msgId, _):
                         footerDirtyMessageIds.insert(msgId)
+                    case .assistantToolGroup(let id):
+                        footerDirtyMessageIds.formUnion(toolGroups[id]?.members.map(\.messageID) ?? [])
+                    default: break
                     }
                 }
                 for msgId in footerDirtyMessageIds {
@@ -4033,12 +4115,7 @@ extension CollectionViewMessageListV3 {
         /// item (used to detect the actively streaming message so its cells are
         /// excluded from the height memo).
         static func messageId(of item: MessageListItem) -> UUID? {
-            switch item {
-            case .wholeMessage(let id): return id
-            case .assistantHeader(let id): return id
-            case .assistantFooter(let id): return id
-            case .assistantBlock(let mid, _): return mid
-            }
+            item.messageId
         }
 
         /// [T-ios-earlier-stream-seed-freeze] Ids of every assistant message
@@ -4108,6 +4185,8 @@ extension CollectionViewMessageListV3 {
             case .assistantFooter(let id):
                 let c = msg(id)?.blocks.first?.content ?? ""
                 return "f#\(digest(c))"
+            case .assistantToolGroup(let id):
+                return "g#\(id.blockID.uuidString.prefix(8))"
             case .assistantBlock(let mid, let bid):
                 guard let b = msg(mid)?.blocks.first(where: { $0.id == bid }) else { return "b#?" }
                 let c = b.content
@@ -4130,6 +4209,10 @@ extension CollectionViewMessageListV3 {
                 return "h:\(id.uuidString)"
             case .assistantFooter(let id):
                 return "f:\(id.uuidString)"
+            case .assistantToolGroup(let id):
+                // Fixed single-line frame: membership/status cannot change its
+                // height. Font changes already clear the list's height caches.
+                return "g:\(id.messageID.uuidString):\(id.blockID.uuidString):44"
             case .assistantBlock(let mid, let bid):
                 let block = msg(mid)?.blocks.first(where: { $0.id == bid })
                 let n = block?.content.count ?? 0
@@ -4191,6 +4274,8 @@ extension CollectionViewMessageListV3 {
                 }
             case .assistantHeader:
                 return 28
+            case .assistantToolGroup:
+                return ToolGroupMetrics.rowHeight
             case .assistantBlock(let msgId, let blockId):
                 guard let msg = messages.first(where: { $0.id == msgId }),
                       let block = msg.blocks.first(where: { $0.id == blockId }) else { return 44 }
@@ -4448,9 +4533,12 @@ extension CollectionViewMessageListV3 {
         /// Whether a list item is part of the given assistant message's span
         /// (block or footer — the header is the span's start, matched
         /// separately). [T-stream-hover-earlier-streaming]
-        static func item(_ item: MessageListItem, belongsTo messageId: UUID) -> Bool {
+        static func item(_ item: MessageListItem, belongsTo messageId: UUID,
+                         groups: [ToolGroupID: ToolGroupDescriptor] = [:]) -> Bool {
             switch item {
             case .assistantBlock(let mid, _): return mid == messageId
+            case .assistantToolGroup:
+                return item.ownerMessageIDs(groups: groups).contains(messageId)
             case .assistantFooter(let mid): return mid == messageId
             case .wholeMessage, .assistantHeader: return false
             }
@@ -4488,6 +4576,50 @@ extension CollectionViewMessageListV3 {
             cv.scrollToItem(at: IndexPath(item: item, section: section), at: .bottom, animated: animated)
         }
 
+        // MARK: - Tool group expansion (UI-only)
+
+        private func toggleToolGroup(_ id: ToolGroupID) {
+            guard toolGroups[id] != nil, let vm, !vm.isLoadingSession,
+                  !vm.streamingUIUpdatesSuspended, !isFlushing,
+                  let cv = viewController?.collectionView,
+                  !cv.isTracking, !cv.isDecelerating,
+                  let ip = dataSource.indexPath(for: .assistantToolGroup(id)) else { return }
+            // The summary survives both directions. Keep its viewport Y while
+            // browsing, rather than keeping a raw offset into a changing list.
+            let viewportY = cv.layoutAttributesForItem(at: ip).map { $0.frame.minY - cv.contentOffset.y }
+            let preserveAnchor = scrollMode == .userBrowsing
+            let sessionID = vm.sessionId
+            toolGroupToggleGeneration &+= 1
+            let generation = toolGroupToggleGeneration
+            if expandedToolGroups.contains(id) { expandedToolGroups.remove(id) }
+            else { expandedToolGroups.insert(id) }
+            applySnapshot(messages: vm.messages, caller: "tool-group-toggle")
+            guard preserveAnchor, let viewportY else { return }
+            restoreToolGroupAnchor(id, viewportY: viewportY)
+            // iOS 15's hosting size report may land next runloop. One bounded
+            // correction, invalidated by another tap/session/scroll gesture.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.toolGroupToggleGeneration == generation,
+                      self.vm?.sessionId == sessionID else { return }
+                self.restoreToolGroupAnchor(id, viewportY: viewportY)
+            }
+        }
+
+        private func restoreToolGroupAnchor(_ id: ToolGroupID, viewportY: CGFloat) {
+            guard scrollMode == .userBrowsing,
+                  let cv = viewController?.collectionView,
+                  !cv.isTracking, !cv.isDecelerating,
+                  let ip = dataSource.indexPath(for: .assistantToolGroup(id)) else { return }
+            cv.layoutIfNeeded()
+            guard let frame = cv.layoutAttributesForItem(at: ip)?.frame else { return }
+            let minOffset = -cv.adjustedContentInset.top
+            let maxOffset = max(minOffset, cv.contentSize.height - cv.bounds.height + cv.adjustedContentInset.bottom)
+            let target = min(maxOffset, max(minOffset, frame.minY - viewportY))
+            cv.setContentOffset(CGPoint(x: cv.contentOffset.x, y: target), animated: false)
+            lastDidScrollOffsetY = target
+            syncScrollFlags()
+        }
+
         // MARK: - Search jump
 
         private var handledJumpNonce: Int?
@@ -4502,8 +4634,22 @@ extension CollectionViewMessageListV3 {
             guard let request, request.nonce != handledJumpNonce else { return }
             handledJumpNonce = request.nonce
             guard let cv = viewController?.collectionView, let ds = dataSource else { return }
-            guard let item = ds.snapshot().itemIdentifiers.first(where: { $0.messageId == request.messageID }),
-                  let indexPath = ds.indexPath(for: item) else { return }
+            // The hit can belong to the SECOND message hidden in a group.
+            // Expand those groups before looking up the real block's row.
+            scrollMode = .userBrowsing
+            let matching = toolGroups.values.filter { group in
+                group.members.contains { $0.messageID == request.messageID }
+            }.map(\.id)
+            if !Set(matching).isSubset(of: expandedToolGroups), let vm, !vm.isLoadingSession {
+                expandedToolGroups.formUnion(matching)
+                applySnapshot(messages: vm.messages, caller: "tool-group-search")
+            }
+            guard let item = ds.snapshot().itemIdentifiers.first(where: {
+                if case .assistantToolGroup = $0 { return false }
+                return $0.messageId == request.messageID
+            }) ?? ds.snapshot().itemIdentifiers.first(where: {
+                $0.ownerMessageIDs(groups: toolGroups).contains(request.messageID)
+            }), let indexPath = ds.indexPath(for: item) else { return }
             // The user asked for a specific message; leaving follow mode first
             // keeps the next streaming update from snapping back to the bottom.
             scrollMode = .userBrowsing
@@ -4970,7 +5116,7 @@ extension CollectionViewMessageListV3 {
             let endIdx: Int
             if let assistantMessageId,
                let i = items.lastIndex(where: {
-                   Coordinator.messageId(of: $0) == assistantMessageId
+                   $0.ownerMessageIDs(groups: toolGroups).contains(assistantMessageId)
                }) {
                 endIdx = i
             } else {

@@ -13,30 +13,8 @@ import Combine
 import SwiftUI
 import UIKit
 
-// MARK: - MessageListItem
-
-/// Item identifier for the diffable data source.
-/// Assistant messages are split into header + individual blocks + footer
-/// so each block is its own small cell with a stable height.
-enum MessageListItem: Hashable {
-    /// A complete user message, compact divider, or system info message.
-    case wholeMessage(UUID)
-    /// The "sparkles Minis" label row at the top of an assistant turn.
-    case assistantHeader(UUID)
-    /// A single AssistantBlock within an assistant turn.
-    case assistantBlock(UUID, UUID)  // (messageId, blockId)
-    /// Footer area: typing indicator, error, resume, usage.
-    case assistantFooter(UUID)
-
-    /// The message ID this item belongs to.
-    var messageId: UUID {
-        switch self {
-        case .wholeMessage(let id), .assistantHeader(let id),
-             .assistantFooter(let id): return id
-        case .assistantBlock(let msgId, _): return msgId
-        }
-    }
-}
+// MessageListItem lives in ToolGroupProjection.swift so the production
+// ordered-stream projection can also run in a Foundation-only host regression.
 
 
 // REENTRY-DIAG-BEGIN
