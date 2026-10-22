@@ -24,7 +24,7 @@ if command -v xcrun >/dev/null 2>&1 && [[ -z "${SWIFTC:-}" ]]; then
   sdk_args=(-sdk "$sdk" -target "$(uname -m)-apple-macosx12.0")
 fi
 
-SOURCE="$ROOT/src/ios/Agent/Quota/BalanceLookup.swift"
+SOURCE="$ROOT/src/ios/Providers/BalanceLookup.swift"
 TESTS="$ROOT/scripts/balance-tests/main.swift"
 
 echo "== baseline =="
