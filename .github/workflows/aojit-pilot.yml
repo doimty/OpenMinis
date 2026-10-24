@@ -157,21 +157,26 @@ jobs:
             '#!/bin/bash' \
             'args=()' \
             'while [ $# -gt 0 ]; do' \
-            '  if [ "$1" = "-r" ]; then args+=("-f"); else args+=("$1"); fi' \
+            '  case "$1" in' \
+            '    -r|-f) shift; args+=("-f" "${FAKEFS_DIR:?}");;' \
+            '    *) args+=("$1");;' \
+            '  esac' \
             '  shift' \
             'done' \
             'exec "${REAL_ISH:?}" "${args[@]}"' > out/ish-f.sh
           chmod +x out/ish-f.sh
           head -3 out/ish-f.sh
           echo "REAL_ISH=$PWD/deps/ish/build-cli/ish" >> "$GITHUB_ENV"
+          echo "FAKEFS_DIR=$PWD/work/fakefs" >> "$GITHUB_ENV"
 
       - name: Record the busybox image for this abi
         run: |
           set -euo pipefail
           REAL_ISH="$PWD/deps/ish/build-cli/ish" \
+            FAKEFS_DIR="$PWD/work/fakefs" \
             RECORDING="$PWD/out/busybox_rec.jsonl" \
             sh deps/ish/tools/jit_aot/record.sh \
-              out/ish-f.sh "$PWD/work/fakefs" \
+              out/ish-f.sh "$PWD/work/rootfs" \
               /tmp/aojit/busybox/busybox_train.sh \
               out/aot_busybox.S busybox
           ls -la out
