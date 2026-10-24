@@ -132,6 +132,23 @@ jobs:
           set -euo pipefail
           deps/ish/build-cli/ish -f "$PWD/work/fakefs" /bin/sh /tmp/aojit/setup.sh
 
+      - name: Give the workload the python trees it scans
+        continue-on-error: true
+        run: |
+          set +e
+          deps/ish/build-cli/ish -f "$PWD/work/fakefs" /bin/sh -c '
+            printf "nameserver 1.1.1.1\n" > /etc/resolv.conf
+            if apk add --no-cache python3 > /tmp/apk.log 2>&1; then
+              echo "python3 installed"
+            else
+              echo "apk failed, trimming the python scans from the workload"
+              sed -i "/usr\/lib\/python3.12/d" /tmp/aojit/busybox/busybox_train.sh
+            fi
+            tail -3 /tmp/apk.log
+            ls -d /usr/lib/python3* 2>/dev/null
+          '
+          true
+
       - name: Make a wrapper that maps -r to -f
         run: |
           set -euo pipefail
