@@ -90,16 +90,29 @@ jobs:
           codesign -d --entitlements - deps/ish/build-cli/ish 2>&1 | head -12
 
       - name: Run the suite setup inside the fakefs
+        continue-on-error: true
         run: |
           set +e
           deps/ish/build-cli/ish -f "$PWD/work/fakefs" /bin/sh -c 'echo HELLO; cat /etc/alpine-release'
           echo "exit=$?"
           ls -la ~/Library/Logs/DiagnosticReports 2>/dev/null | tail -5
           f=$(ls -t ~/Library/Logs/DiagnosticReports/ish* 2>/dev/null | head -1)
-          if [ -n "$f" ]; then echo "== crash report"; head -40 "$f"; fi
+          if [ -n "$f" ]; then echo "== crash report"; head -60 "$f"; fi
+          true
+
+      - name: Capture a backtrace of the crash
+        continue-on-error: true
+        run: |
+          set +e
+          lldb --batch \
+            -o 'settings set target.env-vars TERM=dumb' \
+            -o run \
+            -o 'thread backtrace all' \
+            -o quit -- deps/ish/build-cli/ish -f "$PWD/work/fakefs" /bin/sh -c 'echo HELLO' 2>&1 | tail -70
           true
 
       - name: Run the guest suite setup
+        continue-on-error: true
         run: |
           set -euo pipefail
           deps/ish/build-cli/ish -f "$PWD/work/fakefs" /bin/sh /tmp/aojit/setup.sh
