@@ -65,7 +65,7 @@ jobs:
           ROOTFS="$(find deps/resources -maxdepth 1 -type d -name '*rootfs*' | head -1)"
           test -n "$ROOTFS"
           echo "ROOTFS=$ROOTFS" >> "$GITHUB_ENV"
-          sh benchmark/aojit/install.sh deps/ish/build-cli/ish "$ROOTFS"
+          sh deps/ish/benchmark/aojit/install.sh deps/ish/build-cli/ish "$ROOTFS"
 
       - name: Record the busybox image for this abi
         run: |
@@ -73,7 +73,7 @@ jobs:
           mkdir -p out
           cat "$ROOTFS/etc/alpine-release" || true
           RECORDING="$PWD/out/busybox_rec.jsonl" \
-            sh tools/jit_aot/record.sh \
+            sh deps/ish/tools/jit_aot/record.sh \
               deps/ish/build-cli/ish "$ROOTFS" \
               /tmp/aojit/busybox/busybox_train.sh \
               out/aot_busybox.S busybox
