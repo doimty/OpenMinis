@@ -49,8 +49,15 @@ jobs:
             -Dkernel=ish \
             -Dengine=asbestos \
             -Dguest_arch=arm64 \
-            -Djit=true
+            -Djit=true \
+            -Dc_args=-U_FORTIFY_SOURCE
           ninja -C build-cli ish
+
+      - name: Install the recorder's Python deps
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user --quiet tqdm || python3 -m pip install --user --quiet --break-system-packages tqdm
+          python3 -c 'import tqdm; print("tqdm", tqdm.__version__)'
 
       - name: Prepare the arm64 rootfs
         run: |
