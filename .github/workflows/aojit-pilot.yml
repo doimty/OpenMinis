@@ -75,10 +75,29 @@ jobs:
           deps/ish/build-native/tools/fakefsify work/staged.tar.gz work/fakefs
           ls -la work/fakefs
 
-      - name: Run the suite setup inside the fakefs
+      - name: Sign the CLI so the JIT may allocate executable memory
         run: |
           set -euo pipefail
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0"><dict>' \
+            '  <key>com.apple.security.cs.allow-jit</key><true/>' \
+            '  <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>' \
+            '  <key>com.apple.security.cs.disable-library-validation</key><true/>' \
+            '</dict></plist>' > /tmp/jit.plist
+          codesign --force --sign - --entitlements /tmp/jit.plist --options runtime deps/ish/build-cli/ish
+          codesign -d --entitlements - deps/ish/build-cli/ish 2>&1 | head -12
+
+      - name: Run the suite setup inside the fakefs
+        run: |
+          set +e
           deps/ish/build-cli/ish -f "$PWD/work/fakefs" /bin/sh -c 'echo HELLO; cat /etc/alpine-release'
+          echo "exit=$?"
+          ls -la ~/Library/Logs/DiagnosticReports 2>/dev/null | tail -5
+          f=$(ls -t ~/Library/Logs/DiagnosticReports/ish* 2>/dev/null | head -1)
+          if [ -n "$f" ]; then echo "== crash report"; head -40 "$f"; fi
+          true
 
       - name: Run the guest suite setup
         run: |
