@@ -172,11 +172,15 @@ jobs:
       - name: Record the busybox image for this abi
         run: |
           set -euo pipefail
-          REAL_ISH="$PWD/deps/ish/build-cli/ish" \
-            FAKEFS_DIR="$PWD/work/fakefs" \
+          # record.sh runs the CLI with -r (realfs) and reads symbols from that same
+          # binary with nm, so it gets the real CLI; only the mount flag is swapped.
+          sed -i '' 's|"$ish" -r "$rootfs" /bin/sh "$workload"|"$ish" -f "${FAKEFS_DIR:-$rootfs}" /bin/sh "$workload"|' \
+            deps/ish/tools/jit_aot/record.sh
+          grep -n 'FAKEFS_DIR' deps/ish/tools/jit_aot/record.sh
+          FAKEFS_DIR="$PWD/work/fakefs" \
             RECORDING="$PWD/out/busybox_rec.jsonl" \
             sh deps/ish/tools/jit_aot/record.sh \
-              out/ish-f.sh "$PWD/work/rootfs" \
+              deps/ish/build-cli/ish "$PWD/work/rootfs" \
               /tmp/aojit/busybox/busybox_train.sh \
               out/aot_busybox.S busybox
           ls -la out
