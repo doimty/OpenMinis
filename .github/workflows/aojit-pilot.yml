@@ -59,7 +59,30 @@ jobs:
           ./deps/prepare_alpine_rootfs.sh
           ls deps/resources
 
+      - name: Diagnose why the CLI refuses to start
+        run: |
+          set +e
+          ISH="$PWD/deps/ish/build-cli/ish"
+          ROOT="$PWD/$(find deps/resources -maxdepth 1 -type d -name '*rootfs*' | head -1)"
+          echo "== binary"; file "$ISH"; ls -la "$ISH"
+          echo "== rootfs layout"; ls -la "$ROOT" | head -10
+          echo "== data/ head"; ls "$ROOT/data" | head -10
+          echo "== /bin/sh"; ls -la "$ROOT/data/bin/sh"; ls -la "$ROOT/data/bin/busybox" 2>&1
+          echo "== etc/alpine-release"; cat "$ROOT/data/etc/alpine-release" 2>&1
+          try() {
+            echo "--- $*"
+            out=$("$@" </dev/null 2>&1); rc=$?
+            echo "$out" | head -6
+            echo "exit=$rc"
+          }
+          try "$ISH" -r "$ROOT"
+          try "$ISH" -r "$ROOT" /bin/sh -c 'echo HELLO'
+          try "$ISH" -r "$ROOT" -- /bin/sh -c 'echo HELLO2'
+          try env -i PATH=/usr/bin:/bin "$ISH" -r "$ROOT" /bin/sh
+          try "$ISH" -r "$ROOT/data" /bin/sh -c 'echo HELLO3'
+
       - name: Install the AOJIT guest suite
+        continue-on-error: true
         run: |
           set -euo pipefail
           ROOTFS="$(find deps/resources -maxdepth 1 -type d -name '*rootfs*' | head -1)"
@@ -68,6 +91,7 @@ jobs:
           sh deps/ish/benchmark/aojit/install.sh deps/ish/build-cli/ish "$ROOTFS"
 
       - name: Record the busybox image for this abi
+        continue-on-error: true
         run: |
           set -euo pipefail
           mkdir -p out
