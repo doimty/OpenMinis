@@ -39,6 +39,14 @@ jobs:
           brew install meson ninja libarchive pkg-config lld llvm
           echo "/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin" >> "$GITHUB_PATH"
 
+      - name: Clamp the guest hostname to the utsname field
+        run: |
+          set -euo pipefail
+          # do_uname() copies the host nodename into a 65-byte guest field; GitHub's
+          # macOS hostname is longer, so fortify aborts inside sys_uname.
+          sed -i '' 's|strcpy(uts->hostname, hostname);|snprintf(uts->hostname, sizeof(uts->hostname), "%s", hostname);|' deps/ish/kernel/uname.c
+          grep -n 'uts->hostname' deps/ish/kernel/uname.c
+
       - name: Build the ish CLI with the JIT enabled
         run: |
           set -euo pipefail
