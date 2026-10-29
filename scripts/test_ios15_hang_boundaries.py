@@ -99,6 +99,11 @@ def parsed(kind, raw):
 
 def extract(root):
     sources = {rel: Swift((root / rel).read_bytes()) for rel in (REG, LIST, INFRA, UI)}
+    # 1.15 split CollectionViewMessageListV3 into a component directory and moved
+    # the coordinator members into Coordinator/*.swift, so the list side of the
+    # contract has to be read from the whole tree.
+    v3_dir = (root / LIST).parent
+    sources[LIST] = Swift(b"\n".join(path.read_bytes() for path in sorted(v3_dir.rglob("*.swift"))))
     r, m, a, u = (sources[p] for p in (REG, LIST, INFRA, UI))
     registry = r.owner("AgentJobRegistry")
     mods = [c for c in registry.children if c.type == "modifiers"]
