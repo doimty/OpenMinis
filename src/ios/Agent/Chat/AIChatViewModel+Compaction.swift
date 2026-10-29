@@ -23,8 +23,7 @@ extension AIChatViewModel {
         let contextWindow = resolved.window
         guard contextWindow > 0 else { return .ok }
 
-        let policy = ContextPolicy(contextWindow: contextWindow, isUserCap: resolved.isUserCap,
-                                   autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens)
+        let policy = ContextPolicy(contextWindow: contextWindow, isUserCap: resolved.isUserCap, autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens)
         // [T-ctx-measure-outbound] Judge the request that is about to go out.
         //
         // This used to be `max(estimateContextTokens(), lastReportedContextTokens())`.
@@ -244,8 +243,7 @@ extension AIChatViewModel {
         guard let entry = resolveCurrentEntry() else { return (warmUp, false) }
         let resolved = resolvedContextWindow(for: entry.model)
         guard resolved.window > 0, contextFixedTokens > 0 else { return (warmUp, false) }
-        let policy = ContextPolicy(contextWindow: resolved.window, isUserCap: resolved.isUserCap,
-                                   autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens)
+        let policy = ContextPolicy(contextWindow: resolved.window, isUserCap: resolved.isUserCap, autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens)
         let line = policy.compactThreshold > 0 ? policy.compactThreshold : resolved.window
         let budget = Int(Double(line) / contextCalibrationRatio(for: entry.model.id)) - contextFixedTokens
         let echo = contextEchoesReasoning
@@ -283,8 +281,7 @@ extension AIChatViewModel {
         guard let entry = resolveCurrentEntry() else { return nil }
         let resolved = resolvedContextWindow(for: entry.model)
         guard resolved.window > 0 else { return nil }
-        return (ContextPolicy(contextWindow: resolved.window, isUserCap: resolved.isUserCap,
-                                   autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens), resolved.window)
+        return (ContextPolicy(contextWindow: resolved.window, isUserCap: resolved.isUserCap, autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens), resolved.window)
     }
 
     /// False for the exhausted-only tiers (windows under 64K), where a model
