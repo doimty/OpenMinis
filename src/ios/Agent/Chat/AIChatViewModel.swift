@@ -1286,10 +1286,16 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// from the confirm dialog's "Compact & Enable Auto-Compact" button or
     /// the "..." menu's Auto Compact toggle; persisted in UserDefaults so
     /// future conversations inherit it.
-    @Published var autoCompactEnabled: Bool = UserDefaults.standard.bool(forKey: "autoCompactOnThreshold") {
-        didSet {
-            guard autoCompactEnabled != oldValue else { return }
-            UserDefaults.standard.set(autoCompactEnabled, forKey: "autoCompactOnThreshold")
+    /// [T-auto-compact-budget] Read the persisted value at decision time rather
+    /// than caching it in the view model, so editing settings also updates
+    /// already-constructed view models. The setter persists through the shared
+    /// key constant.
+    var autoCompactEnabled: Bool {
+        get { AutoCompactionPreferences.enabled }
+        set {
+            guard newValue != AutoCompactionPreferences.enabled else { return }
+            objectWillChange.send()
+            UserDefaults.standard.set(newValue, forKey: AutoCompactionPreferences.enabledKey)
         }
     }
     /// When true, shows a prompt telling user to start a new session or clear chat.
