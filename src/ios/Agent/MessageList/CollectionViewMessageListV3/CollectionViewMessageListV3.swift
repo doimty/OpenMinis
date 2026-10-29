@@ -94,6 +94,17 @@ extension Notification.Name {
 /// - **3-tier height resolution**: measured cache → precalc (NSAttributedString) → estimate
 /// - **2-state scroll model**: autoScrolling / userBrowsing (replaces V2's 6+ mechanisms)
 /// - **O(1) message lookup**: UUID index rebuilt on each snapshot
+    /// Pure seam for the bottom-inset floor. When the floating tool preview's
+    /// geometry has not been reported yet (observer stall) the preview is
+    /// visibly mounted while `floatingBarHeight` stays <= 1; the last message
+    /// would then sit under the preview + composer and its taps would be
+    /// intercepted by the overlay. Floor equals the measured preview height
+    /// (device log: 223.67 inset = 115.67 inputBar + ~100 preview + 8).
+    static func effectiveFloatingHeight(floatingBarHeight: CGFloat, hasToolBlocks: Bool) -> CGFloat {
+        if floatingBarHeight > 1 { return floatingBarHeight }
+        return hasToolBlocks ? 100 : 0
+    }
+
 struct CollectionViewMessageListV3: UIViewControllerRepresentable {
     @ObservedObject var vm: AIChatViewModel
     var inputFocused: Bool
@@ -194,7 +205,17 @@ struct CollectionViewMessageListV3: UIViewControllerRepresentable {
             composerLiveHeight?.onChange = { [weak coord] in coord?.composerLiveHeightDidChange() }
         }
         coord.composerShrink.noteCommitted(inputBarHeight)
-        let bottomPad: CGFloat = inputBarHeight + floatingBarHeight + 8 - coord.composerShrink.absorbed
+        // [T-ios15-floating-inset-floor] The floating preview can be mounted
+        // before its geometry observer reports, which would leave the last
+        // message under the overlay and touch-dead.
+        let hasToolBlocks = vm.messages.contains(where: {
+            $0.role == .assistant && !$0.isCompactedHistory
+                && $0.blocks.contains { $0.toolStatus != nil }
+        })
+        let effectiveFloating = Self.effectiveFloatingHeight(
+            floatingBarHeight: floatingBarHeight,
+            hasToolBlocks: hasToolBlocks)
+        let bottomPad: CGFloat = inputBarHeight + effectiveFloating + 8 - coord.composerShrink.absorbed
         let baseChanged = abs(coord.baseBottomInset - bottomPad) > 0.5
         if baseChanged {
             let cv = vc.collectionView!

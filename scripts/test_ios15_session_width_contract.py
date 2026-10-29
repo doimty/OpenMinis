@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "src/ios/Views/Chat/Markdown/Bridge/SelectableMarkdownView.swift"
+SOURCE = ROOT / "src/ios/Views/Chat/Markdown/TextKit/SelectableMarkdownTextView.swift"
 
 
 class SessionWidthContractTests(unittest.TestCase):
