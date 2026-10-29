@@ -608,7 +608,9 @@ def check_new_view_contract(ss, rep):
     path, txt = view_files[0]
     rep.add("view", "view.auto_compaction_settings_page", "PASS", str(path.relative_to(ss.root)))
     # settings entry
-    content = (ss.root / "src/ios/Views/ContentView/ContentView.swift")
+    # 1.15 keeps the settings list in SettingsSheet.swift; ContentView has no
+    # NavigationLink at all any more.
+    content = (ss.root / "src/ios/Views/Settings/SettingsSheet.swift")
     entry_ok = False
     if content.exists():
         ctext = content.read_text(errors="replace")
