@@ -92,7 +92,7 @@ class CompatibilityContractTests(unittest.TestCase):
         body = source.split("private func refreshActiveTaskBadge(sessions: Set<String>, enabled: Bool) {", 1)[1]
         body = body.split("// MARK: - Background Task Notifications", 1)[0]
         self.assertTrue(body.lstrip().startswith("guard #available(iOS 16.0, *) else {"))
-        self.assertIn("UIApplication.shared.applicationIconBadgeNumber = enabled ? sessions.count : 0", body)
+        self.assertIn("UIApplication.shared.applicationIconBadgeNumber = total", body)
         self.assertIn("center.setBadgeCount(sessions.count)", body)
         app = (ROOT / "src/ios/MinisApp.swift").read_text(encoding="utf-8")
         self.assertEqual(app.count("UNUserNotificationCenter.current().setBadgeCount(0)"), 1)
@@ -183,9 +183,16 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertNotIn("hitRegionContains", after_guard.split("return false")[0])
 
     def test_ios15_session_row_is_tappable_on_legacy_os(self):
-        source = (ROOT / "src/ios/Views/ContentView/ContentView.swift").read_text(encoding="utf-8")
-        self.assertIn(".compatLegacyNavigationTap {", source)
-        self.assertIn("navigationPath.append(session.id)", source)
+        # Upstream 1.15 replaced the hidden NavigationLink (which needed the
+        # compatLegacyNavigationTap shim on iOS 15) with a plain Button that
+        # sends a menu action. A Button is available on 15, so the invariant is
+        # now "the row opens its session through the action channel" rather
+        # than "the row carries the shim".
+        rows = (ROOT / "src/ios/Views/ContentView/Sidebar/SessionListRows.swift").read_text(encoding="utf-8")
+        self.assertIn("menuActions.send(.open(sid))", rows)
+        self.assertNotIn(".compatLegacyNavigationTap {", rows)
+        channels = (ROOT / "src/ios/Views/ContentView/Sidebar/SidebarActionChannels.swift").read_text(encoding="utf-8")
+        self.assertIn("case open(String)", channels)
 
     def test_ios15_markdown_measure_width_is_guarded(self):
         # The legacy iOS 15 path measured at NSTextContainer's default
