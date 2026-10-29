@@ -44,6 +44,25 @@ import UIKit
 
 /// Non-editable, selectable UITextView subclass for rendering Markdown as NSAttributedString.
 final class SelectableMarkdownTextView: UITextView, UIGestureRecognizerDelegate {
+
+    // [T-ios15-fallback-intrinsic-width 2026-09-19]
+    // The legacy iOS 15 bridging path has no representable sizeThatFits, so
+    // SwiftUI asks intrinsicContentSize with an unbounded width proposal. A
+    // non-scrolling NSTextContainer reports its ideal width (653pt for long
+    // text, 1e7pt once a width-filling attachment is present), and the default
+    // horizontal compression resistance lets that demand win over the host's
+    // 396pt proposal: the live bounds grow to 1e7 and CoreAnimation refuses the
+    // layer. Declare no intrinsic horizontal demand until a real width exists,
+    // and measure the height at that width. Plain UIKit, so it also works on
+    // the iOS 15 runtime.
+    override var intrinsicContentSize: CGSize {
+        let original = super.intrinsicContentSize
+        guard bounds.width > 1, bounds.width.isFinite else {
+            return CGSize(width: UIView.noIntrinsicMetric, height: original.height)
+        }
+        let height = sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height
+        return CGSize(width: UIView.noIntrinsicMetric, height: height)
+    }
     var attachmentViews: [UIView] = []
     /// Returns true if the text storage contains NSTextAttachment objects but no attachment views
     /// have been created yet. Used by updateUIView to detect the LazyVStack reappear case where

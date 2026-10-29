@@ -138,7 +138,24 @@ extension SelectableMarkdownTextView {
         // outer-cell probe width (~402) by SwiftUI's preferredLayoutAttributes
         // pass — measuring at that wrong width would write a 23pt-too-small
         // height into lastComputedHeight, producing the streaming spike.
-        let measureWidth: CGFloat = bounds.width > 1 ? bounds.width : textContainer.size.width
+        // [T-ios15-measure-width-guard] The guard above only rejects <= 1, but
+        // NSTextContainer's default width is the 10_000_000pt "unbounded"
+        // sentinel, which passes it. The legacy iOS 15 bridge reaches this
+        // before the text view has a real frame, and measuring there poisoned
+        // lastComputedHeight and handed CoreAnimation an undrawable layer
+        // (device log 2026-09-19: measureW=10000000, 146x "Ignoring bogus
+        // layer size (10000000, 1020)").
+        let fallbackW = textContainer.size.width
+        let maxSaneW = max(fallbackW, UIScreen.main.bounds.width)
+        let measureWidth: CGFloat
+        if bounds.width > 1 {
+            measureWidth = bounds.width
+        } else if fallbackW > 1, maxSaneW < 1_000_000 {
+            measureWidth = fallbackW
+        } else {
+            // no real width yet; deferring to GeometryReader/next pass
+            return
+        }
         // [TableGenDedup] Compute the sum of every TableAttachment's generation
         // counter. Streaming tables mutate rows in place without changing
         // textStorage.length, so the (storageLen, width) fingerprint alone

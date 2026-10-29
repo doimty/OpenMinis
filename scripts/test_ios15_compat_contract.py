@@ -199,7 +199,7 @@ class CompatibilityContractTests(unittest.TestCase):
         # 10_000_000pt sentinel when bounds.width <= 1, poisoning the height
         # cache and handing CoreAnimation an undrawable layer (device log
         # 2026-09-19: measureW=10000000, 146x "Ignoring bogus layer size").
-        source = (ROOT / "src/ios/Views/Chat/Markdown/Bridge/SelectableMarkdownView.swift").read_text(encoding="utf-8")
+        source = (ROOT / "src/ios/Views/Chat/Markdown/TextKit/SelectableMarkdownTextView+CellSizing.swift").read_text(encoding="utf-8")
         self.assertIn("T-ios15-measure-width-guard", source)
         self.assertIn("let maxSaneW = max(fallbackW, UIScreen.main.bounds.width)", source)
         self.assertIn("no real width yet; deferring to GeometryReader/next pass", source)
@@ -217,7 +217,7 @@ class CompatibilityContractTests(unittest.TestCase):
         # reproduced in the pinned iOS 26.2 simulator matrix in
         # docs/ios15-markdown-width-investigation.md). The override must be
         # plain UIKit so it also works on the iOS 15 runtime.
-        source = (ROOT / "src/ios/Views/Chat/Markdown/Bridge/SelectableMarkdownView.swift").read_text(encoding="utf-8")
+        source = (ROOT / "src/ios/Views/Chat/Markdown/TextKit/SelectableMarkdownTextView.swift").read_text(encoding="utf-8")
         self.assertIn("T-ios15-fallback-intrinsic-width", source)
         self.assertIn("override var intrinsicContentSize: CGSize", source)
         self.assertIn("noIntrinsicMetric", source)
