@@ -55,27 +55,15 @@ struct BackupDestinationDetailView: View {
     @State private var folderPackages: [BackupDestinations.FoundPackage] = []
 
     var body: some View {
-        Form {
-            switch target {
-            case .remote(let r): remoteSections(r)
-            case .folder(let f): folderSections(f)
-            }
-        }
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        // These MUST hang off the Form, not off a Section inside
-        // remoteSections. That builder re-runs whenever the package list
-        // finishes loading (isLoadingPackages / packages change), and a
-        // presentation modifier attached to a view that gets rebuilt is torn
-        // down with it — the sheet opened and then closed itself. Only
-        // reproducible on FIRST entry, because that is when the load is still
-        // in flight; afterwards the state had already settled.
-        .alert("Rename Destination", isPresented: $showRename) {
+        .compatTextInputAlert(
+            Text("Rename Destination"),
+            isPresented: $showRename,
+            confirmLabel: Text("Save"),
+            onConfirm: { if let r = activeRemote { rename(r) } }
+        ) {
             TextField("Name", text: $draftName)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-            Button("Cancel", role: .cancel) {}
-            Button("Save") { if let r = activeRemote { rename(r) } }
         } message: {
             Text("Letters, numbers, - and _ only.")
         }
@@ -588,85 +576,16 @@ struct RcloneFolderBrowser: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    if !currentDir.isEmpty {
-                        Button {
-                            let parent = (currentDir as NSString).deletingLastPathComponent
-                            Task { await list(parent == "." ? "" : parent) }
-                        } label: {
-                            Label("Up one level", systemImage: "arrow.up.left")
-                        }
-                    }
-                    if isListing {
-                        HStack { ProgressView(); Text("Loading…").foregroundStyle(.secondary) }
-                    } else if visibleEntries.isEmpty {
-                        Text(showsFiles ? "This folder is empty."
-                                        : "No folders here.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(visibleEntries) { e in
-                            if e.isDir {
-                                Button {
-                                    Task { await list(e.path) }
-                                } label: {
-                                    HStack {
-                                        Label(e.name, systemImage: "folder.fill")
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption2).foregroundStyle(.tertiary)
-                                    }
-                                }
-                            } else {
-                                Label(e.name, systemImage: "doc")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                } header: {
-                    HStack(spacing: 8) {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            Text(currentDir.isEmpty ? "/" : "/\(currentDir)")
-                                .font(.footnote.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Color(.secondarySystemFill), in: Capsule())
-                        }
-                        Button {
-                            newFolderName = ""
-                            showNewFolder = true
-                        } label: {
-                            Label("New Folder", systemImage: "folder.badge.plus")
-                                .labelStyle(.iconOnly)
-                                .font(.body)
-                        }
-                        .buttonStyle(.borderless)
-                        .disabled(isListing)
-                    }
-                    .textCase(nil)
-                }
-
-            }
-            .backupHUD($errorText)
-            .navigationTitle("Backup Folder")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save Here") { onPicked(currentDir) }
-                        .disabled(isListing)
-                }
-            }
-            .alert("New Folder", isPresented: $showNewFolder) {
+            .compatTextInputAlert(
+                Text("New Folder"),
+                isPresented: $showNewFolder,
+                confirmLabel: Text("Create"),
+                onConfirm: { Task { await createFolder() } },
+                onCancel: { newFolderName = "" }
+            ) {
                 TextField("Folder name", text: $newFolderName)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                Button("Cancel", role: .cancel) { newFolderName = "" }
-                Button("Create") { Task { await createFolder() } }
             } message: {
                 Text("Created inside \(currentDir.isEmpty ? "/" : "/" + currentDir).")
             }

@@ -201,7 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('--input-sha', required=True, help='SHA256 of the original local input file')
     args = parser.parse_args()
     try:
-        result = validate(json.loads(args.report.read_text()), args.commit, args.input_sha)
+        result = validate(json.loads(args.report.read_text(encoding="utf-8")), args.commit, args.input_sha)
     except (ValueError, KeyError, TypeError, OSError) as error:
         result = {'status': 'INVALID', 'reason': str(error)}
     print(json.dumps(result, ensure_ascii=False))

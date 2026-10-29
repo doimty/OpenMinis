@@ -20,11 +20,11 @@ class BridgeSourceTests(unittest.TestCase):
             old=f'@objc public final class {name}: NSObject'
             new=f'@objc({name}) public final class {name}: NSObject'
             self.assertEqual(before.count(old),1)
-            self.assertEqual((ROOT/relative).read_text(),before.replace(old,new,1),relative)
+            self.assertEqual((ROOT/relative).read_text(encoding="utf-8"),before.replace(old,new,1),relative)
 
     def test_c_lookup_remains_the_same(self):
         before=subprocess.check_output(['git','show',f'{DEFAULT_BASELINE}:{OFFLOAD_SOURCE}'],cwd=ROOT,text=True)
-        now=(ROOT/OFFLOAD_SOURCE).read_text()
+        now=(ROOT/OFFLOAD_SOURCE).read_text(encoding="utf-8")
         self.assertEqual(dispatcher_slice(before),dispatcher_slice(now))
         self.assertIn('NSClassFromString(@"DebugLocalDispatch")',now)
         self.assertIn('NSClassFromString(@"MinisDebugLogReader")',now)
@@ -43,7 +43,7 @@ class BridgeSourceTests(unittest.TestCase):
 
     def test_log_reader_remains_release_available(self):
         import re
-        self.assertIsNone(re.search(r'^\s*#if DEBUG', (ROOT/SWIFT_SOURCES[1]).read_text(),re.M))
+        self.assertIsNone(re.search(r'^\s*#if DEBUG', (ROOT/SWIFT_SOURCES[1]).read_text(encoding="utf-8"),re.M))
 
     def test_worktree_bytes_cannot_claim_head_commit(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -69,7 +69,7 @@ class BridgeSourceTests(unittest.TestCase):
             self.assertNotEqual(dirty['candidate_input_sha256'],clean['candidate_input_sha256'])
             self.assertTrue(any(SWIFT_SOURCES[0] in p for p in dirty['candidate_dirty_inputs']))
             path.write_bytes(original)
-            (root/PROBE_INFRA_FIXTURE).write_text((root/PROBE_INFRA_FIXTURE).read_text()+'\n# provenance fixture\n')
+            (root/PROBE_INFRA_FIXTURE).write_text((root/PROBE_INFRA_FIXTURE).read_text(encoding="utf-8")+'\n# provenance fixture\n')
             infra=prepare(root,Path(tmp)/'infra',head)
             self.assertIsNone(infra['candidate_commit'])
             self.assertNotEqual(infra['candidate_input_sha256'],clean['candidate_input_sha256'])

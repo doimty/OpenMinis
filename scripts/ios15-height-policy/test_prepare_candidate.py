@@ -57,7 +57,7 @@ class CandidatePreparationTests(unittest.TestCase):
             (app / 'PlugIns' / 'Share.appex').mkdir(parents=True)
             copy = candidate.prepare_bundle(app, root / 'candidate', 'b' * 40)
             info = plistlib.loads((copy / 'Info.plist').read_bytes())
-            profile = json.loads((candidate.HERE / 'candidate-source.json').read_text())
+            profile = json.loads((candidate.HERE / 'candidate-source.json').read_text(encoding="utf-8"))
             self.assertEqual(info['CFBundleIdentifier'], 'com.openminis.layoutprobe')
             self.assertEqual(info['CFBundleDisplayName'], 'Minis Height Fix')
             self.assertTrue(info['MinisHeightRepairCandidate'])

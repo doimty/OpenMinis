@@ -12,8 +12,8 @@ OUT=args.output or Path(tempfile.mkdtemp(prefix='debug-cli-operands-'))
 OUT.mkdir(parents=True,exist_ok=True)
 def original(path):
     return subprocess.check_output(['git','show',BASELINE+':'+path],cwd=ROOT,text=True)
-utils=(ROOT/'src/ios/NativeOffloads/NativeOffloadUtils.m').read_text()
-debug=(ROOT/'src/ios/NativeOffloads/DebugOffload.m').read_text()
+utils=(ROOT/'src/ios/NativeOffloads/NativeOffloadUtils.m').read_text(encoding="utf-8")
+debug=(ROOT/'src/ios/NativeOffloads/DebugOffload.m').read_text(encoding="utf-8")
 old_debug=original('src/ios/NativeOffloads/DebugOffload.m')
 def region(text,start,end):
     assert text.count(start)==1

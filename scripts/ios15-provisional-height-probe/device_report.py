@@ -384,7 +384,7 @@ def _cli() -> int:
     parser.add_argument("--commit")
     args = parser.parse_args()
     try:
-        result = validate_report(json.loads(args.report.read_text()), expected_commit=args.commit)
+        result = validate_report(json.loads(args.report.read_text(encoding="utf-8")), expected_commit=args.commit)
     except (OSError, json.JSONDecodeError, ValueError) as error:
         print(f"status=INVALID reason={error}")
         return 2

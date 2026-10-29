@@ -19,7 +19,7 @@ def section(text, start, end):
 class SourceGuards(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.source = SOURCE.read_text()
+        cls.source = SOURCE.read_text(encoding="utf-8")
         cls.representable = cls.source.split("struct PastableTextView:", 1)[1]
         cls.sync = section(cls.representable, "func syncFocus(", "private func withFocusSync(")
         cls.visibility = section(cls.representable, "private func canAcquireFocus(", "func dismantle(")

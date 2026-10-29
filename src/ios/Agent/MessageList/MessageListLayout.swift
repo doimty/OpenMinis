@@ -97,30 +97,30 @@ final class MessageListLayout: UICollectionViewLayout {
     private var _topAnchoredIndex: Int?
     var topAnchoredIndex: Int? {
         get {
-            os_unfair_lock_lock(&_streamingLock)
-            defer { os_unfair_lock_unlock(&_streamingLock) }
+            _streamingLock.lock()
+            defer { _streamingLock.unlock() }
             return _topAnchoredIndex
         }
         set {
-            os_unfair_lock_lock(&_streamingLock)
+            _streamingLock.lock()
             _topAnchoredIndex = newValue
-            os_unfair_lock_unlock(&_streamingLock)
+            _streamingLock.unlock()
         }
     }
 
     private var _streamingCellRanges: [Range<Int>] = []
-    private var _streamingLock = os_unfair_lock_s()
+    private let _streamingLock = NSLock()
 
     var streamingCellRanges: [Range<Int>] {
         get {
-            os_unfair_lock_lock(&_streamingLock)
-            defer { os_unfair_lock_unlock(&_streamingLock) }
+            _streamingLock.lock()
+            defer { _streamingLock.unlock() }
             return _streamingCellRanges
         }
         set {
-            os_unfair_lock_lock(&_streamingLock)
+            _streamingLock.lock()
             _streamingCellRanges = newValue
-            os_unfair_lock_unlock(&_streamingLock)
+            _streamingLock.unlock()
         }
     }
 
@@ -128,8 +128,8 @@ final class MessageListLayout: UICollectionViewLayout {
     /// gate in MessageListInfrastructure). Reads as the tail streaming
     /// message's first item, matching the old single-index meaning.
     var streamingCellIndex: Int? {
-        os_unfair_lock_lock(&_streamingLock)
-        defer { os_unfair_lock_unlock(&_streamingLock) }
+        _streamingLock.lock()
+        defer { _streamingLock.unlock() }
         return _streamingCellRanges.last?.lowerBound
     }
 

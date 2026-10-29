@@ -81,91 +81,19 @@ struct RcloneAddServerView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                if connectedRemote == nil {
-                    typeSection
-                    if backend != nil {
-                        detailsSection
-                        connectSection
-                    }
-                } else {
-                    browseSection
-                }
-
-                // Connect-time errors stay inline: the user is looking at
-                // the form they just filled in, and the message belongs next
-                // to it. Errors raised while BROWSING (mkdir, listing) go to
-                // the HUD instead — see backupHUD below — because the folder
-                // list can be long enough to push an inline row off screen.
-                if let errorText, connectedRemote == nil {
-                    Section {
-                        Text(errorText)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                    }
-                }
-            }
-            .backupHUD(Binding(
-                get: { connectedRemote == nil ? nil : errorText },
-                set: { if $0 == nil { errorText = nil } }))
-            .navigationTitle(connectedRemote == nil ? "Add Server" : "Choose Folder")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { cancelAndDismiss() }
-                }
-                // The confirming action belongs in the top-right slot, where
-                // iOS puts Done/Save everywhere else. As a row at the bottom
-                // of a long directory listing it moved with the scroll and
-                // could sit off-screen entirely in a folder with many
-                // entries — the one control the screen exists to offer.
-                if connectedRemote != nil {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save Here") { saveHere() }
-                            .disabled(isListing)
-                    }
-                }
-            }
-            .alert("New Folder", isPresented: $showNewFolder) {
-                TextField("Folder name", text: $newFolderName)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                Button("Cancel", role: .cancel) { newFolderName = "" }
-                // [T-backup-newfolder-create-missing] NO `.disabled()` here.
-                // Alert buttons are not regular views: SwiftUI renders an
-                // alert's actions through UIAlertController, and a disabled
-                // action is OMITTED ENTIRELY rather than greyed out. The name
-                // field starts empty, so the guard was true the moment the
-                // alert appeared and the Create button simply did not exist —
-                // the user saw a New Folder dialog offering only Cancel
-                // (reported verbatim: "只有取消", with a screenshot).
-                //
-                // The sibling dialog in BackupDestinationDetailView never had
-                // the modifier and always showed Create, which is why leaving
-                // and re-entering "fixed" it: re-entry goes through that
-                // screen, not this one.
-                //
-                // Empty input is rejected inside the action instead, where it
-                // costs nothing — createFolder() already trims and ignores a
-                // blank name.
-                Button("Create") { Task { await createFolder() } }
-            } message: {
-                Text("Created inside \(displayPath).")
-            }
-            // [T-sftp-absolute-path] Go-to-path. No `.disabled()` on these
-            // buttons: an alert's actions are UIAlertActions, and a disabled
-            // one is omitted entirely rather than greyed out (that is what
-            // removed the Create button in the New Folder dialog).
-            .alert("Go to Path", isPresented: $showPathEditor) {
-                TextField("Path", text: $pathInput)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                Button("Cancel", role: .cancel) { }
-                Button("Go") {
+            .compatTextInputAlert(
+                Text("Go to Path"),
+                isPresented: $showPathEditor,
+                confirmLabel: Text("Go"),
+                onConfirm: {
                     let target = Self.normalizedInputPath(pathInput,
                                                           isSFTP: RcloneBackendCatalog.usesAbsolutePaths(backend?.type ?? ""))
                     Task { await list(dir: target) }
                 }
+            ) {
+                TextField("Path", text: $pathInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
             } message: {
                 Text("Type a folder path to jump straight to it, including one outside the starting directory.")
             }

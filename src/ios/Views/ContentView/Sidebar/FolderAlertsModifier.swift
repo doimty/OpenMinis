@@ -43,20 +43,14 @@ struct FolderAlertsModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content
-            .alert(
-                "Rename Group",
+        .compatTextInputAlert(
+                Text("Rename Group"),
                 isPresented: Binding(
                     get: { folderToRename != nil },
                     set: { if !$0 { folderToRename = nil } }
-                )
-            ) {
-                TextField("Group Name", text: $renameFolderText)
-                // The one-sentence auto-grouping context — hidden in the
-                // list, surfaced for editing exactly here as requested.
-                TextField("Description (optional)", text: $renameFolderDesc)
-                Button("Cancel", role: .cancel) { folderToRename = nil }
-                Button("Rename") {
+                ),
+                confirmLabel: Text("Rename"),
+                onConfirm: {
                     let name = renameFolderText.trimmingCharacters(in: .whitespacesAndNewlines)
                     if let folder = folderToRename, !name.isEmpty {
                         // [T-folder-duplicate-name] Renaming onto an existing
@@ -69,8 +63,12 @@ struct FolderAlertsModifier: ViewModifier {
                         }
                     }
                     folderToRename = nil
-                }
-            }
+                },
+                onCancel: { folderToRename = nil }
+            ) {
+                TextField("Group Name", text: $renameFolderText)
+                TextField("Description (optional)", text: $renameFolderDesc)
+            } message: { EmptyView() }
             // [T-folder-duplicate-name] Follow-up for a blocked rename. A plain
             // `.alert` cannot host a picker, so the choice is spelled out: go
             // back and pick another name, or move this group's chats into the

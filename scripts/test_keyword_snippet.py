@@ -309,7 +309,7 @@ def run_mutants(rep, source_root, runner, tmp_root):
         mtarget = mdir / CSTORE_REL
         mtarget.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, mtarget)
-        original = mtarget.read_text()
+        original = mtarget.read_text(encoding="utf-8")
         if original.count(old) != 1:
             rep.add("mutant", label, "FAIL",
                     "mutation anchor is not unique (%d matches)" % original.count(old))

@@ -114,7 +114,7 @@ class ExtractionTests(unittest.TestCase):
         self.manifest = prepare(ROOT, self.out, HERE)
 
     def test_baseline_infrastructure_restores_to_locked_old_commit(self):
-        text = (self.out / "ProductionInfrastructure-baseline.swift").read_text()
+        text = (self.out / "ProductionInfrastructure-baseline.swift").read_text(encoding="utf-8")
         old_infra = locked(SOURCE_PATHS[3]).split(SPLIT, 1)[0]
         self.assertEqual(restore_infrastructure(text), old_infra)
 
@@ -123,8 +123,8 @@ class ExtractionTests(unittest.TestCase):
                          locked(SOURCE_PATHS[1]).encode())
 
     def test_c1_diff_is_exactly_the_declared_clear_edit(self):
-        base = (self.out / "ProductionInfrastructure-baseline.swift").read_text()
-        c1 = (self.out / "ProductionInfrastructure-c1.swift").read_text()
+        base = (self.out / "ProductionInfrastructure-baseline.swift").read_text(encoding="utf-8")
+        c1 = (self.out / "ProductionInfrastructure-c1.swift").read_text(encoding="utf-8")
         self.assertIn(CLEAR_OLD, base)
         self.assertNotIn(CLEAR_OLD, c1)
         self.assertIn(CLEAR_C1, c1)
@@ -137,7 +137,7 @@ class ExtractionTests(unittest.TestCase):
                          (self.out / "ProductionInfrastructure-c1.swift").read_bytes())
 
     def test_c3_legacy_restores_to_locked_old_commit_and_carries_generation_guard(self):
-        text = (self.out / "LegacyHostingContent-c3.swift").read_text()
+        text = (self.out / "LegacyHostingContent-c3.swift").read_text(encoding="utf-8")
         self.assertIn("LegacyHostedSize", text)
         self.assertIn("payload.generation == configurationGeneration", text)
         self.assertIn("value: LegacyHostedSize(generation: generation, size: proxy.size)", text)
@@ -147,12 +147,12 @@ class ExtractionTests(unittest.TestCase):
         # The landed production file must equal the C3 variant that native run
         # 35596858464 verified, generated from the LOCKED pre-change commit.
         verified = make_legacy(locked(SOURCE_PATHS[1]), "c3")
-        self.assertEqual((ROOT / SOURCE_PATHS[1]).read_text(), verified)
+        self.assertEqual((ROOT / SOURCE_PATHS[1]).read_text(encoding="utf-8"), verified)
 
     def test_production_clear_matches_verified_c1_modulo_comments(self):
         # Production clearCachedHeight must keep the C1 statement set; only the
         # probe-tag comment was rewritten for production.
-        production = (ROOT / SOURCE_PATHS[3]).read_text()
+        production = (ROOT / SOURCE_PATHS[3]).read_text(encoding="utf-8")
         self.assertEqual(normalize_swift(clear_body(production)), normalize_swift(CLEAR_C1))
         self.assertNotIn("legacyMeasuredSize = nil", clear_body(production))
         self.assertIn("seededHeight = nil", clear_body(production))
@@ -160,7 +160,7 @@ class ExtractionTests(unittest.TestCase):
 
     def test_all_variants_carry_readonly_getters(self):
         for variant in VARIANTS:
-            text = (self.out / f"ProductionInfrastructure-{variant}.swift").read_text()
+            text = (self.out / f"ProductionInfrastructure-{variant}.swift").read_text(encoding="utf-8")
             self.assertEqual(text.count(GETTER_HEAD), 1)
             self.assertEqual(text.count(GETTER_TAIL), 1)
             self.assertIn("probeCacheSnapshot", text)
@@ -186,7 +186,7 @@ class ExtractionTests(unittest.TestCase):
         self.assertIn("measurement_source", self.manifest["legacy_payload_contract"])
 
     def test_probe_app_adds_no_synchronous_measure_or_fabricated_heights(self):
-        text = PROBE_APP.read_text()
+        text = PROBE_APP.read_text(encoding="utf-8")
         self.assertNotIn("systemLayoutSizeFitting", text)
         self.assertNotIn("setCachedHeight(", text)
         self.assertNotIn("cell.preferredLayoutAttributesFitting(", text)
@@ -194,7 +194,7 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(text.count("clearCachedHeight()"), 2)
 
     def test_probe_app_uses_real_infra_and_layout(self):
-        text = PROBE_APP.read_text()
+        text = PROBE_APP.read_text(encoding="utf-8")
         self.assertIn("MessageListViewController()", text)
         self.assertIn("cell.applyHostedContent(parent: vc)", text)
         self.assertIn("messageListLayout.invalidateHeight(at:", text)

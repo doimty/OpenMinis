@@ -72,7 +72,7 @@ class RunnerTests(unittest.TestCase):
             p=subprocess.run(['python3',str(ROOT/'scripts/test_ios15_hang_boundaries.py'),
                 '--runner',td+'/missing-swiftc','--json',td+'/out.json'],capture_output=True,text=True)
             self.assertEqual(p.returncode,1)
-            r=json.loads(Path(td,'out.json').read_text())
+            r=json.loads(Path(td,'out.json').read_text(encoding="utf-8"))
             self.assertGreater(r['summary']['FAIL'],0)
 
 if __name__=='__main__':unittest.main()

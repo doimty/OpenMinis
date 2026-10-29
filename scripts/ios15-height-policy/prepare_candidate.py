@@ -24,7 +24,7 @@ def prepare_sources(build_root, repository, profile_path=None):
     main = before[probe.MAIN_PATH].decode()
     gate.require(main.count(probe.ENTRY) == 1, 'candidate app entrypoint must be unique')
     driver = PROBE / 'DeviceProbe.swift'
-    driver_text = driver.read_text()
+    driver_text = driver.read_text(encoding="utf-8")
     gate.require(driver_text.count('@main') == 1 and 'final class NativeProvisionalHeightApp' in driver_text,
                  'missing unique replay entrypoint')
     for name in ('SelectableMarkdownTextView', 'LegacyHostingContentView', 'SelfSizingCell', 'MessageListLayout'):
@@ -53,7 +53,7 @@ def prepare_sources(build_root, repository, profile_path=None):
 
 
 def prepare_bundle(source_app, output, commit, profile_path=None):
-    profile = json.loads(Path(profile_path or HERE / 'candidate-source.json').read_text())
+    profile = json.loads(Path(profile_path or HERE / 'candidate-source.json').read_text(encoding="utf-8"))
     gate.require(profile['baselineCommit'] == gate.BASELINE and set(profile['productionChanges']) == gate.ALLOWED,
                  'invalid candidate package profile')
     app = probe.prepare_bundle(source_app, output, commit)

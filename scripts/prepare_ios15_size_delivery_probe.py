@@ -87,7 +87,7 @@ def prepare(root, output):
     else:
         raise ValueError('output must not be within production src/')
     source_path = root / RELATIVE_SOURCE
-    original = source_path.read_text()
+    original = source_path.read_text(encoding="utf-8")
     generated = testable_source(original)
     output.mkdir(parents=True, exist_ok=True)
     generated_path = output / 'LegacyHostingContentTestable.swift'

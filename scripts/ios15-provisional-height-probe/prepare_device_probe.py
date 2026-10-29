@@ -21,12 +21,12 @@ MAIN_PATH = 'src/ios/MinisApp.swift'
 DEBUG_PATH = 'src/ios/Debug/MessageListTestView.swift'
 LOGGER_PATH = 'src/ios/Shared/AppLogger.swift'
 RENDER_PATHS = (
-    'src/ios/Views/Chat/SelectableMarkdownView.swift',
+    'src/ios/Views/Chat/Markdown/Bridge/SelectableMarkdownView.swift',
     'src/ios/Agent/Markdown/MinisMarkdownParser.swift',
     'src/ios/Shared/LegacyHostingContent.swift',
     'src/ios/Agent/MessageList/MessageListInfrastructure.swift',
     'src/ios/Agent/MessageList/MessageListLayout.swift',
-    'src/ios/Agent/MessageList/CollectionViewMessageListV3.swift',
+    'src/ios/Agent/MessageList/CollectionViewMessageListV3/CollectionViewMessageListV3.swift',
     'src/ios/Views/Chat/AssistantBlockView.swift',
     'src/ios/Agent/Chat/AIChatViewModel.swift',
     'src/ios/Agent/Chat/AIChatViewModel+Persistence.swift',
@@ -124,7 +124,7 @@ def prepare_sources(build_root: Path, repository: Path, driver: Path) -> dict:
     main = original[MAIN_PATH].decode('utf8')
     if main.count(ENTRY) != 1:
         raise ValueError('app entrypoint is not uniquely identified')
-    driver_text = driver.read_text()
+    driver_text = driver.read_text(encoding="utf-8")
     if driver_text.count('@main') != 1 or 'final class NativeProvisionalHeightApp' not in driver_text:
         raise ValueError('missing unique probe entrypoint')
     for name in ('SelectableMarkdownTextView', 'LegacyHostingContentView', 'SelfSizingCell', 'MessageListLayout'):

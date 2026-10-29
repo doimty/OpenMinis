@@ -35,8 +35,8 @@ class DevicePreparationTests(unittest.TestCase):
             for name in tool.RENDER_PATHS:
                 self.assertEqual((stage / name).read_bytes(), original[name])
             self.assertEqual(tool.restore_sources(stage), original)
-            self.assertIn('NativeProvisionalHeightApp', (stage / tool.DEBUG_PATH).read_text())
-            self.assertEqual((stage / tool.MAIN_PATH).read_text().count('@main'), 0)
+            self.assertIn('NativeProvisionalHeightApp', (stage / tool.DEBUG_PATH).read_text(encoding="utf-8"))
+            self.assertEqual((stage / tool.MAIN_PATH).read_text(encoding="utf-8").count('@main'), 0)
             with self.assertRaises(ValueError):
                 tool.prepare_sources(stage, ROOT, HERE / 'DeviceProbe.swift')
 
@@ -50,7 +50,7 @@ class DevicePreparationTests(unittest.TestCase):
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_bytes(data)
             changed = stage / tool.RENDER_PATHS[0]
-            changed.write_text(changed.read_text() + '\n// unexpected functional source\n')
+            changed.write_text(changed.read_text(encoding="utf-8") + '\n// unexpected functional source\n')
             before = (stage / tool.MAIN_PATH).read_bytes()
             with self.assertRaisesRegex(ValueError, 'baseline'):
                 tool.prepare_sources(stage, ROOT, HERE / 'DeviceProbe.swift')

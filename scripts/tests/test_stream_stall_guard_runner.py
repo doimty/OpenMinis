@@ -104,7 +104,7 @@ class RunnerTests(unittest.TestCase):
                                 '--runner', td + '/missing-swiftc', '--json', td + '/out.json'],
                                capture_output=True, text=True)
             self.assertEqual(p.returncode, 1)
-            r = json.loads(Path(td, 'out.json').read_text())
+            r = json.loads(Path(td, 'out.json').read_text(encoding="utf-8"))
             self.assertGreater(r['summary']['FAIL'], 0)
 
     def test_18_native_case_results_are_json_safe(self):

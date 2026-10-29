@@ -146,7 +146,7 @@ class PackageTests(unittest.TestCase):
             self.assertFalse(any("AgentWidget" in name for name in names))
             self.assertTrue((app / "PlugIns" / "MinisFileProvider.appex").is_dir())
             self.assertEqual(manifest["ipa_sha256"], _sha256(ipa))
-            stored = json.loads((output / "manifest.json").read_text())
+            stored = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(stored["ipa_sha256"], manifest["ipa_sha256"])
 
     def test_diagnostic_stamp_is_opt_in_and_does_not_mutate_source(self):
@@ -224,7 +224,7 @@ class PackageTests(unittest.TestCase):
 
 class WorkflowWiringTests(unittest.TestCase):
     def test_baseline_workflow_packages_and_uploads_ipa(self):
-        source = WORKFLOW.read_text()
+        source = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("python3 scripts/test_package_ios15_ipa.py -v", source)
         self.assertIn("python3 scripts/package_ios15_ipa.py", source)
         self.assertIn("--derived-data \"$RUNNER_TEMP/m1/DerivedData\"", source)

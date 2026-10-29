@@ -91,7 +91,7 @@ def render_entry(key: str, locales: dict) -> str:
 
 
 def load_input(path: str) -> dict:
-    raw = sys.stdin.read() if path == "-" else pathlib.Path(path).read_text()
+    raw = sys.stdin.read() if path == "-" else pathlib.Path(path).read_text(encoding="utf-8")
     data = json.loads(raw)
     if not isinstance(data, dict):
         sys.exit("input must be a JSON object of {key: {locale: value}}")
@@ -120,7 +120,7 @@ def main() -> int:
         sys.exit(f"catalog not found: {catalog}")
 
     wanted = load_input(args.input)
-    original = catalog.read_text()
+    original = catalog.read_text(encoding="utf-8")
     before = json.loads(original)["strings"]
 
     new = [k for k in wanted if k not in before]
@@ -163,7 +163,7 @@ def main() -> int:
 
     # ---- verify, and roll back on any surprise -------------------------------
     try:
-        after = json.loads(catalog.read_text())["strings"]
+        after = json.loads(catalog.read_text(encoding="utf-8"))["strings"]
     except Exception as e:
         catalog.write_text(original)
         sys.exit(f"FAILED: result is not valid JSON ({e}). Original restored.")

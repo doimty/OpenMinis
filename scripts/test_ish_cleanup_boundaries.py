@@ -79,10 +79,10 @@ def run_fixture(code,out,name):
 def main():
  ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--out',required=True,type=pathlib.Path);g=ap.add_mutually_exclusive_group(required=True);g.add_argument('--characterize',action='store_true');g.add_argument('--gate',action='store_true');args=ap.parse_args()
  out=args.out.resolve();out.mkdir(parents=True,exist_ok=False)
- src=(ROOT/OBJC).read_text();helper,hm=c_unit(src,'static BOOL ISHTaskIsDescendantOf(');kill,km=c_unit(src,'+ (void)killProcessGroup:(int)pid {')
+ src=(ROOT/OBJC).read_text(encoding="utf-8");helper,hm=c_unit(src,'static BOOL ISHTaskIsDescendantOf(');kill,km=c_unit(src,'+ (void)killProcessGroup:(int)pid {')
  ckill=kill.replace('+ (void)killProcessGroup:(int)pid {','static void productionKillProcessGroup(int pid) {',1)
  assert ckill[ckill.index('{'):]==kill[kill.index('{'):]
- template=(ROOT/'scripts/ish-cleanup-tests/kernel_fixture.m').read_text();production=helper+'\n'+ckill
+ template=(ROOT/'scripts/ish-cleanup-tests/kernel_fixture.m').read_text(encoding="utf-8");production=helper+'\n'+ckill
  generated=template.replace('/* PRODUCTION_FUNCTIONS */',production)
  rc,cases=run_fixture(generated,out,'baseline-kernel')
  if rc or not cases or cases[-1].get('fixture_failures')!=0:raise RuntimeError('baseline fixture expectations did not hold')

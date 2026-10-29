@@ -561,7 +561,7 @@ def check_catalog(ss, rep):
         rep.add("catalog", "catalog.auto_compact_keys", "PENDING", CATALOG_REL + " not found")
         return
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         strings = data.get("strings", {})
     except Exception as exc:
         rep.add("catalog", "catalog.auto_compact_keys", "FAIL", "xcstrings does not parse: %r" % (exc,))
@@ -608,7 +608,7 @@ def check_new_view_contract(ss, rep):
     path, txt = view_files[0]
     rep.add("view", "view.auto_compaction_settings_page", "PASS", str(path.relative_to(ss.root)))
     # settings entry
-    content = (ss.root / "src/ios/Views/ContentView.swift")
+    content = (ss.root / "src/ios/Views/ContentView/ContentView.swift")
     entry_ok = False
     if content.exists():
         ctext = content.read_text(errors="replace")
@@ -617,7 +617,7 @@ def check_new_view_contract(ss, rep):
     rep.add("view", "view.settings_entry", "PASS" if entry_ok else "FAIL",
             "settings list links the page" if entry_ok else "no NavigationLink found in ContentView.swift")
     # chat menu entry
-    chat = ss.root / "src/ios/Views/Chat/AIChatView.swift"
+    chat = ss.root / "src/ios/Views/Chat/AIChatView/AIChatView.swift"
     menu_ok = False
     if chat.exists():
         ctext = chat.read_text(errors="replace")
@@ -678,7 +678,7 @@ def check_oracle(rep, test_file):
     if not test_file.exists():
         rep.add("oracle", check_name, "FAIL", "test file not found: %s" % test_file)
         return
-    text = test_file.read_text()
+    text = test_file.read_text(encoding="utf-8")
     rows = []
     for m in CASE_RE.finditer(text):
         try:
@@ -858,7 +858,7 @@ def main():
                 mr = Path(td) / ('m'+str(idx))
                 for f in CHAT_FILES:
                     dst=mr/f;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(args.source_root/f,dst)
-                target=mr/rel; original=target.read_text()
+                target=mr/rel; original=target.read_text(encoding="utf-8")
                 if original.count(old)!=1:
                     rep.add('mutant',label,'FAIL','mutation anchor is not unique');continue
                 target.write_text(original.replace(old,new,1)); mutated=SourceSet(mr)

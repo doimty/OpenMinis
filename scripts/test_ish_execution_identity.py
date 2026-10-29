@@ -10,9 +10,9 @@ def main():
  ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--out',required=True,type=pathlib.Path);a=ap.parse_args();out=a.out.resolve();out.mkdir(parents=True,exist_ok=False)
  compiler=shutil.which('cc') or shutil.which('clang')
  if not compiler:raise RuntimeError('a C compiler is required')
- src=(P/'src/ios/iSH/ISHShellExecutor.m').read_text()
+ src=(P/'src/ios/iSH/ISHShellExecutor.m').read_text(encoding="utf-8")
  helper,manifest=b.c_unit(src,'static BOOL ISHSignalTasksForExecutionToken(')
- template=(P/'scripts/ish-cleanup-tests/token_signal.c').read_text()
+ template=(P/'scripts/ish-cleanup-tests/token_signal.c').read_text(encoding="utf-8")
  code=template.replace('/* PRODUCTION_TOKEN_SIGNAL */',helper)
  header=P/'src/ios/iSH/ISHExecutionIdentity.h'
  results=[]
@@ -31,7 +31,7 @@ def main():
  run('identity',path=P/'scripts/ish-cleanup-tests/identity.c')
  run('production-token-signal',code=code)
  cancelled,cancel_manifest=b.c_unit(src,'static int ISHStartCancelledTask(')
- cancel_template=(P/'scripts/ish-cleanup-tests/cancelled_start.c').read_text()
+ cancel_template=(P/'scripts/ish-cleanup-tests/cancelled_start.c').read_text(encoding="utf-8")
  run('production-cancelled-start',code=cancel_template.replace('/* PRODUCTION_CANCELLED_START */',cancelled))
  bad=cancelled.replace('task->group->doing_group_exit = true;', 'task->group->doing_group_exit = false;')
  if bad==cancelled:raise RuntimeError('exit-only mutation did not apply')

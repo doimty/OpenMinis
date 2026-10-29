@@ -463,7 +463,7 @@ struct UnifiedModelPicker: View {
     /// re-filters. 120ms sits inside the 100-150ms the issue suggests: long
     /// enough that a burst of typing is one pass, short enough to feel
     /// immediate.
-    private static let searchDebounce: Duration = .milliseconds(120)
+    private static let searchDebounce: UInt64 = 120_000_000
 
     /// [T-picker-search-cap] Rows rendered for one search.
     ///
@@ -695,7 +695,7 @@ struct UnifiedModelPicker: View {
                 return
             }
             searchDebounceTask = Task { @MainActor in
-                try? await Task.sleep(for: Self.searchDebounce)
+                try? await Task.sleep(nanoseconds: Self.searchDebounce)
                 guard !Task.isCancelled else { return }
                 debouncedSearch = trimmed
             }

@@ -18,9 +18,9 @@ SOURCES = (
     'src/ios/Shared/LegacyHostingContent.swift',
     'src/ios/Agent/MessageList/MessageListInfrastructure.swift',
     'src/ios/Agent/MessageList/MessageListLayout.swift',
-    'src/ios/Agent/MessageList/CollectionViewMessageListV3.swift',
-    'src/ios/Views/Chat/SelectableMarkdownView.swift',
-    'src/ios/Views/Chat/AIChatView.swift',
+    'src/ios/Agent/MessageList/CollectionViewMessageListV3/CollectionViewMessageListV3.swift',
+    'src/ios/Views/Chat/Markdown/Bridge/SelectableMarkdownView.swift',
+    'src/ios/Views/Chat/AIChatView/AIChatView.swift',
 )
 BLOCK = re.compile(r'(?m)^[ \t]*// REENTRY-DIAG-BEGIN\n.*?^[ \t]*// REENTRY-DIAG-END\n?', re.S)
 
@@ -32,7 +32,7 @@ def normalize(source: str) -> str:
 def check(root: Path) -> dict:
     result = {}
     for name in SOURCES:
-        source = (root / name).read_text()
+        source = (root / name).read_text(encoding="utf-8")
         baseline = subprocess.check_output(['git', '-C', str(root), 'show', BASELINE + ':' + name], text=True)
         blocks = BLOCK.findall(source)
         if not blocks or source.count('REENTRY-DIAG-BEGIN') != len(blocks):
@@ -55,7 +55,7 @@ def check(root: Path) -> dict:
 
 
 def extract_helper(root: Path) -> str:
-    source = (root / SOURCES[0]).read_text()
+    source = (root / SOURCES[0]).read_text(encoding="utf-8")
     blocks = BLOCK.findall(source)
     if len(blocks) != 1:
         raise ValueError('collector extraction must have exactly one source block')

@@ -14,14 +14,14 @@ class RetryHitContractTests(unittest.TestCase):
         probe = ROOT / "scripts/ios15-retry-probe/ProbeApp.swift"
         self.assertTrue(probe.exists())
         self.assertTrue((ROOT / "scripts/run_ios15_retry_probe.sh").exists())
-        self.assertIn("LegacyHostingConfiguration", probe.read_text())
+        self.assertIn("LegacyHostingConfiguration", probe.read_text(encoding="utf-8"))
 
     def test_workflow_has_retry_probe_step(self):
-        workflow = (ROOT / ".github/workflows/ios15-m0-baseline.yml").read_text()
+        workflow = (ROOT / ".github/workflows/ios15-m0-baseline.yml").read_text(encoding="utf-8")
         self.assertIn("run_ios15_retry_probe.sh", workflow)
 
     def test_bottom_inset_floors_unreported_floating_preview(self):
-        source = (ROOT / "src/ios/Agent/MessageList/CollectionViewMessageListV3.swift").read_text()
+        source = (ROOT / "src/ios/Agent/MessageList/CollectionViewMessageListV3/CollectionViewMessageListV3.swift").read_text(encoding="utf-8")
         self.assertIn("effectiveFloatingHeight", source)
         self.assertIn("floatingBarHeight > 1", source)
         self.assertIn("hasToolBlocks ? 100 : 0", source)
@@ -32,7 +32,7 @@ class RetryHitContractTests(unittest.TestCase):
         # must never leave that overflow touch-dead. The production fix is a
         # bounds-aware hitTest, not a bottom constraint (which would change
         # intrinsic sizing).
-        source = (ROOT / "src/ios/Shared/LegacyHostingContent.swift").read_text()
+        source = (ROOT / "src/ios/Shared/LegacyHostingContent.swift").read_text(encoding="utf-8")
         self.assertNotIn("host.view.bottomAnchor.constraint", source)
         self.assertIn("override func hitTest", source)
         self.assertIn("host.view", source.split("override func hitTest", 1)[1][:900])

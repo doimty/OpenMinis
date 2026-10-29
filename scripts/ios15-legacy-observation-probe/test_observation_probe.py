@@ -99,15 +99,15 @@ class ExtractionTests(unittest.TestCase):
         self.manifest = prepare(ROOT, self.out, HERE)
 
     def test_baseline_restores_to_locked_old_commit(self):
-        baseline = (self.out / "ProductionInfrastructure-baseline.swift").read_text()
+        baseline = (self.out / "ProductionInfrastructure-baseline.swift").read_text(encoding="utf-8")
         self.assertEqual(restore_production(baseline), locked(SOURCE_PATHS[3]).split(SPLIT, 1)[0])
 
     def test_manifest_records_locked_baseline(self):
         self.assertEqual(self.manifest["baseline_commit"], BASELINE_COMMIT)
 
     def test_candidate_diff_is_exactly_the_declared_clear_edit(self):
-        baseline = (self.out / "ProductionInfrastructure-baseline.swift").read_text()
-        candidate = (self.out / "ProductionInfrastructure-candidate.swift").read_text()
+        baseline = (self.out / "ProductionInfrastructure-baseline.swift").read_text(encoding="utf-8")
+        candidate = (self.out / "ProductionInfrastructure-candidate.swift").read_text(encoding="utf-8")
         self.assertIn(CLEAR_OLD, baseline)
         self.assertNotIn(CLEAR_OLD, candidate)
         self.assertIn(CLEAR_CANDIDATE, candidate)
@@ -117,7 +117,7 @@ class ExtractionTests(unittest.TestCase):
 
     def test_both_variants_carry_readonly_getters(self):
         for name in ("ProductionInfrastructure-baseline.swift", "ProductionInfrastructure-candidate.swift"):
-            text = (self.out / name).read_text()
+            text = (self.out / name).read_text(encoding="utf-8")
             self.assertEqual(text.count(GETTER_HEAD), 1)
             self.assertEqual(text.count(GETTER_TAIL), 1)
             self.assertIn("probeCacheSnapshot", text)
@@ -136,7 +136,7 @@ class ExtractionTests(unittest.TestCase):
             self.manifest["generated_sha256"]["ProductionInfrastructure-candidate.swift"])
 
     def test_probe_app_adds_no_synchronous_measure_or_fabricated_heights(self):
-        text = PROBE_APP.read_text()
+        text = PROBE_APP.read_text(encoding="utf-8")
         self.assertNotIn("systemLayoutSizeFitting", text)
         self.assertNotIn("setCachedHeight(", text)
         self.assertNotIn("cell.preferredLayoutAttributesFitting(", text)
@@ -144,7 +144,7 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(text.count("clearCachedHeight()"), 2)
 
     def test_probe_app_uses_real_infra_and_layout(self):
-        text = PROBE_APP.read_text()
+        text = PROBE_APP.read_text(encoding="utf-8")
         self.assertIn("MessageListViewController()", text)
         self.assertIn("cell.applyHostedContent(parent: vc)", text)
         self.assertIn("messageListLayout.invalidateHeight(at:", text)

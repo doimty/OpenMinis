@@ -4,12 +4,12 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "src/ios/Views/Chat/SelectableMarkdownView.swift"
+SOURCE = ROOT / "src/ios/Views/Chat/Markdown/Bridge/SelectableMarkdownView.swift"
 
 
 class SessionWidthContractTests(unittest.TestCase):
     def test_invalid_bounds_do_not_report_textview_ideal_width(self):
-        source = SOURCE.read_text()
+        source = SOURCE.read_text(encoding="utf-8")
         marker = "    override var intrinsicContentSize: CGSize {"
         self.assertEqual(source.count(marker), 1)
         method = source[source.index(marker):source.index("\n    // [T-ios-table-cell-image-menu]", source.index(marker))]

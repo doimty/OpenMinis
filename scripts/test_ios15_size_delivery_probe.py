@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class SourceCopyTests(unittest.TestCase):
     def test_generated_copy_restores_exactly_to_production_source(self):
-        source = (ROOT / RELATIVE_SOURCE).read_text()
+        source = (ROOT / RELATIVE_SOURCE).read_text(encoding="utf-8")
         generated = testable_source(source)
         self.assertNotEqual(generated, source)
         self.assertIn('func contentSizeChanged(_ payload: LegacyHostedSize)', generated)
@@ -47,7 +47,7 @@ class SourceCopyTests(unittest.TestCase):
             self.assertEqual(metadata['production_source'], str(RELATIVE_SOURCE))
             # The generated copy only widens access + adds a probe getter:
             # restoring it must recover the production bytes exactly.
-            self.assertEqual(restore_source(generated.read_text()), before.decode())
+            self.assertEqual(restore_source(generated.read_text(encoding="utf-8")), before.decode())
         self.assertEqual(source_path.read_bytes(), before)
 
     def test_generation_refuses_production_directory(self):

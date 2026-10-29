@@ -244,7 +244,7 @@ class RealOutputRegressionTests(unittest.TestCase):
         self.assertFalse(audit_metadata(text, 'arm64', PLIST_OK, output=True)['ok'])
 
     def test_toolchain_prefix_is_not_added_twice(self):
-        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text()
+        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text(encoding="utf-8")
         self.assertFalse('^Xcode ${EXPECTED_XCODE' in script,
                          'workflow value already includes the Xcode prefix')
         self.assertFalse('Build version ${EXPECTED_XCODE_BUILD' in script,
@@ -266,7 +266,7 @@ class RealOutputRegressionTests(unittest.TestCase):
 class OutputEvidenceRegressionTests(unittest.TestCase):
     def test_evidence_paths_are_unique_on_case_insensitive_filesystems(self):
         import re
-        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text()
+        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text(encoding="utf-8")
         paths = set(re.findall(r'\$WORK/(out/[^"\s]+\.txt)', script))
         folded = {}
         for path in paths:
@@ -321,13 +321,13 @@ class OutputEvidenceRegressionTests(unittest.TestCase):
 
     def _summarize(self, work, statuses, exit_code=0):
         import subprocess, sys
-        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text()
+        script = (Path(__file__).parent / 'probe_ios15_vad.sh').read_text(encoding="utf-8")
         body = script.split('summarize() {', 1)[1].split("<<'PY'\n", 1)[1].split('\nPY\n', 1)[0]
         (work / 'status.txt').write_text(statuses)
         subprocess.run([sys.executable, '-', str(work), str(exit_code)], input=body,
                        capture_output=True, text=True, check=True, timeout=10)
         import json
-        return json.loads((work / 'evidence/evidence.json').read_text())
+        return json.loads((work / 'evidence/evidence.json').read_text(encoding="utf-8"))
 
     def test_partial_gate_list_cannot_approve(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -350,7 +350,7 @@ class OutputEvidenceRegressionTests(unittest.TestCase):
             content = 'start\n' + 'x' * 210000 + '\nBUILD SUCCEEDED\n'
             (work / 'out/build.log').write_text(content)
             self._summarize(work, 'toolchain=0\n')
-            evidence = _json.loads((work / 'evidence/evidence.json').read_text())
+            evidence = _json.loads((work / 'evidence/evidence.json').read_text(encoding="utf-8"))
             self.assertEqual(evidence['out_build.log'], content)
 
 
@@ -360,14 +360,14 @@ class LocalPackageIntegrationTests(unittest.TestCase):
     ROOT = Path(__file__).resolve().parent.parent
 
     def test_pbxproj_uses_local_vad_package_reference(self):
-        pbx = (self.ROOT / 'src/ios/Minis.xcodeproj/project.pbxproj').read_text()
+        pbx = (self.ROOT / 'src/ios/Minis.xcodeproj/project.pbxproj').read_text(encoding="utf-8")
         self.assertIn('XCLocalSwiftPackageReference "RealTimeCutVADLibrary"', pbx)
         self.assertIn('E5A1B2C3D4E5F60718293A4B', pbx)
         self.assertNotIn('helloooideeeeea/RealTimeCutVADLibrary.git', pbx)
         self.assertNotIn('B318C2F47DB3F301A17E49BE', pbx)
 
     def test_vendored_package_uses_local_binary_path(self):
-        manifest = (self.ROOT / 'vendor/RealTimeCutVADLibrary/Package.swift').read_text()
+        manifest = (self.ROOT / 'vendor/RealTimeCutVADLibrary/Package.swift').read_text(encoding="utf-8")
         self.assertIn('path: "Frameworks/RealTimeCutVADCXXLibrary.xcframework"', manifest)
         self.assertNotIn('url:', manifest)
         self.assertNotIn('RealTimeCutVADLibraryForXCFramework', manifest)
@@ -382,13 +382,13 @@ class LocalPackageIntegrationTests(unittest.TestCase):
         self.assertGreater((root / 'Resources/silero_vad_v5.onnx').stat().st_size, 1_000_000)
 
     def test_build_vad_script_overrides_floor_and_checks_inputs(self):
-        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text()
+        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text(encoding="utf-8")
         self.assertIn('IPHONEOS_DEPLOYMENT_TARGET=15.0', script)
         self.assertIn('ONNX_SHA256', script)
         # The source SHA is pinned in the workflow env, not hardcoded in the
         # script; verify the script consumes it and the workflow pins it.
         self.assertIn('NATIVE_CXX_SHA', script)
-        workflow = (self.ROOT / '.github/workflows/ios15-m0-baseline.yml').read_text()
+        workflow = (self.ROOT / '.github/workflows/ios15-m0-baseline.yml').read_text(encoding="utf-8")
         self.assertIn('1648fc13a04a90521a2ef3887885ef2506208605', workflow)
 
     def test_build_vad_script_success_marker_is_fixed_string(self):
@@ -396,7 +396,7 @@ class LocalPackageIntegrationTests(unittest.TestCase):
         # SUCCEEDED **'` fails with "repetition-operator operand invalid" on
         # BSD grep (macOS) even when xcodebuild succeeded, so the native-deps
         # step misreports a green VAD build as failed. Must be grep -Fq.
-        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text()
+        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text(encoding="utf-8")
         self.assertIn("grep -Fq '** BUILD SUCCEEDED **'", script)
         self.assertNotIn("grep -q '** BUILD SUCCEEDED **'", script)
 
@@ -408,7 +408,7 @@ class LocalPackageIntegrationTests(unittest.TestCase):
         # Without the format version, Xcode 26 fails with "Failed to decode
         # XCFramework Info.plist ... because it is missing" even though the
         # plist file exists. Also require the AvailableLibraries slice keys.
-        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text()
+        script = (self.ROOT / 'deps/build_vad_framework.sh').read_text(encoding="utf-8")
         self.assertIn('XCFrameworkFormatVersion', script)
         self.assertIn("'1.0'", script)
         self.assertIn("'CFBundlePackageType'", script)

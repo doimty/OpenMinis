@@ -172,42 +172,42 @@ final class CrashReporter: NSObject, MXMetricManagerSubscriber {
 
     private var logRing: [String] = []
     private let logRingCapacity = 20
-    private var logRingLock = os_unfair_lock()
+    private let logRingLock = NSLock()
 
     func appendLog(_ line: String) {
-        os_unfair_lock_lock(&logRingLock)
+        logRingLock.lock()
         if logRing.count >= logRingCapacity {
             logRing.removeFirst()
         }
         logRing.append(line)
-        os_unfair_lock_unlock(&logRingLock)
+        logRingLock.unlock()
     }
 
     func logRingSnapshot() -> [String] {
-        os_unfair_lock_lock(&logRingLock)
+        logRingLock.lock()
         let snapshot = logRing
-        os_unfair_lock_unlock(&logRingLock)
+        logRingLock.unlock()
         return snapshot
     }
 
     // MARK: - Last API Tracking
 
-    private var lastAPILock = os_unfair_lock()
+    private let lastAPILock = NSLock()
     private var _lastAPIProvider: String?
     private var _lastAPIModel: String?
 
     func setLastAPI(provider: String, model: String) {
-        os_unfair_lock_lock(&lastAPILock)
+        lastAPILock.lock()
         _lastAPIProvider = provider
         _lastAPIModel = model
-        os_unfair_lock_unlock(&lastAPILock)
+        lastAPILock.unlock()
     }
 
     private func lastAPI() -> (provider: String?, model: String?) {
-        os_unfair_lock_lock(&lastAPILock)
+        lastAPILock.lock()
         let p = _lastAPIProvider
         let m = _lastAPIModel
-        os_unfair_lock_unlock(&lastAPILock)
+        lastAPILock.unlock()
         return (p, m)
     }
 

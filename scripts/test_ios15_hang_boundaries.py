@@ -23,9 +23,9 @@ import tree_sitter_swift
 PARSER = Parser(Language(tree_sitter_swift.language()))
 BASE = "b393f824c6f3d431fbe6e642c38b83f27555960c"
 REG = "src/ios/Agent/Jobs/AgentJobRegistry.swift"
-LIST = "src/ios/Agent/MessageList/CollectionViewMessageListV3.swift"
+LIST = "src/ios/Agent/MessageList/CollectionViewMessageListV3/CollectionViewMessageListV3.swift"
 INFRA = "src/ios/Agent/MessageList/MessageListInfrastructure.swift"
-UI = "src/ios/Views/Chat/AIChatView.swift"
+UI = "src/ios/Views/Chat/AIChatView/AIChatView.swift"
 TEST = "tests/Standalone/HangBoundaryTests.swift"
 # Frozen BASE layout bytes: covers super, background/off-window/snapshot,
 # reentrancy, finite offset correction, user-scroll and width-prewarm guards.

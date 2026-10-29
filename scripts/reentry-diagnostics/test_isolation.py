@@ -14,7 +14,7 @@ class IsolationTests(unittest.TestCase):
 
     def run_with_mutation(self, path, old, new):
         original = Path.read_text
-        data = path.read_text()
+        data = path.read_text(encoding="utf-8")
         self.assertEqual(data.count(old), 1)
         mutated = data.replace(old, new)
         def read(p, *args, **kwargs):
@@ -23,14 +23,14 @@ class IsolationTests(unittest.TestCase):
             check(ROOT)
 
     def test_unrelated_scroll_behavior_change_is_rejected(self):
-        path = ROOT / 'src/ios/Agent/MessageList/CollectionViewMessageListV3.swift'
+        path = ROOT / 'src/ios/Agent/MessageList/CollectionViewMessageListV3/CollectionViewMessageListV3.swift'
         with self.assertRaisesRegex(ValueError, 'non-diagnostic source change'):
             self.run_with_mutation(path,
                 'var scrollMode: ScrollMode = .autoScrolling {',
                 'var scrollMode: ScrollMode = .userBrowsing {')
 
     def test_observer_cannot_force_an_extra_text_measure(self):
-        path = ROOT / 'src/ios/Views/Chat/SelectableMarkdownView.swift'
+        path = ROOT / 'src/ios/Views/Chat/Markdown/Bridge/SelectableMarkdownView.swift'
         with self.assertRaisesRegex(ValueError, 'active UI operation'):
             self.run_with_mutation(path,
                 '        let context = reentryDiagnosticContext(self)\n',

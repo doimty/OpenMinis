@@ -31,7 +31,7 @@ def main() -> int:
                     help="extra swiftc argument, repeated in order (SDK/target)")
     args = ap.parse_args()
 
-    original = args.source.read_text()
+    original = args.source.read_text(encoding="utf-8")
     args.work.mkdir(parents=True, exist_ok=True)
     failures = []
 

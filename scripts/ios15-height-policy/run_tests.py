@@ -116,7 +116,7 @@ def main():
     args = parser.parse_args()
     expected = args.expect_failure
     if args.expected_failures:
-        recorded = json.loads(args.expected_failures.read_text())
+        recorded = json.loads(args.expected_failures.read_text(encoding="utf-8"))
         assert isinstance(recorded, list) and all(isinstance(name, str) for name in recorded)
         expected += recorded
     assert len(expected) == len(set(expected)), 'repeated expected failure name'
