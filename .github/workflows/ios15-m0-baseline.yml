@@ -17,7 +17,7 @@ env:
   EXPECTED_XCODE: "Xcode 26.2"
   EXPECTED_XCODE_BUILD: "Build version 17C52"
   EXPECTED_IOS_SDK: "26.2"
-  EXPECTED_ISH: "e6521d9cfe9cd48f19917fc3b23aea622ba358b4"
+  EXPECTED_ISH: "0fd17a135e78b7a0cf08a4f5831217bbb76ed22f"
   # Pins for the vendored local VAD package's binary (built from C++ source
   # at IPHONEOS_DEPLOYMENT_TARGET=15.0, see deps/build_vad_framework.sh).
   # Checksums are the published values from the wrapper Package.swift tag
