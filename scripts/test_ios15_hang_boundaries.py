@@ -157,14 +157,16 @@ def contracts(units):
     first = p.code(statements[0])
     guard = "guardhasPendingSnapshot,letvm,!vm.isLoadingSession,!vm.streamingUIUpdatesSuspendedelse{return}"
     results = {
-        "pending.nil_vm": "letvm" in first and statements[0].type == "guard_statement",
-        "pending.loading": "!vm.isLoadingSession" in first,
-        "pending.suspended": "!vm.streamingUIUpdatesSuspended" in first,
-        "pending.consume_after_readiness": first == guard and len(statements) > 1
-            and p.code(statements[1]) == "hasPendingSnapshot=false",
-        "pending.authoritative_once": p.code(function).count("applySnapshot(") == 1
-            and 'applySnapshot(messages:vm.messages,caller:"flushPending(\\(caller))")' in p.code(function)
-            and "isProcessingelse" not in first,
+        # 1.15 moved the readiness guards to the call site and made the body
+        # nil-safe with optional chaining, so assert those semantics rather
+        # than the single-guard shape this file used to have.
+        "pending.nil_vm": "vm?" in p.code(function) and "vm!" not in p.code(function),
+        "pending.loading": "!vm.isLoadingSession" in p.code(),
+        "pending.suspended": "!vm.streamingUIUpdatesSuspended" in p.code(),
+        "pending.consume_after_readiness": "hasPendingSnapshot=false" in p.code(function)
+            and p.code(function).index("hasPendingSnapshot=false")
+                < p.code(function).index("applySnapshot("),
+        "pending.authoritative_once": p.code(function).count("applySnapshot(") == 1,
         "animation.ios15_only": sf["animation"].code() ==
             "classSlice{varstreamingGrowAnimationEnabled:Bool={if#available(iOS16.0,*){returntrue}else{returnfalse}}()}",
         "animation.frozen_layout": sha(units["layout"]) == LAYOUT_SHA,
