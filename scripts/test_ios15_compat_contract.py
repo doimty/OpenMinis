@@ -93,13 +93,18 @@ class CompatibilityContractTests(unittest.TestCase):
         body = body.split("// MARK: - Background Task Notifications", 1)[0]
         self.assertTrue(body.lstrip().startswith("guard #available(iOS 16.0, *) else {"))
         self.assertIn("UIApplication.shared.applicationIconBadgeNumber = total", body)
-        self.assertIn("center.setBadgeCount(sessions.count)", body)
+        # 1.15 recomputes from one ledger, so the total (not the raw running count) is set.
+        self.assertIn(".setBadgeCount(total)", body)
+        # 1.15 dropped the launch-time badge reset from MinisApp: the single
+        # ledger in BackgroundKeepAliveManager owns the icon now, so assert the
+        # 16+ API is confined there instead of at startup.
         app = (ROOT / "src/ios/MinisApp.swift").read_text(encoding="utf-8")
-        self.assertEqual(app.count("UNUserNotificationCenter.current().setBadgeCount(0)"), 1)
-        self.assertIn("UIApplication.shared.applicationIconBadgeNumber = 0", app)
+        self.assertNotIn("setBadgeCount", app)
 
     def test_markdown_rendering_uses_legacy_safe_media_and_image_scan(self):
         source = (ROOT / "src/ios/Views/Chat/Markdown/Bridge/SelectableMarkdownView.swift").read_text(encoding="utf-8")
+        # 1.15 moved the video thumbnail work into its own attachment file.
+        source += (ROOT / "src/ios/Views/Chat/Markdown/Attachments/VideoAttachment.swift").read_text(encoding="utf-8")
         self.assertNotIn("markdown.ranges(of:", source)
         self.assertNotIn("try await generator.image(at:", source)
         self.assertIn("MarkdownStripper.imageSyntaxMatches(in: markdown)", source)

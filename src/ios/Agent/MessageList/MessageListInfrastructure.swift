@@ -72,6 +72,13 @@ class SelfSizingCell: UICollectionViewCell {
     /// SwiftUI's view graph and triggering a geometry observer race.
     private var lastComputedHeight: CGFloat?
 
+    /// iOS 15's legacy hosting path reports this from GeometryReader after the
+    /// host has rendered. It is the only synchronous-free size source on that
+    /// OS; calling UIHostingController.systemLayoutSizeFitting from UIKit's
+    /// preferred-layout callback re-enters AttributeGraph and can PAC-crash.
+    private var legacyMeasuredSize: CGSize?
+
+
     /// The width at which `lastComputedHeight` was measured. A width change
     /// still re-measures; an unchanged width reuses the cached height without
     /// calling `super.preferredLayoutAttributesFitting` or
@@ -160,6 +167,60 @@ class SelfSizingCell: UICollectionViewCell {
     private static var dedupLastFlush: CFTimeInterval = 0
     private static var broadHits: Int = 0
     private static var broadLastFlush: CFTimeInterval = 0
+
+
+    /// Find the legacy UIContentView wherever UIKit installed it: depending on
+    /// the cell class and OS point release it may be the contentView or sit
+    /// below UIKit's managed container. The hit region must work either way.
+    private var legacyHostingContentView: LegacyHostingContentView? {
+        if let legacy = contentView as? LegacyHostingContentView { return legacy }
+        var pending = contentView.subviews
+        while let view = pending.popLast() {
+            if let legacy = view as? LegacyHostingContentView { return legacy }
+            pending.append(contentsOf: view.subviews)
+        }
+        return nil
+    }
+
+    /// UIKit rejects touches outside the receiver's bounds before it consults
+    /// subviews, and the receiver is THIS cell — the content view's own
+    /// hitTest forwarding is never reached for a point below the cell bounds.
+    /// The overflow tail is then visible but touch-dead; the chat footer's
+    /// Retry and Resume capsules are exactly that tail. Extend the hit region
+    /// to the host's real bounds on the legacy path only: iOS 16+'s
+    /// UIHostingConfiguration measures synchronously, never leaves this
+    /// window, and keeps the exact cell-bounds hit region.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        if super.point(inside: point, with: event) { return true }
+        guard contentConfiguration is LegacyHostingConfiguration,
+              let legacy = legacyHostingContentView else {
+            return false
+        }
+        return legacy.hitRegionContains(convert(point, to: legacy))
+    }
+
+    /// The legacy host may sit below UIKit's managed content container, which
+    /// can reject an overflow point after this cell accepted it. Forward once
+    /// more from the cell so the host's own hitTest gets a chance to resolve
+    /// the SwiftUI control.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        guard hit === self else { return hit }
+        guard contentConfiguration is LegacyHostingConfiguration,
+              let legacy = legacyHostingContentView else {
+            return hit
+        }
+        // Respect visibility/interaction vetoes from this cell down to the
+        // host: super returned self only because of geometric rejection.
+        var cursor: UIView? = legacy.superview
+        while let view = cursor, view !== self {
+            if view.isHidden || view.alpha <= 0.01 || !view.isUserInteractionEnabled {
+                return hit
+            }
+            cursor = view.superview
+        }
+        return legacy.hitTest(convert(point, to: legacy), with: event) ?? hit
+    }
 
     override func preferredLayoutAttributesFitting(
         _ layoutAttributes: UICollectionViewLayoutAttributes
@@ -358,6 +419,29 @@ class SelfSizingCell: UICollectionViewCell {
         // byte-identical.
         var hostingSubtree: [UIView] = []
         Self.collectSubtree(self.contentView, into: &hostingSubtree)
+        // [T-ios15-legacy-hosting-size] On the legacy path the size only exists
+        // after GeometryReader has reported: measuring synchronously from this
+        // callback re-enters SwiftUI's AttributeGraph during a diffable update
+        // and crashes. Until a report arrives, keep the layout's estimate;
+        // afterwards return the measured height and let the normal
+        // invalidation path settle the row.
+        if contentConfiguration is LegacyHostingConfiguration {
+            guard let measured = legacyMeasuredSize,
+                  measured.width > 1,
+                  measured.height.isFinite else {
+                return layoutAttributes
+            }
+            let copy = layoutAttributes.copy() as! UICollectionViewLayoutAttributes
+            let height = max(0, ceil(measured.height))
+            copy.size.height = height
+            if height >= 4 {
+                lastComputedHeight = height
+                lastComputedWidth = layoutAttributes.size.width
+                lastMeasureMediaTime = CACurrentMediaTime()
+            }
+            return copy
+        }
+
         var superAttrs: UICollectionViewLayoutAttributes = layoutAttributes
         let superOk = noff_try_objc {
             withExtendedLifetime(hostingSubtree) {

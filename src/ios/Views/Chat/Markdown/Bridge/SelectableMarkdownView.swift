@@ -544,7 +544,7 @@ struct SelectableMarkdownView: UIViewRepresentable {
         // becomes a measurable chunk of every updateUIView pass (and
         // updateUIView runs on each SwiftUI body re-evaluation, so it
         // multiplies during streaming and self-sizing measurement loops).
-        let imageMatches = markdown.ranges(of: /!\[([^\]]*)\]\(([^)]+)\)/)
+        let imageMatches = MarkdownStripper.imageSyntaxMatches(in: markdown)
         if !imageMatches.isEmpty {
             for match in imageMatches {
                 let matchStr = String(markdown[match])

@@ -203,7 +203,7 @@ final class VideoAttachment: NSTextAttachment {
 
             var thumb: UIImage?
             do {
-                let (cgImage, _) = try await generator.image(at: .zero)
+                let cgImage = try await ThumbnailCache.videoFrame(using: generator, at: .zero)
                 thumb = UIImage(cgImage: cgImage)
             } catch {
                 // Fallback: no thumbnail

@@ -169,7 +169,6 @@ struct MinisApp: App {
         // @State initializer (evaluated at ContentView instantiation, before any
         // .onAppear refresh) locks the sidebar title to the default even when the
         // user set a custom name. refreshCache() only reads the tiny SOUL.md file.
-        SoulStore.refreshCache()
         // Pre-warm KaTeX WKWebView as fallback for formulas SwiftMath can't render
         KaTeXRenderer.shared.warmUp()
         // Pre-warm the biometric capability probe off the main thread. The
@@ -749,6 +748,7 @@ struct MinisApp: App {
 
     // MARK: - FileProvider
 
+    @available(iOS 16.0, *)
     private static let fileProviderDomain = NSFileProviderDomain(
         identifier: NSFileProviderDomainIdentifier("com.openminis.app.files"),
         displayName: "Minis"
@@ -815,6 +815,29 @@ struct MinisApp: App {
     private static func registerFileProviderDomain() {
         logAppUpdateMarkerForFPTrace()
 
+        let root = AIChatViewModel.minisAppGroupRoot
+        let fm = FileManager.default
+        // Ensure all three subdirectories exist.
+        for sub in ["memory", "skills", "shared"] {
+            try? fm.createDirectory(at: root.appendingPathComponent(sub, isDirectory: true),
+                                    withIntermediateDirectories: true)
+        }
+        // [T-soul-md] Seed SOUL.md with default content on first launch so the
+        // Soul settings page and chat bubble identity have something to render
+        // before the user customises it. Never overwrites an existing file.
+        // Cache the parsed metadata so synchronous call sites see the user's
+        // name/emoji immediately.
+        SoulStore.ensureExists()
+        // [T-ios-soul-name-sidebar-stale] Refresh synchronously: this runs from
+        // the app's .onAppear on the main thread and refreshCache() is
+        // @MainActor, so the async hop only delayed cachedMetadata.
+        SoulStore.refreshCache()
+
+        // [T-ios15-file-provider] NSFileProviderManager's domain work is iOS 16+.
+        // The core setup above must still run on 15: the App Group directories
+        // and SOUL.md are what the rest of the app reads.
+        guard #available(iOS 16.0, *) else { return }
+
         // [T-ios-fp-mac-bootcrash] Circuit breaker, NOT a blanket disable.
         //
         // On Macs running the iPhone build the appex can die pre-main (SIGILL
@@ -853,19 +876,11 @@ struct MinisApp: App {
             lifecycleLog.warning("[FileProvider] appex has not reported a successful boot since \(pending) registration(s) on this build")
         }
 
-        let root = AIChatViewModel.minisAppGroupRoot
-        let fm = FileManager.default
-        // Ensure all three subdirectories exist.
-        for sub in ["memory", "skills", "shared"] {
-            try? fm.createDirectory(at: root.appendingPathComponent(sub, isDirectory: true),
-                                    withIntermediateDirectories: true)
-        }
         // [T-soul-md] Seed SOUL.md with default content on first launch so
         // the Soul settings page and chat bubble identity have something
         // to render before the user customizes anything. Never overwrites
         // an existing file. Cache the parsed metadata so synchronous call
         // sites (chat bubble header) see the user's name/emoji immediately.
-        SoulStore.ensureExists()
         // [T-ios-soul-name-sidebar-stale] Refresh synchronously. This runs from
         // the app's .onAppear (main thread) and refreshCache() is @MainActor, so
         // the async hop only delayed cachedMetadata for no reason and let the
@@ -1021,6 +1036,7 @@ struct MinisApp: App {
     }
 
     private static func signalFileProvider() {
+        guard #available(iOS 16.0, *) else { return }
         NSFileProviderManager(for: fileProviderDomain)?.signalEnumerator(for: .rootContainer) { error in
             if let error {
                 lifecycleLog.warning("[FileProvider] signal failed: \(error.localizedDescription)")

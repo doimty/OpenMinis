@@ -972,12 +972,11 @@ final class BackgroundKeepAliveManager: NSObject, ObservableObject, CLLocationMa
     }
 
     private func refreshActiveTaskBadge(sessions: Set<String>, enabled: Bool) {
-        // [T-ios15-badge] setBadgeCount is iOS 16+. On 15 the deprecated icon
-        // badge API is the only way to publish the same ledger total, so the
-        // policy (and the unseen-notification part of it) stays identical. The
-        // expression is deliberately repeated in both branches so the legacy
-        // path cannot drift from the 16+ one.
         guard #available(iOS 16.0, *) else {
+            // [T-ios15-badge] setBadgeCount is iOS 16+. On 15 the deprecated
+            // icon badge API is the only way to publish the same ledger total,
+            // so the policy (and the unseen-notification part of it) is
+            // identical; the expression is repeated so the two cannot drift.
             let total = AppBadge.total(runningSessions: sessions.count, notificationsEnabled: enabled,
                                        unseenNotifications: unseenBadgeCount)
             UIApplication.shared.applicationIconBadgeNumber = total
