@@ -617,10 +617,13 @@ def check_new_view_contract(ss, rep):
     rep.add("view", "view.settings_entry", "PASS" if entry_ok else "FAIL",
             "settings list links the page" if entry_ok else "no NavigationLink found in ContentView.swift")
     # chat menu entry
-    chat = ss.root / "src/ios/Views/Chat/AIChatView/AIChatView.swift"
+    # 1.15 split AIChatView into a component directory and moved the
+    # overflow menu into Toolbar/ChatToolbarHost.swift, so read the tree.
+    chat_dir = ss.root / "src/ios/Views/Chat/AIChatView"
     menu_ok = False
-    if chat.exists():
-        ctext = chat.read_text(errors="replace")
+    ctext = "\n".join(p.read_text(encoding="utf-8", errors="replace")
+                      for p in sorted(chat_dir.rglob("*.swift"))) if chat_dir.exists() else ""
+    if ctext:
         for m in re.finditer(r"Menu\s*\{", ctext):
             block = balanced_block(ctext, m.end() - 1)
             if block and re.search(r"uto[\s-]?Compact", block, re.IGNORECASE):
