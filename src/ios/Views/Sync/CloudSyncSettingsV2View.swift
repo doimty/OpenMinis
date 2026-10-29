@@ -44,7 +44,7 @@ struct CloudSyncSettingsV2View: View {
                     NavigationLink {
                         SyncMigrationDetailView()
                     } label: {
-                        LabeledContent("Status") {
+                        CompatLabeledContent("Status") {
                             Text(statusText).foregroundStyle(.secondary)
                         }
                     }
@@ -60,7 +60,7 @@ struct CloudSyncSettingsV2View: View {
                         deviceNameDraft = deviceName
                         showDeviceNameEditor = true
                     } label: {
-                        LabeledContent("Name") {
+                        CompatLabeledContent("Name") {
                             HStack(spacing: 6) {
                                 Text(deviceName).foregroundStyle(.secondary)
                                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
@@ -86,7 +86,7 @@ struct CloudSyncSettingsV2View: View {
                             }
                         )) {
                             HStack(spacing: 12) {
-                                Image(systemName: iconName(for: cat))
+                                Image(systemName: CompatSystemSymbol.name(iconName(for: cat)))
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(.white)
                                     .frame(width: 28, height: 28)
@@ -163,20 +163,19 @@ struct CloudSyncSettingsV2View: View {
         // that pattern caused — see refreshIntervalSeconds). SwiftUI cancels this Task
         // on teardown.
         .task { await refreshLoop() }
-        .alert("Device Name", isPresented: $showDeviceNameEditor) {
-            TextField("Device name", text: $deviceNameDraft)
-            Button("Save") {
-                let trimmed = deviceNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty {
-                    UploadPolicy.customDeviceName = nil
-                    deviceName = DeviceIdentity.deviceName
-                } else {
-                    UploadPolicy.customDeviceName = trimmed
-                    deviceName = trimmed
-                }
-                Task { await markDeviceDirty() }
+        .compatTextInputAlert(Text("Device Name"), isPresented: $showDeviceNameEditor,
+                              confirmLabel: Text("Save"), onConfirm: {
+            let trimmed = deviceNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                UploadPolicy.customDeviceName = nil
+                deviceName = DeviceIdentity.deviceName
+            } else {
+                UploadPolicy.customDeviceName = trimmed
+                deviceName = trimmed
             }
-            Button("Cancel", role: .cancel) {}
+            Task { await markDeviceDirty() }
+        }) {
+            TextField("Device name", text: $deviceNameDraft)
         } message: {
             Text("Friendly name shown to your other Minis devices.")
         }
@@ -274,10 +273,10 @@ struct CloudSyncSettingsV2View: View {
         let secs = Int(Date().timeIntervalSince(d))
         if secs < 60 { return AppLocalized("Just now") }
         let mins = secs / 60
-        if mins < 60 { return AppLocalized("\(mins) min ago") }
+        if mins < 60 { return String(format: AppLocalized("%lld min ago"), Int(mins)) }
         let hrs = mins / 60
-        if hrs < 24 { return AppLocalized("\(hrs) hr ago") }
+        if hrs < 24 { return String(format: AppLocalized("%lld hr ago"), Int(hrs)) }
         let days = hrs / 24
-        return AppLocalized("\(days) day ago")
+        return String(format: AppLocalized("%lld day ago"), Int(days))
     }
 }

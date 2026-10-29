@@ -31,6 +31,17 @@ object ContextOffload {
     const val OFFLOADED_PREFIX = "[CONTEXT OFFLOADED]"
 
     /**
+     * [GH#352] Text this large must leave the prompt even inside the protected
+     * recent-message tail. Token-threshold offload does not inspect that tail,
+     * and the char/3.5 estimator under-counts base64 by roughly 2.5x.
+     */
+    const val HARD_OFFLOAD_CHARS = 32_768
+
+    /** Do not force-offload a stub or a file-read result already tied to offload storage. */
+    fun isForceOffloadContent(content: String): Boolean =
+        content.length >= HARD_OFFLOAD_CHARS && !isOffloadReadback(content)
+
+    /**
      * [T-offload-stub-system-reminder] (GH#374) Tag carried by the current stub
      * format. The pruned-argument notice is wrapped in a `<system-reminder>`
      * envelope so the model reads it as a meta-instruction about a REMOVED

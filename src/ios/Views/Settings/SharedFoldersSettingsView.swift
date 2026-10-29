@@ -76,7 +76,7 @@ private struct SharedFolderRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: entry.iconName)
+            Image(systemName: CompatSystemSymbol.name(entry.iconName))
                 .font(.system(size: 9))
                 .foregroundStyle(.white)
                 .frame(width: 21, height: 21)

@@ -138,12 +138,12 @@ struct ModelGroupsView: View {
         .navigationTitle("Model Groups")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddAgentModels) {
-            NavigationStack {
+            CompatNavigationStack {
                 UnifiedModelPicker(config: .agentLoopAddModels())
             }
         }
         .sheet(isPresented: $showAddAgentGroups) {
-            NavigationStack {
+            CompatNavigationStack {
                 AddAgentLoopGroupsSheet()
             }
         }
@@ -162,7 +162,7 @@ struct ModelGroupsView: View {
                             Task { await forceSyncGroups() }
                         } label: {
                             Label(AppLocalized("Force iCloud Sync"),
-                                  systemImage: "arrow.triangle.2.circlepath.icloud")
+                                  systemImage: CompatSystemSymbol.name("arrow.triangle.2.circlepath.icloud"))
                         }
                     }
                 } label: {
@@ -212,10 +212,9 @@ struct ModelGroupsView: View {
         } message: { group in
             Text("Delete \"\(group.name)\"? Any default, voice, or vision selection pointing at this group will be cleared. The models themselves are not deleted.")
         }
-        .alert("New Group", isPresented: $showCreateGroup) {
+        .compatTextInputAlert(Text("New Group"), isPresented: $showCreateGroup,
+                              confirmLabel: Text("Create"), onConfirm: { createGroup() }) {
             TextField("Group name", text: $newGroupName)
-            Button("Create") { createGroup() }
-            Button("Cancel", role: .cancel) {}
         } message: {
             Text("Enter a name for the new model group.")
         }
@@ -325,7 +324,7 @@ private struct GroupRow: View {
                 .font(.caption).foregroundStyle(.tint)
                 .accessibilityLabel(AppLocalized("Video generation"))
         case .imageOutput:
-            Image(systemName: "photo.badge.plus")
+            Image(systemName: CompatSystemSymbol.name("photo.badge.plus"))
                 .font(.caption).foregroundStyle(.tint)
                 .accessibilityLabel(AppLocalized("Image generation"))
         case .audioOutput:
@@ -333,7 +332,7 @@ private struct GroupRow: View {
                 .font(.caption).foregroundStyle(.tint)
                 .accessibilityLabel(AppLocalized("Speech output"))
         case .audioInput:
-            Image(systemName: "waveform.badge.mic")
+            Image(systemName: CompatSystemSymbol.name("waveform.badge.mic"))
                 .font(.caption).foregroundStyle(.secondary)
                 .accessibilityLabel(AppLocalized("Speech transcription"))
         case .videoInput:
@@ -400,7 +399,7 @@ private struct GroupRow: View {
                 Text("·")
                     .font(.caption)
                     .foregroundStyle(.quaternary)
-                Text(AppLocalized("\(group.memberEntryIds.count) models"))
+                Text(String(format: AppLocalized("%lld models"), Int64(group.memberEntryIds.count)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

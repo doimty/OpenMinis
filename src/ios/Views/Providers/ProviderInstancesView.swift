@@ -100,7 +100,7 @@ struct ProviderInstancesView: View {
             if store.instances.isEmpty {
                 Section {
                     VStack(spacing: 8) {
-                        Image(systemName: "key.slash")
+                        Image(systemName: CompatSystemSymbol.name("key.slash"))
                             .font(.system(size: 32))
                             .foregroundStyle(.quaternary)
                         Text("No providers configured")
@@ -118,8 +118,8 @@ struct ProviderInstancesView: View {
         .navigationTitle("Providers")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if !store.instances.isEmpty {
-                ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .topBarLeading) {
+                if !store.instances.isEmpty {
                     EditButton()
                 }
             }
@@ -141,7 +141,7 @@ struct ProviderInstancesView: View {
                             Task { await forceSyncProviders() }
                         } label: {
                             Label(AppLocalized("Force iCloud Sync"),
-                                  systemImage: "arrow.triangle.2.circlepath.icloud")
+                                  systemImage: CompatSystemSymbol.name("arrow.triangle.2.circlepath.icloud"))
                         }
                     }
                 } label: {
@@ -150,7 +150,7 @@ struct ProviderInstancesView: View {
             }
         }
         .sheet(isPresented: $showAddProvider) {
-            NavigationStack {
+            CompatNavigationStack {
                 AddProviderView()
             }
         }
@@ -170,7 +170,7 @@ struct ProviderInstancesView: View {
                     return
                 }
                 if let label = store.importInstanceJSON(json) {
-                    importMessage = AppLocalized("Imported provider \"\(label)\" successfully.")
+                    importMessage = String(format: AppLocalized("Imported provider \"%@\" successfully."), String(label))
                 } else {
                     importMessage = AppLocalized("Invalid provider configuration file.")
                 }
@@ -449,7 +449,7 @@ private struct InstanceRow: View {
                         .lineLimit(1)
                 }
                 if modelCount > 0 {
-                    Text(AppLocalized("\(modelCount) models"))
+                    Text(String(format: AppLocalized("%lld models"), Int64(modelCount)))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -505,8 +505,12 @@ private struct ShadowVoiceRow: View {
 
     private func voiceSummary(asr: Int, tts: Int) -> String {
         var parts: [String] = []
-        if asr > 0 { parts.append(AppLocalized("\(asr) speech-to-text", comment: "ASR model count")) }
-        if tts > 0 { parts.append(AppLocalized("\(tts) text-to-speech", comment: "TTS model count")) }
+        if asr > 0 {
+            parts.append(String(format: AppLocalized("%lld speech-to-text"), Int64(asr)))
+        }
+        if tts > 0 {
+            parts.append(String(format: AppLocalized("%lld text-to-speech"), Int64(tts)))
+        }
         return parts.joined(separator: " · ")
     }
 }

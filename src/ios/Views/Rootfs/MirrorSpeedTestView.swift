@@ -485,7 +485,7 @@ struct MirrorsSectionView: View {
                     MirrorCategoryDetailView(category: category)
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: category.systemImage)
+                        Image(systemName: CompatSystemSymbol.name(category.systemImage))
                             .font(.system(size: 9))
                             .foregroundStyle(.white)
                             .frame(width: 21, height: 21)

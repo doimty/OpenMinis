@@ -105,9 +105,9 @@ final class BackupTransferStatus: ObservableObject {
         let sent = ByteCountFormatter.string(fromByteCount: d.bytesSent, countStyle: .file)
         let total = ByteCountFormatter.string(fromByteCount: d.totalBytes, countStyle: .file)
         if let remaining = d.remaining {
-            logSink?(AppLocalized("Uploading to \(name) — \(sent) of \(total) · \(Self.rateText(d.bytesPerSecond)) · about \(Self.durationText(remaining)) left"), true)
+            logSink?(String(format: AppLocalized("Uploading to %@ — %@ of %@ · %@ · about %@ left"), String(name), String(sent), String(total), String(Self.rateText(d.bytesPerSecond)), String(Self.durationText(remaining))), true)
         } else {
-            logSink?(AppLocalized("Uploading to \(name) — \(sent) of \(total)"), true)
+            logSink?(String(format: AppLocalized("Uploading to %@ — %@ of %@"), String(name), String(sent), String(total)), true)
         }
     }
 
@@ -125,10 +125,10 @@ final class BackupTransferStatus: ObservableObject {
         // average rate after the live rows are gone.
         let d = destinations[i]
         if let error {
-            logSink?(AppLocalized("Upload to \(name) failed — \(error)"), false)
+            logSink?(String(format: AppLocalized("Upload to %@ failed — %@"), String(name), String(error)), false)
         } else {
             let total = ByteCountFormatter.string(fromByteCount: d.totalBytes, countStyle: .file)
-            logSink?(AppLocalized("Uploaded to \(name) — \(total) in \(Self.durationText(d.elapsed)) · \(Self.rateText(d.bytesPerSecond))"), false)
+            logSink?(String(format: AppLocalized("Uploaded to %@ — %@ in %@ · %@"), String(name), String(total), String(Self.durationText(d.elapsed)), String(Self.rateText(d.bytesPerSecond))), false)
         }
     }
 
@@ -203,8 +203,8 @@ final class BackupTransferStatus: ObservableObject {
 
     static func durationText(_ seconds: TimeInterval) -> String {
         if seconds < 1 { return AppLocalized("less than a second") }
-        if seconds < 60 { return AppLocalized("\(Int(seconds.rounded()))s") }
+        if seconds < 60 { return String(format: AppLocalized("%llds"), Int(Int(seconds.rounded()))) }
         let m = Int(seconds) / 60, s = Int(seconds) % 60
-        return s == 0 ? AppLocalized("\(m)m") : AppLocalized("\(m)m \(s)s")
+        return s == 0 ? String(format: AppLocalized("%lldm"), Int(m)) : AppLocalized("\(m)m \(s)s")
     }
 }

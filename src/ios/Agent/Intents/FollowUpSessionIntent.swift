@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 private let logger = AppLogger(category: "FollowUpIntent")
 
 /// Sends a follow-up prompt to an existing session, continuing the conversation.
+@available(iOS 16.0, *)
 struct FollowUpSessionIntent: AppIntent {
     static var title: LocalizedStringResource = "Follow Up Session"
     static var description = IntentDescription("Sends a follow-up prompt to an existing Minis session, continuing the conversation with the AI agent.")
@@ -214,7 +215,7 @@ struct FollowUpSessionIntent: AppIntent {
             prompt: prompt
         )
 
-        return .result(value: result, dialog: IntentDialog(stringLiteral: AppLocalized("Follow-up sent to \(session.displayName) with \(modelName).")))
+        return .result(value: result, dialog: IntentDialog(stringLiteral: String(format: AppLocalized("Follow-up sent to %@ with %@."), String(session.displayName), String(modelName))))
     }
 
     // See the note in QuickTaskIntent: without a `parameterSummary` the action

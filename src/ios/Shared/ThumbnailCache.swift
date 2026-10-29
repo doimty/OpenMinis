@@ -1,4 +1,5 @@
 import UIKit
+import AVFoundation
 
 /// Thread-safe thumbnail cache with async loading and downsampling.
 /// Used by tool capsule previews and browser screenshots to avoid
@@ -128,6 +129,29 @@ final class ThumbnailCache {
     /// Sync cached lookup by URL.
     func cachedThumbnail(for url: URL, maxSize: CGFloat = 400) -> UIImage? {
         cachedThumbnail(for: url.path, maxSize: maxSize)
+    }
+
+    /// Frame generation only; the caller retains ownership of its cache,
+    /// size metadata and loading notifications. Never decode synchronously on UI.
+    static func videoFrame(using generator: AVAssetImageGenerator, at time: CMTime) async throws -> CGImage {
+        if #available(iOS 16.0, *) {
+            let (image, _) = try await generator.image(at: time)
+            return image
+        }
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CGImage, Error>) in
+            // Exactly one requested time gives one terminal callback.
+            generator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { _, image, _, result, error in
+                if result == .succeeded, let image {
+                    continuation.resume(returning: image)
+                } else if result == .cancelled {
+                    continuation.resume(throwing: CancellationError())
+                } else {
+                    continuation.resume(throwing: error ?? NSError(
+                        domain: "MinisVideoThumbnail", code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: "Could not generate a video thumbnail."]))
+                }
+            }
+        }
     }
 
     // MARK: - Eviction

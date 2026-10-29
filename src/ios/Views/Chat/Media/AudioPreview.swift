@@ -391,7 +391,7 @@ private struct CircleIconButton: View {
     let icon: String
     let hasArtwork: Bool
     var body: some View {
-        Image(systemName: icon)
+        Image(systemName: CompatSystemSymbol.name(icon))
             .font(.system(size: 16, weight: .medium))
             .foregroundColor(hasArtwork ? .white : Color(UIColor.secondaryLabel))
             .frame(width: 36, height: 36)

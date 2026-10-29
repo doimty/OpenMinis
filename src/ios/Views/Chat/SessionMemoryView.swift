@@ -12,7 +12,7 @@ struct SessionMemoryView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 // Section 1: Auto-injected memories
                 Section {
@@ -64,7 +64,7 @@ struct SessionMemoryView: View {
 
     private func row(name: String, detail: String, icon: String) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: icon)
+            Image(systemName: CompatSystemSymbol.name(icon))
                 .foregroundStyle(.pink)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
@@ -274,19 +274,17 @@ private struct MemoryContentView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if fileURL != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    if isEditing {
-                        Button("Save") {
-                            save()
-                        }
-                    } else {
-                        Button {
-                            editedContent = content
-                            isEditing = true
-                        } label: {
-                            Image(systemName: "pencil")
-                        }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if isEditing {
+                    Button("Save") {
+                        save()
+                    }
+                } else if fileURL != nil {
+                    Button {
+                        editedContent = content
+                        isEditing = true
+                    } label: {
+                        Image(systemName: "pencil")
                     }
                 }
             }

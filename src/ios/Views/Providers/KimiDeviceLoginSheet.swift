@@ -10,7 +10,6 @@ import SafariServices
 ///   .sheet(isPresented: $showKimiLogin) {
 ///       KimiDeviceLoginSheet(instanceId: instance.id) { success in ... }
 ///   }
-@available(iOS 16.0, *)
 struct KimiDeviceLoginSheet: View {
     let instanceId: String
     /// Called on dismiss with whether authentication succeeded.
@@ -30,7 +29,7 @@ struct KimiDeviceLoginSheet: View {
     @State private var loginTask: Task<Void, Never>?
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(spacing: 24) {
                 switch phase {
                 case .starting:

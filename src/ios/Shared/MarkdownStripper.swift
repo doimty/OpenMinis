@@ -49,6 +49,20 @@ enum MarkdownStripper {
         try! NSRegularExpression(pattern: pattern)
     }
 
+    // Kept separate from imageRe because diagnostics need the complete source
+    // spelling, while plain-text stripping only needs the alt-text capture.
+    private static let imageSyntaxRe = regex(#"!\[([^\]]*)\]\(([^)]+)\)"#)
+
+    /// Returns complete Markdown image spellings for renderer diagnostics.
+    /// This is intentionally observational and does not alter rendering.
+    static func imageSyntaxMatches(in input: String) -> [String] {
+        guard input.contains("![") else { return [] }
+        let nsInput = input as NSString
+        let range = NSRange(input.startIndex..<input.endIndex, in: input)
+        return imageSyntaxRe.matches(in: input, range: range)
+            .map { nsInput.substring(with: $0.range) }
+    }
+
     /// Apply one compiled pattern over a whole string, matching the semantics
     /// of `replacingOccurrences(of:with:options:.regularExpression)` exactly:
     /// same template syntax (`$1`), same full-string range, same left-to-right

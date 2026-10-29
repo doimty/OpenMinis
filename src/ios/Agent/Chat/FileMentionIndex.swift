@@ -429,18 +429,11 @@ final class FileMentionIndex: ObservableObject {
 
     // MARK: - Root discovery (main actor)
 
-    /// Session-scoped roots. Browser/offloads/memory/skills intentionally excluded
-    /// from session scope since browser snapshots aren't user-authored files and
-    /// offloads/memory/skills are handled via their global roots.
+    /// Session-scoped roots. Attachments stay session-bound; workspace is
+    /// global and is scanned with the shared roots below.
     private static func sessionRoots(sessionId: String?) -> [ScanRoot] {
         guard let sid = sessionId, !sid.isEmpty else { return [] }
         return [
-            ScanRoot(
-                scope: .workspace,
-                hostURL: AIChatViewModel.minisWorkspacePersistentDir(for: sid),
-                linuxPrefix: AIChatViewModel.minisWorkspaceLinuxDir,
-                mountName: nil
-            ),
             ScanRoot(
                 scope: .attachments,
                 hostURL: AIChatViewModel.minisAttachmentsPersistentDir(for: sid),
@@ -452,6 +445,12 @@ final class FileMentionIndex: ObservableObject {
 
     private static func sharedRoots() -> [ScanRoot] {
         [
+            ScanRoot(
+                scope: .workspace,
+                hostURL: AIChatViewModel.minisGlobalWorkspacePersistentDir,
+                linuxPrefix: AIChatViewModel.minisWorkspaceLinuxDir,
+                mountName: nil
+            ),
             ScanRoot(
                 scope: .shared,
                 hostURL: AIChatViewModel.minisSharedPersistentDir,

@@ -169,7 +169,15 @@ struct SubAgentEditorView: View {
     @State private var instructions = ""
     @State private var modelGroupId: String?
     @State private var thinkingOverride: ThinkingLevel?
-    @State private var didSeed = false
+
+    init(existing: SubAgentDefinition?) {
+        self.existing = existing
+        _name = State(initialValue: existing?.name ?? "")
+        _descriptionText = State(initialValue: existing?.description ?? "")
+        _instructions = State(initialValue: existing?.instructions ?? "")
+        _modelGroupId = State(initialValue: existing?.modelGroupId)
+        _thinkingOverride = State(initialValue: existing?.thinkingLevelOverride)
+    }
 
     private var isBuiltIn: Bool { existing?.isBuiltIn ?? false }
 
@@ -186,7 +194,7 @@ struct SubAgentEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 // [T-sub-agents-v1] The built-in's name and description are
                 // fixed. They are what the delegating model reads to decide
@@ -216,8 +224,7 @@ struct SubAgentEditorView: View {
                     if isBuiltIn {
                         Text(existing?.displayDescription ?? descriptionText).foregroundStyle(.secondary)
                     } else {
-                        TextField(AppLocalized("Description"), text: $descriptionText, axis: .vertical)
-                            .lineLimit(2...4)
+                        CompatMultilineTextField(AppLocalized("Description"), text: $descriptionText, lineLimit: 2...4)
                         counter(descriptionText.count, SubAgentLimits.descriptionMaxLength)
                     }
                 } header: {
@@ -229,8 +236,7 @@ struct SubAgentEditorView: View {
                 }
 
                 Section {
-                    TextField(AppLocalized("Instructions"), text: $instructions, axis: .vertical)
-                        .lineLimit(4...12)
+                    CompatMultilineTextField(AppLocalized("Instructions"), text: $instructions, lineLimit: 4...12)
                     counter(instructions.count, SubAgentLimits.instructionsMaxLength)
                 } header: {
                     Text(AppLocalized("Instructions"))
@@ -319,7 +325,6 @@ struct SubAgentEditorView: View {
                         .disabled(!isValid)
                 }
             }
-            .onAppear(perform: seed)
         }
     }
 
@@ -353,17 +358,6 @@ struct SubAgentEditorView: View {
                 .font(.caption2)
                 .foregroundStyle(count > limit ? .red : .secondary)
         }
-    }
-
-    private func seed() {
-        guard !didSeed else { return }
-        didSeed = true
-        guard let existing else { return }
-        name = existing.name
-        descriptionText = existing.description
-        instructions = existing.instructions
-        modelGroupId = existing.modelGroupId
-        thinkingOverride = existing.thinkingLevelOverride
     }
 
     private func save() {

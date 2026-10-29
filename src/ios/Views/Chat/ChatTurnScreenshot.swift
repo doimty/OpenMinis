@@ -19,7 +19,7 @@ struct ChatScreenshotPreviewSheet: View {
     private let logger = AppLogger(category: "ScreenshotPreview")
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             ScrollView(.vertical, showsIndicators: true) {
                 Image(uiImage: image)
                     .resizable()
@@ -59,7 +59,7 @@ struct ChatScreenshotPreviewSheet: View {
                     }
                 }
             }
-            .toolbarBackground(.visible, for: .navigationBar)
+            .compatVisibleNavigationBarBackground()
             .overlay(alignment: .bottom) {
                 if let toast {
                     Text(toast)
@@ -128,7 +128,7 @@ struct ChatScreenshotPreviewSheet: View {
     private func saveImageToPhotos(_ image: UIImage) {
         ImageSaver.shared.save(image) { error in
             if let error {
-                flashToast(AppLocalized("Save failed: \(error.localizedDescription)"))
+                flashToast(String(format: AppLocalized("Save failed: %@"), String(error.localizedDescription)))
             } else {
                 flashToast(AppLocalized("Saved to Photos"))
             }

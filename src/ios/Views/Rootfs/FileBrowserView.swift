@@ -219,7 +219,7 @@ struct FileBrowserView: View {
         .sheet(item: $moveOrCopyItem) { item in
             let minisPath = viewModel.rootPath.appendingPathComponent("var/minis")
             let initial = FileManager.default.fileExists(atPath: minisPath.path) ? minisPath : nil
-            NavigationStack {
+            CompatNavigationStack {
                 DirectoryPickerView(
                     rootPath: viewModel.rootPath,
                     rootLabel: viewModel.rootLabel,
@@ -416,7 +416,7 @@ private struct FilePreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             content
                 .navigationTitle(item.name)
                 .navigationBarTitleDisplayMode(.inline)
@@ -488,8 +488,8 @@ private struct MarkdownFilePreview: View {
             }
         }
         .toolbar {
-            if case .loaded = loadState {
-                ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .topBarLeading) {
+                if case .loaded = loadState {
                     // Single toggle button, NOT a segmented Picker.
                     //
                     // A `.segmented` Picker asks for the width of all its
@@ -701,7 +701,7 @@ private struct FileInfoView: View {
         List {
             Section {
                 VStack(spacing: 12) {
-                    Image(systemName: item.iconName)
+                    Image(systemName: CompatSystemSymbol.name(item.iconName))
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                     Text("Preview not available")
@@ -762,7 +762,7 @@ private struct FileBrowserRow: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     onCopiedPath()
                 } label: {
-                    Label(AppLocalized("Copy Absolute Path"), systemImage: "document.on.clipboard")
+                    Label(AppLocalized("Copy Absolute Path"), systemImage: CompatSystemSymbol.name("document.on.clipboard"))
                 }
                 Button { onCopy() } label: {
                     Label("Copy to…", systemImage: "doc.on.doc")
@@ -819,7 +819,7 @@ struct FileItemRow: View {
         HStack(spacing: 12) {
             // Icon
             ZStack(alignment: .bottomLeading) {
-                Image(systemName: item.iconName)
+                Image(systemName: CompatSystemSymbol.name(item.iconName))
                     .font(.title2)
                     .foregroundColor(item.isDirectory ? .blue : .secondary)
                 if item.isSymlink {
@@ -1125,9 +1125,8 @@ class FileBrowserViewModel: ObservableObject {
 
     /// If `removedURL` lives inside a session's per-session minis directory
     /// (`Library/MinisChat/minis/<sid>/<subdir>/<rel>`), queue a SessionFile
-    /// cloud-delete so peer devices stop seeing the file. Silent when the URL
-    /// is outside any session tree (e.g. shared/skills/memory deletes — those
-    /// are not SessionFile-scoped) or when sync isn't configured.
+    /// cloud-delete so peer devices stop seeing the file. Global workspace
+    /// files are shared-file storage and are intentionally not SessionFiles.
     private static func queueSessionFileCloudDelete(forRemovedURL removedURL: URL) {
         let baseURL = ChatStore.shared.minisBaseURL
             .resolvingSymlinksInPath().standardized
@@ -1146,12 +1145,12 @@ class FileBrowserViewModel: ObservableObject {
         let rel = String(parts[1])
         guard !sid.isEmpty, !rel.isEmpty else { return }
 
-        // Only the session-scoped subdirs are SessionFiles. Filter early
-        // so global trees (memory/skills/shared) and stray dirs don't
-        // produce phantom cloud deletes.
+        // Only the session-scoped subdirs are SessionFiles. Global
+        // workspace/skills/memory/shared trees have their own storage
+        // and backup/sync paths.
         let firstSlash = rel.firstIndex(of: "/")
         let subdir: String = firstSlash.map { String(rel[..<$0]) } ?? rel
-        let scoped: Set<String> = ["workspace", "attachments", "browser", "offloads"]
+        let scoped: Set<String> = ["attachments", "browser", "offloads"]
         guard scoped.contains(subdir) else { return }
 
         let traceLogger = AppLogger(category: "SessionFileTracker")
@@ -1743,7 +1742,7 @@ private struct DirectoryPickerView: View {
 }
 
 #Preview {
-    NavigationStack {
+    CompatNavigationStack {
         FileBrowserView()
     }
 }

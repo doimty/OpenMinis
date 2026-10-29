@@ -84,7 +84,7 @@ struct AgentLoopModelsSection: View {
                 Text(group.name)
                     .font(.subheadline.weight(.medium))
                 let count = group.memberEntryIds.count
-                Text(AppLocalized("\(count) models") + " · \(group.strategy == .fallback ? AppLocalized("Fallback") : AppLocalized("Load Balance"))")
+                Text(String(format: AppLocalized("%lld models"), Int64(count)) + " · " + (group.strategy == .fallback ? AppLocalized("Fallback") : AppLocalized("Load Balance")))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -183,13 +183,13 @@ struct AgentLoopModelsSection: View {
     private func modalityBadges(_ model: LLMModel) -> [String] {
         let m = model.capabilities.supportedModalities
         var badges: [String] = []
-        if m.contains(.imageInput)  { badges.append("img") }
-        if m.contains(.audioInput)  { badges.append("audio") }
-        if m.contains(.videoInput)  { badges.append("video") }
-        if m.contains(.pdfInput)    { badges.append("pdf") }
-        if m.contains(.imageOutput) { badges.append("img-out") }
-        if m.contains(.audioOutput) { badges.append("audio-out") }
-        if m.contains(.videoOutput) { badges.append("video-out") }
+        if m.contains(.imageInput)  { badges.append(AppLocalized("image")) }
+        if m.contains(.audioInput)  { badges.append(AppLocalized("audio")) }
+        if m.contains(.videoInput)  { badges.append(AppLocalized("video")) }
+        if m.contains(.pdfInput)    { badges.append(AppLocalized("PDF input")) }
+        if m.contains(.imageOutput) { badges.append(AppLocalized("Image output")) }
+        if m.contains(.audioOutput) { badges.append(AppLocalized("Audio output")) }
+        if m.contains(.videoOutput) { badges.append(AppLocalized("Video output")) }
         return badges
     }
 
@@ -253,7 +253,7 @@ struct AddAgentLoopGroupsSheet: View {
 
                         Spacer()
 
-                        Text("\(group.memberEntryIds.count) models")
+                        Text(String(format: AppLocalized("%lld models"), Int64(group.memberEntryIds.count)))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -267,7 +267,7 @@ struct AddAgentLoopGroupsSheet: View {
                 Button("Cancel") { dismiss() }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Add (\(selectedGroupIds.count))") {
+                Button(String(format: AppLocalized("Add (%lld)"), Int64(selectedGroupIds.count))) {
                     addSelected()
                 }
                 .font(.body.weight(.semibold))

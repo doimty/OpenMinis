@@ -11,7 +11,7 @@ struct AIDataSharingConsentView: View {
     var onDecline: () -> Void
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -353,14 +353,25 @@ struct AddProviderView: View {
             }
         }
         .sheet(isPresented: $showCopilotLogin) {
-            // [T-copilot-provider] Device-code login, gated behind the risk
-            // notice inside the sheet.
-            CopilotDeviceLoginSheet(instanceId: pendingInstanceId) { success in
-                if success {
-                    oauthAuthTime = Date()
-                    oauthMaskedToken = loadMaskedToken(type: .githubCopilot)
-                    pendingOAuthDone = true
+            if #available(iOS 16.0, *) {
+                // [T-copilot-provider] Device-code login, gated behind the risk
+                // notice inside the sheet.
+                CopilotDeviceLoginSheet(instanceId: pendingInstanceId) { success in
+                    if success {
+                        oauthAuthTime = Date()
+                        oauthMaskedToken = loadMaskedToken(type: .githubCopilot)
+                        pendingOAuthDone = true
+                    }
                 }
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "info.circle")
+                        .font(.title2)
+                    Text("Copilot sign-in requires iOS 16 or later.")
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .fileImporter(isPresented: $showImportFile, allowedContentTypes: [.json]) { result in
@@ -397,7 +408,7 @@ struct AddProviderView: View {
                 return
             }
             if let label = store.importInstanceJSON(json) {
-                importMessage = AppLocalized("Imported provider \"\(label)\" successfully.")
+                importMessage = String(format: AppLocalized("Imported provider \"%@\" successfully."), String(label))
                 importSucceeded = true
             } else {
                 importMessage = AppLocalized("Invalid provider configuration file.")
@@ -424,7 +435,7 @@ struct AddProviderView: View {
             // this view and would need editing for every vendor added later.
             // The step that KNOWS which vendor was tapped sets
             // `configuringDisplayName` instead, and this just renders it.
-            return AppLocalized("Configure \(configuringDisplayName)")
+            return String(format: AppLocalized("Configure %@"), String(configuringDisplayName))
         } else if selectedType != nil {
             return AppLocalized("Auth Method")
         }
@@ -559,7 +570,7 @@ struct AddProviderView: View {
                     applyVoiceTemplate(template)
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: template.symbol)
+                        Image(systemName: CompatSystemSymbol.name(template.symbol))
                             .font(.body)
                             .foregroundStyle(template.tint)
                             .frame(width: 32, height: 32)
@@ -626,7 +637,7 @@ struct AddProviderView: View {
                             selectedCredential = cred
                         } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: cred == .apiKey ? "key" : "person.badge.shield.checkmark")
+                                Image(systemName: CompatSystemSymbol.name(cred == .apiKey ? "key" : "person.badge.shield.checkmark"))
                                     .font(.body)
                                     .frame(width: 28)
                                     .foregroundStyle(Color(UIColor.label))
@@ -1270,7 +1281,7 @@ struct AddProviderView: View {
         case (.openAIResponses, .apiKey):
             return AppLocalized("Use an API key for a Responses API endpoint")
         case (_, .apiKey):
-            return AppLocalized("Use an API key from your \(type.displayName) account")
+            return String(format: AppLocalized("Use an API key from your %@ account"), String(type.displayName))
         case (.anthropic, .oauth):
             return AppLocalized("Sign in with your Claude account")
         case (.gemini, .oauth):
@@ -1317,7 +1328,7 @@ struct AddProviderView: View {
             Image(systemName: "arrow.triangle.branch")
                 .foregroundStyle(.cyan)
         case .openAIResponses:
-            Image(systemName: "arrow.trianglehead.2.counterclockwise")
+            Image(systemName: CompatSystemSymbol.name("arrow.trianglehead.2.counterclockwise"))
                 .foregroundStyle(.mint)
         case .xAI:
             Image(systemName: "x.circle")

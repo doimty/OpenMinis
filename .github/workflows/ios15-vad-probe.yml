@@ -1,0 +1,84 @@
+name: ios15-vad-probe
+
+# Bounded, read-only native-floor probe for RealTimeCutVADCXXLibrary.
+# Builds the pinned C++ source at IPHONEOS_DEPLOYMENT_TARGET=15.0 against
+# checksum-pinned ONNX Runtime / WebRTC APM inputs, audits actual Mach-O
+# minimum/platform/arch/plist of inputs and output, compiles the real upstream
+# ObjC wrapper against the rebuilt framework (continuing-PCM callback ABI),
+# and uploads evidence only -- on success AND failure. Publishes no framework.
+#
+# Triggers: manual dispatch, or push to compat/ios15 touching probe files.
+# Initial gate is device arm64 only; simulator coverage is not claimed.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [compat/ios15]
+    paths:
+      - .github/workflows/ios15-vad-probe.yml
+      - scripts/probe_ios15_vad.sh
+      - scripts/audit_ios15_native_floor.py
+      - scripts/test_ios15_native_floor.py
+      - docs/ios15-native-floor.md
+
+permissions:
+  contents: read
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+  EXPECTED_XCODE: "Xcode 26.2"
+  EXPECTED_XCODE_BUILD: "Build version 17C52"
+  EXPECTED_IOS_SDK: "26.2"
+  NATIVE_CXX_SHA: 1648fc13a04a90521a2ef3887885ef2506208605
+  WRAPPER_CXX_SHA: b059608836a055dc0ce74ca2d0eeb19fc54cb7d4
+  ONNX_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/onnxruntime.xcframework.zip
+  ONNX_SHA256: 498ba860229e0ce45e6983ce44478a836b0c0763451ed37a8b1f8e74a8a0dc1f
+  APM_URL: https://github.com/helloooideeeeea/RealTimeCutVADLibraryForXCFramework/releases/download/v1.0.0/webrtc_audio_processing.xcframework.zip
+  APM_SHA256: 3ee3d36e9207a09fa3133c405f08a49a0d023f173ee5b4a47c047362aba56856
+
+jobs:
+  probe:
+    name: VAD native floor probe (device arm64)
+    runs-on: macos-26
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Pin Xcode 26.2
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          test -d "$DEVELOPER_DIR"
+          xcode_version="$(xcodebuild -version)"
+          printf '%s\n' "$xcode_version"
+          test "$(printf '%s\n' "$xcode_version" | sed -n '1p')" = "$EXPECTED_XCODE"
+          test "$(printf '%s\n' "$xcode_version" | sed -n '2p')" = "$EXPECTED_XCODE_BUILD"
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          printf 'iphoneos SDK %s\n' "$sdk"
+          test "$sdk" = "$EXPECTED_IOS_SDK"
+
+      - name: Fixture-based floor audit tests
+        run: |
+          set -euo pipefail
+          python3 scripts/test_ios15_native_floor.py -v
+
+      - name: Run bounded native probe
+        run: |
+          set -euo pipefail
+          bash scripts/probe_ios15_vad.sh
+
+      - name: Upload probe evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios15-vad-probe
+          path: |
+            ${{ runner.temp }}/vad-probe/evidence
+            ${{ runner.temp }}/vad-probe/probe.log
+            ${{ runner.temp }}/vad-probe/status.txt
+          if-no-files-found: warn
+          retention-days: 14

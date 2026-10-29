@@ -67,7 +67,11 @@ fun ModelEntryDetailScreen(
     var displayName by remember { mutableStateOf(overrides.displayName ?: baseModel.displayName) }
     var displayNameTouched by remember { mutableStateOf(false) }
     var maxOutputTokensText by remember { mutableStateOf(overrides.maxOutputTokens?.toString() ?: "") }
-    var contextWindowText by remember { mutableStateOf(overrides.contextWindow?.toString() ?: "") }
+    var contextWindowText by remember {
+        mutableStateOf(
+            (overrides.contextWindow ?: entry.model.contextWindow)?.toString() ?: ""
+        )
+    }
     var thinkingEnabled by remember {
         mutableStateOf(overrides.supportsReasoning ?: baseModel.supportsReasoning ?: false)
     }

@@ -262,37 +262,36 @@ enum ResourceDiagnostics {
 /// Minimal thread-safe counter.
 ///
 /// Swift has no stable atomics in the standard library at this deployment
-/// target and `OSAtomic*` is deprecated, so this uses an `os_unfair_lock` —
-/// uncontended acquire/release is a handful of instructions, which is well
-/// within budget even on the guest-fork path, and unlike a hand-rolled
-/// non-atomic read it is actually correct under concurrency.
+/// target. Use a reference-backed NSLock, matching the iOS 15 CrashReporter
+/// repair: taking & of a stored os_unfair_lock can enter Swift exclusive-access
+/// bookkeeping on guest threads. Counter updates remain mutually exclusive.
 final class ManagedAtomic: @unchecked Sendable {
     private var value: UInt64 = 0
-    private var lock = os_unfair_lock_s()
+    private let lock = NSLock()
 
     init() {}
 
     func increment() {
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         value &+= 1
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
     }
 
     func decrement() {
-        os_unfair_lock_lock(&lock)
+        lock.lock()
         if value > 0 { value &-= 1 }
-        os_unfair_lock_unlock(&lock)
+        lock.unlock()
     }
 
     func load() -> UInt64 {
-        os_unfair_lock_lock(&lock)
-        defer { os_unfair_lock_unlock(&lock) }
+        lock.lock()
+        defer { lock.unlock() }
         return value
     }
 
     func exchange(_ new: UInt64) -> UInt64 {
-        os_unfair_lock_lock(&lock)
-        defer { os_unfair_lock_unlock(&lock) }
+        lock.lock()
+        defer { lock.unlock() }
         let old = value
         value = new
         return old

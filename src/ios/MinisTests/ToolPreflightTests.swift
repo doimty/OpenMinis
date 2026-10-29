@@ -108,4 +108,97 @@ final class ToolPreflightTests: XCTestCase {
             "new_string": "\n",
         ]))
     }
+
+    // MARK: - Responses API argument snapshot resolver
+
+    func testResponsesResolver_recoversDoneItemAndDeltaOnlyCalls() {
+        let done = ResponsesToolArgumentsResolver.resolve(
+            delta: "", argumentsDone: #"{"command":"pwd"}"#, itemArguments: nil
+        )
+        XCTAssertEqual(done.state, .valid)
+        XCTAssertEqual(done.args["command"] as? String, "pwd")
+
+        let item = ResponsesToolArgumentsResolver.resolve(
+            delta: "", argumentsDone: nil, itemArguments: #"{"path":"/tmp/a"}"#
+        )
+        XCTAssertEqual(item.state, .valid)
+        XCTAssertEqual(item.args["path"] as? String, "/tmp/a")
+
+        let delta = ResponsesToolArgumentsResolver.resolve(
+            delta: #"{"command":"echo ok"}"#, argumentsDone: nil, itemArguments: nil
+        )
+        XCTAssertEqual(delta.state, .valid)
+        XCTAssertEqual(delta.args["command"] as? String, "echo ok")
+    }
+
+    func testResponsesResolver_explicitEmptyObjectRemainsValid() {
+        let empty = ResponsesToolArgumentsResolver.resolve(
+            delta: "", argumentsDone: "{}", itemArguments: nil
+        )
+        XCTAssertEqual(empty.state, .valid)
+        XCTAssertTrue(empty.args.isEmpty)
+    }
+
+    func testResponsesResolver_rejectsMalformedMissingAndNonObjectPayloads() {
+        XCTAssertEqual(ResponsesToolArgumentsResolver.resolve(
+            delta: "", argumentsDone: nil, itemArguments: nil
+        ).state, .missing)
+        XCTAssertEqual(ResponsesToolArgumentsResolver.resolve(
+            delta: "", argumentsDone: #"{"command":"unterminated"#, itemArguments: nil
+        ).state, .malformedJSON)
+        XCTAssertEqual(ResponsesToolArgumentsResolver.resolve(
+            delta: "", argumentsDone: "[1,2]", itemArguments: nil
+        ).state, .nonObjectJSON)
+    }
+
+    func testResponsesResolver_conflictingCompleteValuesFailClosed() {
+        let terminalConflict = ResponsesToolArgumentsResolver.resolve(
+            delta: "", argumentsDone: #"{"command":"done"}"#,
+            itemArguments: #"{"command":"item"}"#
+        )
+        XCTAssertEqual(terminalConflict.state, .conflictingFinalValues)
+
+        let staleDeltaConflict = ResponsesToolArgumentsResolver.resolve(
+            delta: #"{"command":"old"}"#, argumentsDone: "{}", itemArguments: nil
+        )
+        XCTAssertEqual(staleDeltaConflict.state, .conflictingFinalValues)
+
+        let malformedTerminalWithValidDelta = ResponsesToolArgumentsResolver.resolve(
+            delta: #"{"command":"streamed"}"#,
+            argumentsDone: #"{"command":"#,
+            itemArguments: nil
+        )
+        XCTAssertEqual(malformedTerminalWithValidDelta.state, .conflictingFinalValues)
+    }
+
+    func testInvalidResponsesPayloadCannotBecomeMemoryGetDefaultRead() {
+        let memoryGet = AgentToolDefinition(
+            name: "memory_get", description: "Search memory", parameters: [:], required: ["tool_title"]
+        )
+        XCTAssertNotNil(AIChatViewModel.toolArgumentsStateError(
+            state: .malformedJSON, truncationWasRepaired: false,
+            toolName: "memory_get", tools: [memoryGet]
+        ))
+        XCTAssertNotNil(AIChatViewModel.toolArgumentsStateError(
+            state: .malformedJSON, truncationWasRepaired: true,
+            toolName: "memory_get", tools: [memoryGet]
+        ), "nonblocking-only tools must not execute guessed repairs")
+        XCTAssertNil(AIChatViewModel.toolArgumentsStateError(
+            state: .valid, truncationWasRepaired: false,
+            toolName: "memory_get", tools: [memoryGet]
+        ), "an explicit valid {} remains eligible for a deliberately no-arg tool")
+        XCTAssertNil(AIChatViewModel.preflightValidateToolCall(
+            name: "memory_get", args: [:], tools: [memoryGet]
+        ), "the real preflight permits valid empty args for this tool")
+
+        let shell = AgentToolDefinition(
+            name: "shell_execute", description: "Run a command",
+            parameters: ["command": AgentToolParam(type: .string, description: "Command")],
+            required: ["command"]
+        )
+        XCTAssertNil(AIChatViewModel.toolArgumentsStateError(
+            state: .malformedJSON, truncationWasRepaired: true,
+            toolName: "shell_execute", tools: [shell]
+        ), "preserve explicit truncation repair for a tool with enforced required args")
+    }
 }

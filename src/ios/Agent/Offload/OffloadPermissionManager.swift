@@ -10,9 +10,9 @@ enum OffloadPermissionLevel: Int, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .bypass: return "Bypass"
-        case .askOnce: return "Ask Once"
-        case .notAllowed: return "Not Allowed"
+        case .bypass: return AppLocalized("Bypass")
+        case .askOnce: return AppLocalized("Ask Once")
+        case .notAllowed: return AppLocalized("Not Allowed")
         }
     }
 }
@@ -50,7 +50,7 @@ struct PermissionRequest: Identifiable {
         // First non-command token is the subcommand
         var idx = 1
         if idx < parts.count && !parts[idx].hasPrefix("-") {
-            result.append((key: "Action", value: parts[idx]))
+            result.append((key: AppLocalized("Action"), value: parts[idx]))
             idx += 1
         }
         while idx < parts.count {
@@ -65,7 +65,7 @@ struct PermissionRequest: Identifiable {
                     idx += 1
                 }
             } else {
-                result.append((key: "arg", value: token))
+                result.append((key: AppLocalized("Argument"), value: token))
                 idx += 1
             }
         }
@@ -107,6 +107,14 @@ struct OffloadCommandInfo {
     let category: OffloadCommandCategory
     /// Only privacy-sensitive commands appear in Settings
     let showInSettings: Bool
+
+    /// These fields are stored as English source keys and localized at read
+    /// time so switching the in-app language updates an already-open settings
+    /// page without rebuilding the static command table.
+    var localizedDisplayLabel: String { AppLocalized(displayLabel) }
+    var localizedDescription: String {
+        description.isEmpty ? "" : AppLocalized(description)
+    }
 }
 
 // MARK: - Manager
@@ -247,8 +255,8 @@ final class OffloadPermissionManager: ObservableObject {
             }
 
             let cmdInfo = Self.allCommands.first(where: { $0.name == command })
-            let displayLabel = cmdInfo?.displayLabel ?? command
-            let description = cmdInfo?.description ?? ""
+            let displayLabel = cmdInfo?.localizedDisplayLabel ?? command
+            let description = cmdInfo?.localizedDescription ?? ""
 
             let allowed = await withCheckedContinuation { continuation in
                 let request = PermissionRequest(

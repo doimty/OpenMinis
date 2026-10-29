@@ -11,7 +11,7 @@ struct AppLockOverlay: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 24) {
-                    Image(systemName: BiometricAuth.biometryIconName)
+                    Image(systemName: CompatSystemSymbol.name(BiometricAuth.biometryIconName))
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
 
@@ -25,7 +25,7 @@ struct AppLockOverlay: View {
                     Button {
                         authenticate()
                     } label: {
-                        Label("Unlock", systemImage: BiometricAuth.biometryIconName)
+                        Label("Unlock", systemImage: CompatSystemSymbol.name(BiometricAuth.biometryIconName))
                             .font(.headline)
                             .padding(.horizontal, 28)
                             .padding(.vertical, 12)

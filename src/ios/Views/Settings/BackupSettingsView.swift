@@ -314,7 +314,7 @@ struct BackupSettingsView: View {
                     // Without maxWidth the row sizes to its content and sits
                     // left; this is what centres it in the Form row.
                     .frame(maxWidth: .infinity)
-                    .fontWeight(.medium)
+                    .compatFontWeight(.medium)
                 }
                 // The start-time requirements gate STARTING only. Applying
                 // them while running would disable the button mid-run and
@@ -332,7 +332,7 @@ struct BackupSettingsView: View {
                 // spanned the middle of the card (user report: the divider
                 // above Stop Backup looked broken). Pin it to the row's
                 // leading edge so it runs the full card width.
-                .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                .compatListRowSeparatorLeading()
 
                 // A disabled button with no explanation is a dead end — say
                 // which requirement is unmet rather than leaving the user to
@@ -350,28 +350,28 @@ struct BackupSettingsView: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
-                            .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                            .compatListRowSeparatorLeading()
                     } else if selected.isEmpty {
                         Text("Choose at least one thing to include.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
-                            .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                            .compatListRowSeparatorLeading()
                     } else if encryptBackup && passphrase.isEmpty {
                         Text("Set a passphrase to encrypt this backup.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
-                            .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                            .compatListRowSeparatorLeading()
                     } else if encryptBackup && passphrase != confirmPassphrase {
                         Text("Confirm the passphrase to continue.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .multilineTextAlignment(.center)
-                            .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+                            .compatListRowSeparatorLeading()
                     }
                 }
 
@@ -388,13 +388,13 @@ struct BackupSettingsView: View {
 
             if let result {
                 Section {
-                    LabeledContent("Size", value: byteText(result.totalBytes))
+                    CompatLabeledContent("Size", value: byteText(result.totalBytes))
                     if result.skippedFiles > 0 {
                         // §3.4: a size-capped export has gaps, and the user is
                         // told here rather than discovering it at restore time.
                         // "too large" would be wrong when files were left out
                         // on purpose — nothing exceeded anything.
-                        LabeledContent(maxFileSizeMB == Self.noFilesTag
+                        CompatLabeledContent(maxFileSizeMB == Self.noFilesTag
                                        ? "Files not included"
                                        : "Excluded (too large)",
                                        value: "\(result.skippedFiles) file(s)")
@@ -690,13 +690,13 @@ struct BackupSettingsView: View {
         let total = ByteCountFormatter.string(fromByteCount: d.totalBytes, countStyle: .file)
         let elapsed = BackupTransferStatus.durationText(d.elapsed)
         if d.finishedAt != nil {
-            return AppLocalized("\(total) in \(elapsed)")
+            return String(format: AppLocalized("%@ in %@"), String(total), String(elapsed))
         }
         let rate = BackupTransferStatus.rateText(d.bytesPerSecond)
         if let remaining = d.remaining {
-            return AppLocalized("\(sent) of \(total) · \(rate) · \(elapsed) elapsed · about \(BackupTransferStatus.durationText(remaining)) left")
+            return String(format: AppLocalized("%@ of %@ · %@ · %@ elapsed · about %@ left"), String(sent), String(total), String(rate), String(elapsed), String(BackupTransferStatus.durationText(remaining)))
         }
-        return AppLocalized("\(sent) of \(total) · \(elapsed) elapsed")
+        return String(format: AppLocalized("%@ of %@ · %@ elapsed"), String(sent), String(total), String(elapsed))
     }
 
     /// Whether this record is the interrupted run whose staging is still on
@@ -846,8 +846,8 @@ struct BackupSettingsView: View {
                 // hidden link driven by state, so the label area pushes the
                 // detail view and the switch keeps its own hit area.
                 HStack(spacing: 12) {
-                    Image(systemName: RcloneBackendCatalog.backend(for: r.backend)?.icon
-                          ?? "externaldrive.connected.to.line.below")
+                    Image(systemName: CompatSystemSymbol.name(RcloneBackendCatalog.backend(for: r.backend)?.icon
+                          ?? "externaldrive.connected.to.line.below"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 28, height: 28)

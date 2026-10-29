@@ -256,7 +256,7 @@ enum OnboardingModelFetch {
     struct TimeoutError: LocalizedError, Equatable {
         let seconds: TimeInterval
         var errorDescription: String? {
-            AppLocalized("Timed out after \(Int(seconds)) seconds.")
+            String(format: AppLocalized("Timed out after %lld seconds."), Int(Int(seconds)))
         }
     }
 

@@ -1,0 +1,547 @@
+{
+  "summary": {
+    "NavigationStack": {
+      "files": 51,
+      "hits": 92
+    },
+    "NavigationPath": {
+      "files": 1,
+      "hits": 9
+    },
+    "NavigationSplitView": {
+      "files": 2,
+      "hits": 4
+    },
+    "UIHostingConfiguration": {
+      "files": 6,
+      "hits": 35
+    },
+    "PhotosPicker": {
+      "files": 4,
+      "hits": 8
+    },
+    "Transferable": {
+      "files": 1,
+      "hits": 2
+    },
+    "LayoutProtocol": {
+      "files": 3,
+      "hits": 3
+    },
+    "AppIntents": {
+      "files": 17,
+      "hits": 34
+    },
+    "NSFileProviderReplicatedExtension": {
+      "files": 1,
+      "hits": 2
+    },
+    "CKSyncEngine": {
+      "files": 4,
+      "hits": 69
+    },
+    "ActivityKit": {
+      "files": 7,
+      "hits": 33
+    },
+    "AlarmKit": {
+      "files": 3,
+      "hits": 21
+    },
+    "available_ios16": {
+      "files": 36,
+      "hits": 115
+    },
+    "available_ios17plus": {
+      "files": 37,
+      "hits": 121
+    }
+  },
+  "rows": [
+    {
+      "file": "Agent/Background/AgentLiveActivityManager.swift",
+      "ActivityKit": 26,
+      "available_ios16": 13,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Agent/Background/BackgroundKeepAliveManager.swift",
+      "NavigationStack": 1,
+      "AppIntents": 2,
+      "ActivityKit": 1,
+      "available_ios16": 5,
+      "available_ios17plus": 4
+    },
+    {
+      "file": "Agent/Backup/BackupImporter+Categories.swift",
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Agent/BrowserUse/BrowserHistory.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Agent/BrowserUse/BrowserSheetView.swift",
+      "NavigationStack": 2,
+      "available_ios16": 2,
+      "available_ios17plus": 2
+    },
+    {
+      "file": "Agent/Chat/AIChatViewModel+Attachments.swift",
+      "PhotosPicker": 2
+    },
+    {
+      "file": "Agent/Chat/AIChatViewModel.swift",
+      "UIHostingConfiguration": 3,
+      "AlarmKit": 1,
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Agent/Chat/ChatStore.swift",
+      "CKSyncEngine": 2,
+      "available_ios16": 4,
+      "available_ios17plus": 4
+    },
+    {
+      "file": "Agent/Intents/AskMinisIntent.swift",
+      "AppIntents": 2
+    },
+    {
+      "file": "Agent/Intents/FollowUpSessionIntent.swift",
+      "AppIntents": 3
+    },
+    {
+      "file": "Agent/Intents/GetSessionStatusIntent.swift",
+      "AppIntents": 2
+    },
+    {
+      "file": "Agent/Intents/ListSessionsIntent.swift",
+      "AppIntents": 2
+    },
+    {
+      "file": "Agent/Intents/MinisShortcutsProvider.swift",
+      "AppIntents": 3
+    },
+    {
+      "file": "Agent/Intents/ModelSelectionEntity.swift",
+      "AppIntents": 1,
+      "available_ios16": 1
+    },
+    {
+      "file": "Agent/Intents/OpenSessionIntent.swift",
+      "AppIntents": 2
+    },
+    {
+      "file": "Agent/Intents/QuickTaskIntent.swift",
+      "AppIntents": 3
+    },
+    {
+      "file": "Agent/Intents/RetryRunIntent.swift",
+      "AppIntents": 3
+    },
+    {
+      "file": "Agent/Intents/SendPromptIntent.swift",
+      "AppIntents": 3
+    },
+    {
+      "file": "Agent/Intents/SendPromptResult.swift",
+      "AppIntents": 1
+    },
+    {
+      "file": "Agent/Intents/SessionEntity.swift",
+      "AppIntents": 1
+    },
+    {
+      "file": "Agent/Intents/ShortcutRunTracker.swift",
+      "AppIntents": 3
+    },
+    {
+      "file": "Agent/Intents/UserMessageEntity.swift",
+      "AppIntents": 1
+    },
+    {
+      "file": "Agent/Markdown/MinisMarkdownParser.swift",
+      "available_ios16": 1
+    },
+    {
+      "file": "Agent/MessageList/CollectionViewMessageListV3.swift",
+      "UIHostingConfiguration": 15,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Agent/MessageList/MessageListInfrastructure.swift",
+      "NavigationSplitView": 2,
+      "UIHostingConfiguration": 4
+    },
+    {
+      "file": "Agent/MessageList/MessageListLayout.swift",
+      "UIHostingConfiguration": 3
+    },
+    {
+      "file": "Agent/Session/SkillStore.swift",
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Agent/Speech/SpeechRecognitionManager.swift",
+      "available_ios16": 2,
+      "available_ios17plus": 2
+    },
+    {
+      "file": "Agent/Sync/CloudSyncEngine.swift",
+      "CKSyncEngine": 29
+    },
+    {
+      "file": "Agent/Sync/V2/ChatStoreSyncHydrators.swift",
+      "available_ios16": 6,
+      "available_ios17plus": 6
+    },
+    {
+      "file": "Agent/Sync/V2/ICloudSharedZoneTransport.swift",
+      "CKSyncEngine": 35
+    },
+    {
+      "file": "Agent/Sync/V2/MigrationEngine.swift",
+      "available_ios16": 5,
+      "available_ios17plus": 5
+    },
+    {
+      "file": "Agent/Sync/V2/SyncCore.swift",
+      "CKSyncEngine": 3
+    },
+    {
+      "file": "Agent/Sync/V2/SyncV2Bootstrap.swift",
+      "available_ios16": 4,
+      "available_ios17plus": 4
+    },
+    {
+      "file": "AgentWidget/AgentLiveActivityWidget.swift",
+      "ActivityKit": 1
+    },
+    {
+      "file": "AppDelegate.swift",
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Debug/BrowserBenchTestView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Debug/DebugJSONRPC.swift",
+      "available_ios16": 2,
+      "available_ios17plus": 2
+    },
+    {
+      "file": "Debug/MessageListTestView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Debug/SessionDataSimulator.swift",
+      "UIHostingConfiguration": 3
+    },
+    {
+      "file": "FileProvider/FileProviderExtension.swift",
+      "NSFileProviderReplicatedExtension": 2
+    },
+    {
+      "file": "MinisApp.swift",
+      "NavigationStack": 1,
+      "AppIntents": 1,
+      "available_ios16": 5,
+      "available_ios17plus": 5
+    },
+    {
+      "file": "NativeOffloads/AlarmOffloadBridge.swift",
+      "AlarmKit": 18
+    },
+    {
+      "file": "NativeOffloads/ConfigOffloadBridge.swift",
+      "ActivityKit": 1
+    },
+    {
+      "file": "Providers/Voice/SystemVoiceCatalog.swift",
+      "available_ios16": 3,
+      "available_ios17plus": 3
+    },
+    {
+      "file": "Providers/Voice/VoiceActivityDetector.swift",
+      "available_ios16": 2,
+      "available_ios17plus": 2
+    },
+    {
+      "file": "ShareExtension/ShareViewController.swift",
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Shared/AgentActivityAttributes.swift",
+      "ActivityKit": 1
+    },
+    {
+      "file": "Shared/AudioTogglePlaybackIntent.swift",
+      "AppIntents": 1
+    },
+    {
+      "file": "Shared/Config/ConfigRegistry+Builtins.swift",
+      "ActivityKit": 2,
+      "available_ios16": 5,
+      "available_ios17plus": 5
+    },
+    {
+      "file": "Shared/Config/Confirm/ConfigConfirmSheet.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Shared/DeepLinkCoordinator.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Shared/FontSettings.swift",
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Shared/QuickActionWorkflow.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Alarms/AlarmListView.swift",
+      "NavigationStack": 1,
+      "available_ios16": 1,
+      "available_ios17plus": 4
+    },
+    {
+      "file": "Views/Chat/AIChatView.swift",
+      "NavigationStack": 11,
+      "PhotosPicker": 2,
+      "available_ios16": 6,
+      "available_ios17plus": 10
+    },
+    {
+      "file": "Views/Chat/AssistantBlockView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Chat/ChatInputBar.swift",
+      "NavigationStack": 1,
+      "PhotosPicker": 1,
+      "Transferable": 2,
+      "LayoutProtocol": 1
+    },
+    {
+      "file": "Views/Chat/ChatMessageViews.swift",
+      "available_ios17plus": 2
+    },
+    {
+      "file": "Views/Chat/ChatTurnScreenshot.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Chat/MinisMediaViews.swift",
+      "NavigationStack": 1,
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Views/Chat/SelectableMarkdownView.swift",
+      "UIHostingConfiguration": 7,
+      "LayoutProtocol": 1,
+      "available_ios16": 2,
+      "available_ios17plus": 2
+    },
+    {
+      "file": "Views/Chat/SessionMemoryView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Chat/SessionSkillsView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Chat/ToolLiveSheet.swift",
+      "NavigationStack": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Views/Chat/Voice/InlineVoiceInputView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Chat/Voice/SpeechPlayerControl.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Chat/WebPreviewSheet.swift",
+      "NavigationStack": 2
+    },
+    {
+      "file": "Views/ContentView.swift",
+      "NavigationStack": 17,
+      "NavigationPath": 9,
+      "NavigationSplitView": 2,
+      "AlarmKit": 2,
+      "available_ios16": 13,
+      "available_ios17plus": 23
+    },
+    {
+      "file": "Views/MCP/MCPFormSheet.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/MCP/MCPIntegrationsView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/MCP/MCPJSONImportSheet.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/MCP/SessionMCPsView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Providers/AddProviderView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Providers/GroupSlotPicker.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Providers/KimiDeviceLoginSheet.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Providers/ModelGroupDetailView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Providers/ModelGroupsView.swift",
+      "NavigationStack": 2,
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Views/Providers/ModelQuickTestSheet.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Providers/ProviderInstanceDetailView.swift",
+      "NavigationStack": 3
+    },
+    {
+      "file": "Views/Providers/ProviderInstancesView.swift",
+      "NavigationStack": 1,
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Views/Providers/ThinkingRuleEditorView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Providers/UnifiedModelPicker.swift",
+      "NavigationStack": 2
+    },
+    {
+      "file": "Views/Rootfs/FileBrowserView.swift",
+      "NavigationStack": 3,
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Views/Rootfs/ISHTerminalView.swift",
+      "NavigationStack": 3
+    },
+    {
+      "file": "Views/Rootfs/RootfsManagementView.swift",
+      "NavigationStack": 2
+    },
+    {
+      "file": "Views/Rootfs/RootfsResetButton.swift",
+      "NavigationStack": 3
+    },
+    {
+      "file": "Views/Settings/BackupDestinationDetailView.swift",
+      "NavigationStack": 2
+    },
+    {
+      "file": "Views/Settings/BackupDestinationPicker.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Settings/BackupRestoreView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Settings/EnhancedBackgroundSettingsView.swift",
+      "ActivityKit": 1
+    },
+    {
+      "file": "Views/Settings/EnvironmentVariablesView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Settings/LogManagementView.swift",
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Views/Settings/MemoryManagementView.swift",
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Views/Settings/MountDetailView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Settings/MountedFoldersSettingsView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Settings/RcloneAddServerView.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "Views/Settings/SoulSettingsView.swift",
+      "NavigationStack": 1,
+      "PhotosPicker": 3,
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "Views/Skills/SkillsManagementView.swift",
+      "NavigationStack": 2,
+      "available_ios16": 2,
+      "available_ios17plus": 2
+    },
+    {
+      "file": "Views/Sync/CloudSyncSettingsV2View.swift",
+      "available_ios16": 5,
+      "available_ios17plus": 5
+    },
+    {
+      "file": "Views/Sync/SyncMigrationDetailView.swift",
+      "NavigationStack": 1,
+      "available_ios16": 12,
+      "available_ios17plus": 12
+    },
+    {
+      "file": "WebApp/WebAppAddToHomeSheet.swift",
+      "NavigationStack": 1
+    },
+    {
+      "file": "WebApp/WebAppWebViewController.swift",
+      "available_ios16": 1,
+      "available_ios17plus": 1
+    },
+    {
+      "file": "iSH/Terminal/TerminalInputView.swift",
+      "LayoutProtocol": 1
+    }
+  ]
+}

@@ -302,7 +302,7 @@ struct CloudSyncSettingsView: View {
     // MARK: - Helpers
 
     private func settingsIcon(_ systemName: String, color: Color) -> some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 9))
             .foregroundStyle(.white)
             .frame(width: 21, height: 21)
@@ -374,12 +374,12 @@ private struct DeviceSyncSection: View {
         let seconds = Int(Date().timeIntervalSince(date))
         if seconds < 60 { return AppLocalized("just now") }
         let minutes = seconds / 60
-        if minutes < 60 { return AppLocalized("\(minutes) min ago") }
+        if minutes < 60 { return String(format: AppLocalized("%lld min ago"), Int(minutes)) }
         let hours = minutes / 60
-        if hours < 24 { return AppLocalized("\(hours) hr ago") }
+        if hours < 24 { return String(format: AppLocalized("%lld hr ago"), Int(hours)) }
         let days = hours / 24
-        if days == 1 { return AppLocalized("\(days) day ago") }
-        return AppLocalized("\(days) days ago")
+        if days == 1 { return String(format: AppLocalized("%lld day ago"), Int(days)) }
+        return String(format: AppLocalized("%lld days ago"), Int(days))
     }
 
     private var deviceIcon: String {
@@ -390,7 +390,7 @@ private struct DeviceSyncSection: View {
     }
 
     private func settingsIcon(_ systemName: String, color: Color) -> some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 9))
             .foregroundStyle(.white)
             .frame(width: 21, height: 21)
@@ -405,7 +405,7 @@ private struct DeviceSyncSection: View {
                 set: { engine.setDeviceSyncEnabled(device.id, enabled: $0) }
             )) {
                 HStack {
-                    Image(systemName: deviceIcon)
+                    Image(systemName: CompatSystemSymbol.name(deviceIcon))
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(device.deviceName)

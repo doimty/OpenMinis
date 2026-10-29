@@ -30,7 +30,7 @@ struct BackupDestinationPicker: View {
     @State private var errorText: String?
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 if !remotes.isEmpty || !folders.isEmpty {
                     savedSection
@@ -202,7 +202,7 @@ struct BackupDestinationPicker: View {
     // MARK: - Helpers
 
     private func icon(_ name: String, _ colour: Color) -> some View {
-        Image(systemName: name)
+        Image(systemName: CompatSystemSymbol.name(name))
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: 28, height: 28)
