@@ -94,17 +94,6 @@ extension Notification.Name {
 /// - **3-tier height resolution**: measured cache → precalc (NSAttributedString) → estimate
 /// - **2-state scroll model**: autoScrolling / userBrowsing (replaces V2's 6+ mechanisms)
 /// - **O(1) message lookup**: UUID index rebuilt on each snapshot
-    /// Pure seam for the bottom-inset floor. When the floating tool preview's
-    /// geometry has not been reported yet (observer stall) the preview is
-    /// visibly mounted while `floatingBarHeight` stays <= 1; the last message
-    /// would then sit under the preview + composer and its taps would be
-    /// intercepted by the overlay. Floor equals the measured preview height
-    /// (device log: 223.67 inset = 115.67 inputBar + ~100 preview + 8).
-    static func effectiveFloatingHeight(floatingBarHeight: CGFloat, hasToolBlocks: Bool) -> CGFloat {
-        if floatingBarHeight > 1 { return floatingBarHeight }
-        return hasToolBlocks ? 100 : 0
-    }
-
 struct CollectionViewMessageListV3: UIViewControllerRepresentable {
     @ObservedObject var vm: AIChatViewModel
     var inputFocused: Bool
@@ -140,6 +129,17 @@ struct CollectionViewMessageListV3: UIViewControllerRepresentable {
     /// rows appended right after a send can take the space a shrinking composer
     /// releases (see `ComposerShrinkAbsorption`). nil = no composer.
     var composerLiveHeight: ComposerLiveHeight? = nil
+
+    /// Pure seam for the bottom-inset floor. When the floating tool preview's
+    /// geometry has not been reported yet (observer stall) the preview is
+    /// visibly mounted while `floatingBarHeight` stays <= 1; the last message
+    /// would then sit under the preview + composer and its taps would be
+    /// intercepted by the overlay. Floor equals the measured preview height
+    /// (device log: 223.67 inset = 115.67 inputBar + ~100 preview + 8).
+    static func effectiveFloatingHeight(floatingBarHeight: CGFloat, hasToolBlocks: Bool) -> CGFloat {
+        if floatingBarHeight > 1 { return floatingBarHeight }
+        return hasToolBlocks ? 100 : 0
+    }
 
     func makeUIViewController(context: Context) -> MessageListViewController {
         let vc = MessageListViewController()
