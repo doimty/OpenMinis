@@ -23,7 +23,9 @@ extension AIChatViewModel {
         let contextWindow = resolved.window
         guard contextWindow > 0 else { return .ok }
 
-        let policy = ContextPolicy(contextWindow: contextWindow, isUserCap: resolved.isUserCap, autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens)
+        // [T-auto-compact-budget] One read of the live preference per decision.
+        let budget = AutoCompactionPreferences.activeBudgetTokens
+        let policy = ContextPolicy(contextWindow: contextWindow, isUserCap: resolved.isUserCap, autoCompactBudgetTokens: budget)
         // [T-ctx-measure-outbound] Judge the request that is about to go out.
         //
         // This used to be `max(estimateContextTokens(), lastReportedContextTokens())`.
