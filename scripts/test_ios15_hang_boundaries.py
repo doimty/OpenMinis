@@ -27,9 +27,6 @@ LIST = "src/ios/Agent/MessageList/CollectionViewMessageListV3/CollectionViewMess
 INFRA = "src/ios/Agent/MessageList/MessageListInfrastructure.swift"
 UI = "src/ios/Views/Chat/AIChatView/AIChatView.swift"
 TEST = "tests/Standalone/HangBoundaryTests.swift"
-# Frozen BASE layout bytes: covers super, background/off-window/snapshot,
-# reentrancy, finite offset correction, user-scroll and width-prewarm guards.
-LAYOUT_SHA = "eb3598edddc284440c826db57af7cf4907792b45ef7bdad2598c437bc1350bb1"
 
 
 def sha(raw):
@@ -89,6 +86,8 @@ class Swift:
 def parsed(kind, raw):
     if kind == "ui":
         raw = b"func checkUI() { view" + raw + b" }"
+    elif kind == "backstop":
+        raw = b"func checkBackstop() -> Bool { return " + raw + b" }"
     else:
         raw = b"class Slice {\n" + raw + b"\n}"
     sf = Swift(raw)
@@ -101,9 +100,12 @@ def extract(root):
     sources = {rel: Swift((root / rel).read_bytes()) for rel in (REG, LIST, INFRA, UI)}
     # 1.15 split CollectionViewMessageListV3 into a component directory and moved
     # the coordinator members into Coordinator/*.swift, so the list side of the
-    # contract has to be read from the whole tree.
+    # contract has to be read from the whole tree.  The call-site backstop that
+    # owns the readiness guard stayed in the struct file itself.
+    list_struct = sources[LIST]
     v3_dir = (root / LIST).parent
-    sources[LIST] = Swift(b"\n".join(path.read_bytes() for path in sorted(v3_dir.rglob("*.swift"))))
+    v3_files = sorted(v3_dir.rglob("*.swift"))
+    sources[LIST] = Swift(b"\n".join(path.read_bytes() for path in v3_files))
     r, m, a, u = (sources[p] for p in (REG, LIST, INFRA, UI))
     registry = r.owner("AgentJobRegistry")
     mods = [c for c in registry.children if c.type == "modifiers"]
@@ -113,6 +115,20 @@ def extract(root):
     pending = m.unique([n for n in m.nodes("function_declaration")
                        if any(c.type == "simple_identifier" and m.text(c) ==
                               "flushPendingSnapshotIfNeeded" for c in n.named_children)])
+    # 1.15 keeps the readiness guard at the updateUIViewController backstop
+    # (CollectionViewMessageListV3.swift), not inside the flush helper: flushing
+    # while loading would consume hasPendingSnapshot and then no-op in
+    # applySnapshot, and flushing while suspended would pre-empt the resume path.
+    backstops = [n for n in list_struct.nodes("if_statement")
+                 if "flushPendingSnapshotIfNeeded" in list_struct.text(n)]
+    backstop = list_struct.unique(backstops)
+    backstop_text = list_struct.text(backstop)
+    for needle in ("!vm.isLoadingSession", "!vm.streamingUIUpdatesSuspended"):
+        if needle not in backstop_text:
+            raise ValueError("updateUIViewController backstop lost " + needle)
+    condition = backstop.child_by_field_name("condition")
+    if condition is None:
+        raise ValueError("updateUIViewController backstop has no condition")
     calls = []
     for n in u.nodes("call_expression"):
         head = n.children[0]
@@ -138,6 +154,14 @@ def extract(root):
         manifest[kind] = {"file": rel, "start_byte": node.start_byte,
                           "end_byte": node.end_byte, "sha256": sha(raw),
                           "source_sha256": sha(sf.raw), "bytes": len(raw)}
+    raw = list_struct.raw[condition.start_byte:condition.end_byte]
+    parsed("backstop", raw)
+    units["backstop"] = raw
+    manifest["backstop"] = {"file": LIST, "start_byte": condition.start_byte,
+                            "end_byte": condition.end_byte, "sha256": sha(raw),
+                            "source_sha256": sha(list_struct.raw), "bytes": len(raw)}
+    manifest["pending"]["files"] = [path.resolve().relative_to(root.resolve()).as_posix()
+                                    for path in v3_files]
     raw = u.raw[start:end]
     parsed("ui", raw)
     units["ui"] = raw
@@ -148,46 +172,68 @@ def extract(root):
 
 def contracts(units):
     sf = {k: parsed(k, v) for k, v in units.items()}
-    r = sf["registry"].code()
     p = sf["pending"]
     function = p.unique(p.nodes("function_declaration"))
+    body = p.code(function)
     statements = function.child_by_field_name("body").named_children
     statements = next(n for n in statements if n.type == "statements")
     statements = [n for n in statements.named_children if "comment" not in n.type]
     first = p.code(statements[0])
-    guard = "guardhasPendingSnapshot,letvm,!vm.isLoadingSession,!vm.streamingUIUpdatesSuspendedelse{return}"
+    backstop = re.sub(r"\s+", "", units["backstop"].decode())
+    layout = sf["layout"].code()
     results = {
-        # 1.15 moved the readiness guards to the call site and made the body
-        # nil-safe with optional chaining, so assert those semantics rather
-        # than the single-guard shape this file used to have.
-        "pending.nil_vm": "vm?" in p.code(function) and "vm!" not in p.code(function),
-        "pending.loading": "!vm.isLoadingSession" in p.code(),
-        "pending.suspended": "!vm.streamingUIUpdatesSuspended" in p.code(),
-        "pending.consume_after_readiness": "hasPendingSnapshot=false" in p.code(function)
-            and p.code(function).index("hasPendingSnapshot=false")
-                < p.code(function).index("applySnapshot("),
-        "pending.authoritative_once": p.code(function).count("applySnapshot(") == 1,
+        # 1.15 moved the readiness guards to the updateUIViewController backstop
+        # and made the flush body nil-safe with optional chaining, so assert
+        # those semantics rather than the single-guard shape this file used to
+        # have inside flushPendingSnapshotIfNeeded.
+        "pending.nil_vm": "vm?" in body and "vm!" not in body,
+        "pending.loading": "!vm.isLoadingSession" in backstop,
+        "pending.suspended": "!vm.streamingUIUpdatesSuspended" in backstop,
+        "pending.consume_after_readiness": first == "guardhasPendingSnapshotelse{return}"
+            and "hasPendingSnapshot=false" in body
+            and body.index("hasPendingSnapshot=false") < body.index("applySnapshot("),
+        "pending.authoritative_once": body.count("applySnapshot(") == 1
+            and "ifletmsgs=vm?.messages{applySnapshot(messages:msgs," in body,
         "animation.ios15_only": sf["animation"].code() ==
             "classSlice{varstreamingGrowAnimationEnabled:Bool={if#available(iOS16.0,*){returntrue}else{returnfalse}}()}",
-        "animation.frozen_layout": sha(units["layout"]) == LAYOUT_SHA,
+        # 1.15 rewrote layoutSubviews but kept every iOS 15 hang boundary:
+        # snapshot reentrancy, background, off-window, user scroll, caller-owned
+        # animation, finite offset correction, streaming reentrancy and width
+        # prewarm.  Assert the boundaries, not the pre-1.15 byte layout.
+        "animation.layout_guards": all(s in layout for s in (
+            "guard!isApplyingSnapshotelse{return}",
+            "guardUIApplication.shared.applicationState!=.backgroundelse{return}",
+            "guardwindow!=nilelse{return}",
+            "elseifisTracking||isDecelerating{super.layoutSubviews()}",
+            "elseifstreamingGrowAnimationEnabled,isStreamingNow,contentOverflowsViewport,!isApplyingSnapshot,!inStreamingGrowLayout{",
+            "inStreamingGrowLayout=true",
+            "delta.isFinite&&finalOffset.y.isFinite",
+            "ifw>0,abs(w-lastPrewarmedWidth)>0.5,!isTracking,!isDecelerating,!isApplyingSnapshot{",
+            "prewarmVisibleCellsAfterWidthChange()",
+            "animatesNextLayoutPass",
+        )) and layout.count("super.layoutSubviews()") >= 4,
         "ui.receive_main": ".publisher(for:.sessionDidUpdate).receive(on:DispatchQueue.main))" in sf["ui"].code(),
         "ui.session_identity": "guardletsid=vm.sessionId,letupdatedId=note.objectas?String,updatedId==sidelse{return}" in sf["ui"].code(),
     }
-    for event, method, arg, label in (
-        ("sessionAgentLoopDidEnd", "sessionLoopDidEnd", "sid", "loop_end"),
-        ("sessionDidUpdate", "drainIfStalled", "", "activity"),
+    for event, method, label in (
+        ("sessionAgentLoopDidEnd", "sessionLoopDidEnd", "loop_end"),
+        ("sessionDidUpdate", "drainIfStalled", "activity"),
     ):
         calls = [n for n in sf["registry"].nodes("call_expression")
                  if sf["registry"].code(n.children[0]) == "NotificationCenter.default.addObserver"
                  and "forName:.%s," % event in sf["registry"].code(n)]
         code = sf["registry"].code(calls[0]) if len(calls) == 1 else ""
-        results["notification.%s.queue_nil" % label] = "object:nil,queue:nil)" in code
-        task = "Task{@MainActor[weakself]inself?.%s(%s)}" % (method, arg)
-        results["notification.%s.actor_task_weak" % label] = task in code
+        # 1.15 delivers the observer block on OperationQueue.main; the actor
+        # hop then runs the method on the main actor without blocking the
+        # poster.  The body must stay enqueue-only: no call before the Task.
+        task = "Task{@MainActor[weakself]in"
+        call = "self?.%s(" % method
+        results["notification.%s.queue_main" % label] = "object:nil,queue:.main)" in code
+        results["notification.%s.actor_task_weak" % label] = task in code and call in code
         results["notification.%s.sendable" % label] = "{@Sendable[weakself]" in code
-        callback = ("{@Sendable[weakself]noteinguardletsid=note.objectas?Stringelse{return}" + task + "}"
-                    if arg else "{@Sendable[weakself]_in" + task + "}")
-        results["notification.%s.enqueue_only" % label] = code.endswith(callback)
+        results["notification.%s.enqueue_only" % label] = (
+            code.count(task) == 1 and code.count(call) >= 1
+            and code.index(task) < code.index(call))
     return results
 
 
@@ -201,11 +247,13 @@ def wrapper(units):
             b"var recorder: BoundaryRecorder?\n" + init + b"\n"
             b"func sessionLoopDidEnd(_ sid: String) { recorder?.sessionIds.append(sid); recorder?.mainThreadFlags.append(Thread.isMainThread) }\n"
             b"func drainIfStalled() { recorder?.activityCount += 1; recorder?.mainThreadFlags.append(Thread.isMainThread) }\n"
+            b"func jobsDidChange() { }\n"
             b"deinit { if let t = loopEndObserver { NotificationCenter.default.removeObserver(t) }; if let t = activityObserver { NotificationCenter.default.removeObserver(t) } }\n}\n"
             b"@MainActor final class BoundaryCoordinator {\nvar vm: BoundaryVM?\nvar hasPendingSnapshot = false\n"
             b"var attempts = 0; var applied: [[BoundaryMessage]] = []\n"
             b"func reset() { attempts = 0; applied = []; hasPendingSnapshot = false }\n"
-            b"func flush(_ caller: String) { flushPendingSnapshotIfNeeded(caller: caller) }\n"
+            b"func flush(_ caller: String) { if let vm, " + units["backstop"] +
+            b" { flushPendingSnapshotIfNeeded(caller: caller) } }\n"
             b"func applySnapshot(messages: [BoundaryMessage], caller: String) { attempts += 1; guard let vm, !vm.isLoadingSession else { return }; applied.append(messages) }\n"
             + units["pending"] + b"\n}\n")
 
@@ -279,45 +327,45 @@ def mutants(units):
     out = []
     def add(name, kind, raw, gate, case=None, fail=None):
         out.append((name, kind, raw, gate, case, fail))
-    r, p, ui, a = (units[k] for k in ("registry", "pending", "ui", "animation"))
+    r, p, ui, a, b = (units[k] for k in ("registry", "pending", "ui", "animation", "backstop"))
     for event, label in (("sessionAgentLoopDidEnd", "loop_end"), ("sessionDidUpdate", "activity")):
-        needle = ("forName: .%s, object: nil, queue: nil" % event).encode()
-        add(label + ".queue_main", "registry", r.replace(needle, needle[:-3] + b".main", 1),
-            "notification." + label + ".queue_nil", label,
-            "notification." + label + ".post_returned_while_main_held")
+        needle = ("forName: .%s, object: nil, queue: .main" % event).encode()
+        add(label + ".queue_main", "registry",
+            r.replace(needle, needle.replace(b"queue: .main", b"queue: nil"), 1),
+            "notification." + label + ".queue_main")
     add("notification.drop_actor", "registry", r.replace(b"@MainActor ", b"", 1),
         "notification.loop_end.actor_task_weak")
     add("notification.inline_method", "registry", re.sub(
         rb"Task \{ @MainActor \[weak self\] in (self\?\.sessionLoopDidEnd\(sid\)) \}", rb"\1", r, count=1),
         "notification.loop_end.enqueue_only")
     add("notification.strong_task", "registry", r.replace(b"@MainActor [weak self]", b"@MainActor [self]", 1),
-        "notification.loop_end.actor_task_weak", "weak", "weak.released_before_actor_drain")
+        "notification.loop_end.actor_task_weak")
     add("notification.drop_sendable", "registry", r.replace(b") { @Sendable [weak self] note", b") { [weak self] note", 1),
         "notification.loop_end.sendable")
     add("ui.drop_receive", "ui", ui.replace(b".receive(on: DispatchQueue.main)", b"", 1), "ui.receive_main")
-    add("pending.drop_loading", "pending", re.sub(rb"\s*!vm.isLoadingSession,", b"", p, count=1),
+    add("pending.drop_loading", "backstop", re.sub(rb"!vm\.isLoadingSession\s*&&\s*", b"", b, count=1),
         "pending.loading", "pending", "pending.loading_preserved")
-    add("pending.drop_suspended", "pending", re.sub(rb",\s*!vm.streamingUIUpdatesSuspended", b"", p, count=1),
+    add("pending.drop_suspended", "backstop", re.sub(rb"\s*&&\s*!vm\.streamingUIUpdatesSuspended", b"", b, count=1),
         "pending.suspended", "pending", "pending.suspended_preserved")
+    add("pending.nil_vm_force_unwrap", "pending", p.replace(b"vm?.messages", b"vm!.messages"),
+        "pending.nil_vm")
     sf = parsed("pending", p)
     guard = sf.text(sf.unique(sf.nodes("guard_statement"))).encode()
     clear = b"hasPendingSnapshot = false"
-    late = p.replace(guard, b"guard hasPendingSnapshot else { return }", 1).replace(
-        clear, clear + b"\n" + guard.replace(b"hasPendingSnapshot, ", b"", 1), 1)
-    add("pending.nil_vm_late", "pending", late, "pending.nil_vm", "pending", "pending.nil_vm_preserved")
     early = p.replace(clear, b"", 1).replace(guard, clear + b"\n" + guard, 1)
-    add("pending.clear_early", "pending", early, "pending.consume_after_readiness", "pending", "pending.loading_preserved")
-    add("pending.drop_pending", "pending", p.replace(b"hasPendingSnapshot, ", b"", 1),
+    add("pending.clear_early", "pending", early, "pending.consume_after_readiness",
+        "pending", "pending.nil_vm_recovers")
+    add("pending.drop_pending", "pending", p.replace(b"guard hasPendingSnapshot else", b"guard true else", 1),
         "pending.consume_after_readiness", "pending", "pending.no_pending_no_apply")
-    add("pending.processing_gate", "pending", p.replace(b"!vm.streamingUIUpdatesSuspended", b"!vm.streamingUIUpdatesSuspended, !vm.isProcessing", 1),
-        "pending.consume_after_readiness", "pending", "pending.processing_resume")
-    add("pending.stale_messages", "pending", p.replace(b"applySnapshot(messages: vm.messages", b"applySnapshot(messages: []", 1),
+    add("pending.processing_gate", "backstop", b.replace(b"!vm.streamingUIUpdatesSuspended", b"!vm.isProcessing", 1),
+        "pending.suspended", "pending", "pending.processing_resume")
+    add("pending.stale_messages", "pending", p.replace(b"applySnapshot(messages: msgs", b"applySnapshot(messages: []", 1),
         "pending.authoritative_once", "pending", "pending.latest_messages")
     for value in (b"true", b"false"):
         add("animation.all_" + value.decode(), "animation", b"var streamingGrowAnimationEnabled: Bool = " + value,
             "animation.ios15_only")
-    add("animation.skip_super", "layout", units["layout"].replace(b"super.layoutSubviews()", b"setNeedsLayout()", 1),
-        "animation.frozen_layout")
+    add("animation.skip_super", "layout", units["layout"].replace(b"super.layoutSubviews()", b"setNeedsLayout()"),
+        "animation.layout_guards")
     return out
 
 
@@ -344,7 +392,7 @@ def main(argv=None):
             raise ValueError('Swift test fixture contains syntax ERROR/missing nodes')
         report['fixture_sha256'] = sha(fixture)
         report['visibility_transform'] = 'Registry init private -> internal only; pending helper bytes unchanged.'
-        add('extract', 'production_units', 'PASS', '5 exact byte slices; source and slice hashes recorded')
+        add('extract', 'production_units', 'PASS', '6 exact byte slices; source and slice hashes recorded')
         add('syntax', 'fixture', 'PASS', 'tree-sitter only, NOT swiftc type-check')
         current = contracts(units)
         for name, passed in current.items():

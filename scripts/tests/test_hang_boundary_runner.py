@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Self-tests of extraction/protocol/negative gates; not native Swift tests."""
-import importlib.util,json,subprocess,tempfile,unittest
+import importlib.util,json,subprocess,sys,tempfile,unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('hang_gates',ROOT/'scripts/test_ios15_hang_boundaries.py')
@@ -16,7 +16,10 @@ class RunnerTests(unittest.TestCase):
             f'SUMMARY case={case} pass={len(ids)-len(f)} fail={len(f)} skip=0'])+'\n'
     def test_01_real_bytes(self):
         for kind,v in self.manifest.items():
-            raw=(ROOT/v['file']).read_bytes()
+            if 'files' in v:
+                raw=b'\n'.join((ROOT/f).read_bytes() for f in v['files'])
+            else:
+                raw=(ROOT/v['file']).read_bytes()
             self.assertEqual(self.units[kind],raw[v['start_byte']:v['end_byte']])
             self.assertEqual(G.sha(self.units[kind]),v['sha256'])
     def test_02_positive_contracts(self):
@@ -38,9 +41,9 @@ class RunnerTests(unittest.TestCase):
                 if case:self.assertIn(expected,G.NATIVE_IDS[case])
     def test_05_comments_cannot_fake_queue_gate(self):
         v=dict(self.units)
-        v['registry']=v['registry'].replace(b'forName: .sessionDidUpdate, object: nil, queue: nil',
-            b'forName: .sessionDidUpdate, object: nil, queue: .main')+b'\n// object:nil,queue:nil)\n'
-        self.assertFalse(G.contracts(v)['notification.activity.queue_nil'])
+        v['registry']=v['registry'].replace(b'forName: .sessionDidUpdate, object: nil, queue: .main',
+            b'forName: .sessionDidUpdate, object: nil, queue: nil')+b'\n// object:nil,queue:.main)\n'
+        self.assertFalse(G.contracts(v)['notification.activity.queue_main'])
     def test_06_valid_positive_protocol(self):
         for case in G.NATIVE_IDS:self.assertFalse(G.protocol(case,0,self.output(case)))
     def test_07_named_semantic_failure_protocol(self):
@@ -69,7 +72,7 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):G.protocol('weak',1,self.output('weak'))
     def test_17_invalid_explicit_runner_fails(self):
         with tempfile.TemporaryDirectory() as td:
-            p=subprocess.run(['python3',str(ROOT/'scripts/test_ios15_hang_boundaries.py'),
+            p=subprocess.run([sys.executable,str(ROOT/'scripts/test_ios15_hang_boundaries.py'),
                 '--runner',td+'/missing-swiftc','--json',td+'/out.json'],capture_output=True,text=True)
             self.assertEqual(p.returncode,1)
             r=json.loads(Path(td,'out.json').read_text(encoding="utf-8"))

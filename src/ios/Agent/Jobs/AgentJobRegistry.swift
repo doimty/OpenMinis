@@ -417,7 +417,7 @@ final class AgentJobRegistry: ObservableObject {
         // is not the one on screen — which is exactly every headless run.
         loopEndObserver = NotificationCenter.default.addObserver(
             forName: .sessionAgentLoopDidEnd, object: nil, queue: .main
-        ) { [weak self] note in
+        ) { @Sendable [weak self] note in
             guard let sid = note.object as? String else { return }
             Task { @MainActor [weak self] in self?.sessionLoopDidEnd(sid) }
         }
@@ -431,7 +431,7 @@ final class AgentJobRegistry: ObservableObject {
         // returns immediately unless a slot is free AND work is waiting.
         activityObserver = NotificationCenter.default.addObserver(
             forName: .sessionDidUpdate, object: nil, queue: .main
-        ) { [weak self] _ in
+        ) { @Sendable [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.drainIfStalled()
                 // [T-scheduled-active-session] `parentsWithActiveChildren` drops

@@ -1483,7 +1483,8 @@ struct AIChatView: View {
         .onChange(of: vm.sessionId) { _ in
             refreshTitlePillSession()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)) { note in
+        .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)
+            .receive(on: DispatchQueue.main)) { note in
             guard let sid = vm.sessionId,
                   let updatedId = note.object as? String,
                   updatedId == sid else { return }
