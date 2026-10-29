@@ -94,6 +94,15 @@ struct SettingsSheet: View {
                 }
 
                 Section("Agent Runtime") {
+                    NavigationLink {
+                        AutoCompactionSettingsView()
+                    } label: {
+                        Label {
+                            Text(AppLocalized("Auto Compaction"))
+                        } icon: {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                        }
+                    }
                     // [T-tools-granular-switches] First row: per-tool switches.
                     NavigationLink {
                         ToolsSettingsView()
