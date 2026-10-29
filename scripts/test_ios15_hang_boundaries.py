@@ -242,6 +242,13 @@ def wrapper(units):
     if not init.startswith(b"private init()"):
         raise ValueError("init visibility must be exactly one private token")
     init = b"internal" + init[len(b"private"):]
+    # The app's main run loop pumps OperationQueue.main; this disposable CLI
+    # does not.  Keep the production queue under the static gate and inject
+    # nil here so the native cases exercise the actor hop / weak capture,
+    # not the absence of a CLI run loop.
+    if b"queue: .main" not in init:
+        raise ValueError("AgentJobRegistry lost the main-queue observer")
+    init = init.replace(b"queue: .main", b"queue: nil")
     return (b"import Foundation\nimport Dispatch\n@MainActor final class AgentJobRegistry {\n"
             b"var loopEndObserver: Any?; var activityObserver: Any?\n"
             b"var recorder: BoundaryRecorder?\n" + init + b"\n"
@@ -339,7 +346,7 @@ def mutants(units):
         rb"Task \{ @MainActor \[weak self\] in (self\?\.sessionLoopDidEnd\(sid\)) \}", rb"\1", r, count=1),
         "notification.loop_end.enqueue_only")
     add("notification.strong_task", "registry", r.replace(b"@MainActor [weak self]", b"@MainActor [self]", 1),
-        "notification.loop_end.actor_task_weak")
+        "notification.loop_end.actor_task_weak", "weak", "weak.released_before_actor_drain")
     add("notification.drop_sendable", "registry", r.replace(b") { @Sendable [weak self] note", b") { [weak self] note", 1),
         "notification.loop_end.sendable")
     add("ui.drop_receive", "ui", ui.replace(b".receive(on: DispatchQueue.main)", b"", 1), "ui.receive_main")
@@ -391,7 +398,9 @@ def main(argv=None):
         if not Swift(fixture).clean():
             raise ValueError('Swift test fixture contains syntax ERROR/missing nodes')
         report['fixture_sha256'] = sha(fixture)
-        report['visibility_transform'] = 'Registry init private -> internal only; pending helper bytes unchanged.'
+        report['visibility_transform'] = ('Registry init private -> internal only; queue .main -> nil '
+                                          'only in the CLI wrapper (the queue is a static gate; the CLI '
+                                          'has no main run loop); pending helper bytes unchanged.')
         add('extract', 'production_units', 'PASS', '6 exact byte slices; source and slice hashes recorded')
         add('syntax', 'fixture', 'PASS', 'tree-sitter only, NOT swiftc type-check')
         current = contracts(units)

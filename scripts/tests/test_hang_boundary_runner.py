@@ -26,7 +26,9 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue(all(G.contracts(self.units).values()))
     def test_03_wrapper_only_visibility_transform(self):
         w=G.wrapper(self.units)
-        self.assertIn(b'internal'+self.units['registry'][len(b'private'):],w)
+        init=b'internal'+self.units['registry'][len(b'private'):]
+        init=init.replace(b'queue: .main',b'queue: nil') # CLI has no main run loop.
+        self.assertIn(init,w)
         self.assertIn(self.units['pending'],w)
         self.assertNotIn(self.units['animation'],w) # Platform gate isn't simulated.
     def test_04_all_named_mutants_are_valid_rejections(self):
