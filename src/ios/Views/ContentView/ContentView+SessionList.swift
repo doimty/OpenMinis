@@ -371,7 +371,7 @@ extension ContentView {
 
         }
         .listStyle(.plain)
-        .navigationSplitViewColumnWidth(min: 340, ideal: 380, max: 500)
+        .compatNavigationSplitViewColumnWidth(min: 340, ideal: 380, max: 500)
         // [T-macos27-liquid-glass-navbar] See MacOS27GlassWorkaround. Applied to
         // the Mac sidebar List only; the iPhone compact list (the other branch
         // of sessionList) is unaffected and does not get it.

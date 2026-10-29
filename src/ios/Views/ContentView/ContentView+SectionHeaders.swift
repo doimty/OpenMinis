@@ -88,7 +88,7 @@ extension ContentView {
             // Dropping on a date-bucket header moves the sessions OUT of any
             // folder — the drag gesture works both directions, otherwise
             // moving out would still require a trip through the menu.
-            .dropDestination(for: String.self) { sessionIds, _ in
+            .compatDropDestination(for: String.self) { sessionIds, _ in
                 Task { @MainActor in
                     await ChatStore.shared.setFolder(nil, forSessions: sessionIds)
                     refreshSessionList()
@@ -323,7 +323,7 @@ extension ContentView {
         // ScrollViewReader anchor for the mini-bar's "back to header" jump.
         .id("folderHeader-\(group.folderId ?? "")")
         .listRowInsets(EdgeInsets())
-        .dropDestination(for: String.self) { sessionIds, _ in
+        .compatDropDestination(for: String.self) { sessionIds, _ in
             guard let fid = group.folderId else { return false }
             Task { @MainActor in
                 await ChatStore.shared.setFolder(fid, forSessions: sessionIds)

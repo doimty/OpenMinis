@@ -108,7 +108,11 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("generator.maximumSize = CGSize(width: 400, height: 400)", source)
 
     def test_sidebar_drag_drop_retires_new_api_calls_without_replacing_actions(self):
-        source = (ROOT / "src/ios/Views/ContentView/ContentView.swift").read_text(encoding="utf-8")
+        # Upstream 1.15 split ContentView into a component directory; assert over the whole tree.
+        source = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted((ROOT / "src/ios/Views/ContentView").rglob("*.swift"))
+        )
         self.assertNotIn(".draggable(session.id)", source)
         self.assertNotIn(".dropDestination(for: String.self)", source)
         self.assertNotIn(".navigationSplitViewColumnWidth(", source)

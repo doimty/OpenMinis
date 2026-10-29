@@ -70,7 +70,7 @@ struct SessionStackRow: View {
         .buttonStyle(SessionRowPressStyle())
         // Entry D: long-press then move drags the session id; the system
         // arbitrates against .contextMenu on the same press.
-        .draggable(session.id)
+        .compatDraggable(session.id)
         .overlay {
             if isRegeneratingTitle {
                 ZStack {
@@ -128,7 +128,7 @@ struct SessionSplitRow: View {
             matchSnippet: matchSnippet
         )
         .equatable()
-        .draggable(session.id)
+        .compatDraggable(session.id)
         .overlay {
             if isRegeneratingTitle {
                 ZStack {
