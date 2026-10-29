@@ -91,7 +91,7 @@ struct RetryLogSheet: View {
     private func row(_ e: RetryLogEvent) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Image(systemName: icon(e.kind))
+                Image(systemName: CompatSystemSymbol.name(icon(e.kind)))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.orange)
                 Text(title(e.kind)).font(.subheadline.weight(.semibold))

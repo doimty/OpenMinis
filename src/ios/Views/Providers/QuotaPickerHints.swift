@@ -179,7 +179,7 @@ struct ModelQuotaHintView: View {
         switch hint {
         case .modelSpecific(let status, let detail, let isManual):
             HStack(spacing: 2) {
-                Image(systemName: QuotaHintStyle.icon(status))
+                Image(systemName: CompatSystemSymbol.name(QuotaHintStyle.icon(status)))
                     .font(.system(size: 9))
                 Text(detail ?? QuotaHintStyle.word(status))
                     .font(.system(size: 9, weight: .medium).monospacedDigit())

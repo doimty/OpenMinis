@@ -54,7 +54,7 @@ struct SessionEditSheet: View {
                                 editCategory = cat.key
                             } label: {
                                 VStack(spacing: 6) {
-                                    Image(systemName: cat.icon)
+                                    Image(systemName: CompatSystemSymbol.name(cat.icon))
                                         .font(.system(size: 20))
                                         .foregroundStyle(editCategory == cat.key ? .white : cat.color)
                                         .frame(width: 44, height: 44)

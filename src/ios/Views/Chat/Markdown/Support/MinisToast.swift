@@ -51,7 +51,7 @@ enum MinisToast {
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
 
-        let check = UIImageView(image: UIImage(systemName: systemImage))
+        let check = UIImageView(image: UIImage(systemName: CompatSystemSymbol.name(systemImage)))
         check.tintColor = .white
         check.contentMode = .scaleAspectFit
         check.translatesAutoresizingMaskIntoConstraints = false

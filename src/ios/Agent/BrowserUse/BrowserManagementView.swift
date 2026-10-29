@@ -89,7 +89,7 @@ struct BrowserManagementView: View {
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label(profile.displayName, systemImage: profile.icon)
+                    Label(profile.displayName, systemImage: CompatSystemSymbol.name(profile.icon))
                         .foregroundStyle(Color(UIColor.label))
                     Text(displayUA(for: profile))
                         .font(.system(size: 11, design: .monospaced))
@@ -122,7 +122,7 @@ struct BrowserManagementView: View {
                 }
             } label: {
                 HStack {
-                    Label("Custom", systemImage: "pencil.line")
+                    Label("Custom", systemImage: CompatSystemSymbol.name("pencil.line"))
                         .foregroundStyle(Color(UIColor.label))
                     Spacer()
                     if isSelected {

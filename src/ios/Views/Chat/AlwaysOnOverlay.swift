@@ -191,7 +191,7 @@ struct AlwaysOnOverlayView: View {
             // snapshot, no animation of its own. First-baseline aligned so a
             // two-line title keeps the icon on its first line.
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: stepIcon)
+                Image(systemName: CompatSystemSymbol.name(stepIcon))
                     .font(.body.weight(.medium))
                     .foregroundStyle(dim.opacity(0.4))
                     .accessibilityHidden(true)

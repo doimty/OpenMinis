@@ -350,7 +350,7 @@ struct SessionRow: View, Equatable {
     }
 
     private func badgeCircle(icon: String, color: Color, iconSize: CGFloat = 9, size: CGFloat = 16) -> some View {
-        Image(systemName: icon)
+        Image(systemName: CompatSystemSymbol.name(icon))
             .font(.system(size: iconSize, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
@@ -436,7 +436,7 @@ struct SessionRow: View, Equatable {
     private var providerIcon: some View {
         let icon = categoryIcon
         let size: CGFloat = (icon.systemName == "bubble.left.fill" || icon.systemName == "terminal.fill") ? 18 : 20
-        Image(systemName: icon.systemName)
+        Image(systemName: CompatSystemSymbol.name(icon.systemName))
             .font(.system(size: size))
             .foregroundStyle(icon.color)
     }
@@ -596,7 +596,7 @@ struct RemoteSessionRow: View {
     private var providerIcon: some View {
         let icon = categoryIcon
         let size: CGFloat = (icon.systemName == "bubble.left.fill" || icon.systemName == "terminal.fill") ? 18 : 20
-        Image(systemName: icon.systemName)
+        Image(systemName: CompatSystemSymbol.name(icon.systemName))
             .font(.system(size: size))
             .foregroundStyle(icon.color)
     }

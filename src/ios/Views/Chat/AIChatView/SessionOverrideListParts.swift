@@ -81,7 +81,7 @@ struct SessionOverrideEmptyCard: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: systemImage)
+            Image(systemName: CompatSystemSymbol.name(systemImage))
                 .font(.system(size: 36))
                 .foregroundStyle(.tertiary)
             Text(title)

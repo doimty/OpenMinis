@@ -12,7 +12,7 @@ from audit_ios15_sf_symbols import CATALOG, ROOT, audit, exact_edits, unsafe_cal
 class SymbolAuditTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.catalog = json.loads(CATALOG.read_text())["introduced_ios"]
+        cls.catalog = json.loads(CATALOG.read_text(encoding="utf-8"))["introduced_ios"]
         cls.parser = Parser(Language(tree_sitter_swift.language()))
 
     def calls(self, source):
@@ -70,17 +70,20 @@ Image(systemName: icon)
         self.assertIn('UIImage(systemName: CompatSystemSymbol.name(icon), withConfiguration: config)', text)
 
     def test_catalog_pin_and_known_introductions(self):
-        meta = json.loads(CATALOG.read_text())
+        meta = json.loads(CATALOG.read_text(encoding="utf-8"))
         self.assertEqual(meta["source_commit"], "cb2e670a213ff42ae08528ee2c401bfb1d799675")
         self.assertEqual(self.catalog["mic.and.signal.meter"], "16.0")
         self.assertEqual(self.catalog["waveform.badge.mic"], "17.0")
         self.assertEqual(self.catalog["arrow.trianglehead.2.counterclockwise"], "18.0")
 
     def test_owner_is_registered_and_native_ci_gate_is_wired(self):
-        project = (ROOT / "src/ios/Minis.xcodeproj/project.pbxproj").read_text()
-        self.assertEqual(project.count("15C01500000000000000000F /* CompatSystemSymbol.swift in Sources */"), 2)
-        self.assertEqual(project.count("15C015000000000000000010 /* CompatSystemSymbol.swift */"), 3)
-        workflow = (ROOT / ".github/workflows/ios15-m0-baseline.yml").read_text()
+        project = (ROOT / "src/ios/Minis.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
+        # Upstream 1.15 moved the project to objectVersion 70 and hands out short
+        # identifiers, so the owner is matched by name instead of a pinned UUID:
+        # once as a build-file declaration and once in a Sources phase.
+        self.assertEqual(project.count("CompatSystemSymbol.swift in Sources */"), 2)
+        self.assertGreaterEqual(project.count("CompatSystemSymbol.swift */"), 3)
+        workflow = (ROOT / ".github/workflows/ios15-m0-baseline.yml").read_text(encoding="utf-8")
         self.assertIn("scripts/test_ios15_sf_symbols.py", workflow)
         self.assertIn("bash scripts/check_ios15_symbols.sh", workflow)
         self.assertIn("tree-sitter-swift==0.7.3", workflow)

@@ -158,9 +158,9 @@ struct BrowserSheetView: View {
                         // The selected tab's own profile - what the page on
                         // screen was loaded with - not the global default,
                         // which only says what the NEXT tab will get.
-                        Image(systemName: UserAgentProfile.panelProfile(
+                        Image(systemName: CompatSystemSymbol.name(UserAgentProfile.panelProfile(
                             activeTab: pool.activeManager?.currentProfile,
-                            globalDefault: pool.userAgentProfile).icon)
+                            globalDefault: pool.userAgentProfile).icon))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                         Text(navigationTitle)

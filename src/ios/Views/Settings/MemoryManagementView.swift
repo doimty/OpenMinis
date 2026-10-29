@@ -73,7 +73,7 @@ struct MemoryManagementView: View {
                             }
                         } label: {
                             Label(AppLocalized("Force iCloud Sync"),
-                                  systemImage: "arrow.triangle.2.circlepath.icloud")
+                                  systemImage: CompatSystemSymbol.name("arrow.triangle.2.circlepath.icloud"))
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")

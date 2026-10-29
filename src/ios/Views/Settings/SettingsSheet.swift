@@ -54,7 +54,7 @@ struct SettingsSheet: View {
                         ProviderInstancesView()
                     } label: {
                         if #available(iOS 26, *) {
-                            Label("Manage Providers", systemImage: "key.circle.fill")
+                            Label("Manage Providers", systemImage: CompatSystemSymbol.name("key.circle.fill"))
                         } else {
                             Label("Manage Providers", systemImage: "lock.circle.fill")
                         }
@@ -123,7 +123,7 @@ struct SettingsSheet: View {
                             // meant for a caller that already draws the disc — the
                             // wider person.2.wave.2 reached the edge of the 21pt
                             // circle at this section's icon size.
-                            Image(systemName: HelperAccent.glyph)
+                            Image(systemName: CompatSystemSymbol.name(HelperAccent.glyph))
                                 .font(.system(size: 9))
                                 .foregroundStyle(.white)
                                 .frame(width: 21, height: 21)
@@ -297,7 +297,7 @@ struct SettingsSheet: View {
                             } icon: {
                                 // Match SF Symbol to the device's actual sensor — Touch ID
                                 // devices showed a Face ID glyph here before.
-                                Image(systemName: BiometricAuth.biometryIconName)
+                                Image(systemName: CompatSystemSymbol.name(BiometricAuth.biometryIconName))
                                     .font(.system(size: 11))
                                     .foregroundStyle(.white)
                                     .frame(width: 21, height: 21)

@@ -540,7 +540,7 @@ struct UserAskCardView: View {
     /// No live state yet (e.g. just relaunched, recovery still scanning).
     private var waitingPlaceholder: some View {
         HStack(spacing: 10) {
-            Image(systemName: "questionmark.bubble")
+            Image(systemName: CompatSystemSymbol.name("questionmark.bubble"))
                 .foregroundStyle(Color.accentColor)
             Text(AppLocalized("Waiting for your answer…"))
                 .font(.system(size: t.secondary))
@@ -660,7 +660,7 @@ private struct UserAskPendingCard: View {
         HStack(spacing: 8) {
             ZStack {
                 Circle().fill(tint.opacity(0.15)).frame(width: 28, height: 28)
-                Image(systemName: q.type == .confirm ? "exclamationmark.shield.fill" : "questionmark.bubble.fill")
+                Image(systemName: CompatSystemSymbol.name(q.type == .confirm ? "exclamationmark.shield.fill" : "questionmark.bubble.fill"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(tint)
             }
@@ -822,7 +822,7 @@ private struct UserAskPendingCard: View {
             haptic()
         } label: {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.system(size: t.icon))
                     .foregroundStyle(selected ? tint : ChatColors.tertiaryText)
                     .frame(width: t.icon + 4)
@@ -888,7 +888,7 @@ private struct UserAskPendingCard: View {
     private func choiceRow(icon: String, label: String, selected: Bool, trailingIcon: String? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.system(size: t.icon))
                     .foregroundStyle(selected ? tint : ChatColors.tertiaryText)
                     .frame(width: t.icon + 4)
@@ -898,7 +898,7 @@ private struct UserAskPendingCard: View {
                     .lineLimit(2)
                 Spacer(minLength: 0)
                 if let trailingIcon {
-                    Image(systemName: trailingIcon)
+                    Image(systemName: CompatSystemSymbol.name(trailingIcon))
                         .font(.system(size: t.secondary))
                         .foregroundStyle(ChatColors.tertiaryText)
                 }
@@ -1123,7 +1123,7 @@ private struct UserAskResolvedCard: View {
                 HStack(alignment: .center, spacing: 12) {
                     ZStack {
                         Circle().fill(tint.opacity(0.15)).frame(width: 34, height: 34)
-                        Image(systemName: glyph)
+                        Image(systemName: CompatSystemSymbol.name(glyph))
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(tint)
                     }
@@ -1943,7 +1943,7 @@ struct UserAskSummaryView: View {
     private var sheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                Label(AppLocalized("Question for you"), systemImage: "questionmark.bubble")
+                Label(AppLocalized("Question for you"), systemImage: CompatSystemSymbol.name("questionmark.bubble"))
                     .font(.system(size: t.title, weight: .semibold))
                     .foregroundStyle(ChatColors.primaryText)
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in

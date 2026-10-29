@@ -248,7 +248,7 @@ struct ExportPreviewSheet: View {
     private func actionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.system(size: 20))
                 Text(label)
                     .font(.caption2)

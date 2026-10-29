@@ -113,7 +113,7 @@ private struct StatRow: View {
                         .frame(width: 14, height: 14)
                 }
             } else {
-                Label(label, systemImage: icon)
+                Label(label, systemImage: CompatSystemSymbol.name(icon))
             }
             Spacer()
             Text(value)

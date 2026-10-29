@@ -118,7 +118,7 @@ struct ChatSearchBar: View {
 
     private func navButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: systemName)
+            Image(systemName: CompatSystemSymbol.name(systemName))
                 .font(.system(size: 15, weight: .semibold))
                 .frame(width: 30, height: 36)
                 .contentShape(Rectangle())

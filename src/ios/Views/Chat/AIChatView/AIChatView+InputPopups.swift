@@ -363,7 +363,7 @@ extension AIChatView {
 
         var body: some View {
             HStack(spacing: 10) {
-                Image(systemName: iconName)
+                Image(systemName: CompatSystemSymbol.name(iconName))
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(isSelected ? Color.white : ChatColors.secondaryText)
                     .frame(width: 20)
@@ -485,7 +485,7 @@ extension AIChatView {
                                 .resizable()
                                 .frame(width: 16, height: 16)
                         } else {
-                            Image(systemName: cmd.icon)
+                            Image(systemName: CompatSystemSymbol.name(cmd.icon))
                                 .font(.system(size: 15, weight: .medium))
                                 .symbolRenderingMode(.hierarchical)
                         }

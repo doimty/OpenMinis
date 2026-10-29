@@ -325,7 +325,7 @@ struct ChatShareSelectionView: View {
     /// variants look), for glyphs that have no system slash variant.
     private func floatingLabel(_ title: String, systemImage: String, struck: Bool = false) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: systemImage)
+            Image(systemName: CompatSystemSymbol.name(systemImage))
                 .mask {
                     ZStack {
                         Rectangle()
@@ -541,7 +541,7 @@ private struct ChatSharePreviewSheet: View {
                              action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
+                Image(systemName: CompatSystemSymbol.name(icon))
                     .font(.system(size: 20))
                     .frame(height: 26)
                 Text(label)
@@ -894,7 +894,7 @@ private struct ChatShareFormatSwitch: View {
         return Button {
             select(value)
         } label: {
-            Label(title, systemImage: icon)
+            Label(title, systemImage: CompatSystemSymbol.name(icon))
                 .font(.footnote.weight(isOn ? .semibold : .medium))
                 .foregroundStyle(isOn ? Color.accentColor : Color.primary)
                 .lineLimit(1)

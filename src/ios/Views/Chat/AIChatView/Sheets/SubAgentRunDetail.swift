@@ -315,7 +315,7 @@ struct SubAgentStatChips: View {
 
     private func chip(_ symbol: String, _ text: String, tint: Color? = nil, label: String? = nil) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
+            Image(systemName: CompatSystemSymbol.name(symbol)).font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(tint ?? Color(UIColor.secondaryLabel))
             // Proportional with fixed-width digits: a monospaced face spread
             // "6 次工具调用" out with double-width gaps around the number.
@@ -437,7 +437,7 @@ struct SubAgentToolTimelineCard: View {
                     ChipFlow(spacing: 6) {
                         ForEach(Array(split.enumerated()), id: \.offset) { _, entry in
                             HStack(spacing: 4) {
-                                Image(systemName: HelperAccent.symbol(forTool: entry.tool))
+                                Image(systemName: CompatSystemSymbol.name(HelperAccent.symbol(forTool: entry.tool)))
                                     .font(.system(size: 9, weight: .semibold))
                                 Text("\(HelperAccent.displayName(forTool: entry.tool)) ×\(entry.count)")
                                     .font(.system(size: 10, weight: .medium))
@@ -473,7 +473,7 @@ struct SubAgentToolTimelineCard: View {
                 .frame(width: 14, height: 16)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Image(systemName: HelperAccent.symbol(forTool: call.tool))
+                    Image(systemName: CompatSystemSymbol.name(HelperAccent.symbol(forTool: call.tool)))
                         .font(.system(size: 10, weight: .semibold))
                     Text(HelperAccent.displayName(forTool: call.tool))
                         .font(.system(size: 12, weight: .semibold))

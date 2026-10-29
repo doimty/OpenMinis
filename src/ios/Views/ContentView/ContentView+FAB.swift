@@ -251,10 +251,10 @@ extension ContentView {
                     fallbackFill: Self.newChatBrandColor,
                     fallbackShadowOpacity: 0.2
                 ) {
-                    Image(systemName: {
+                    Image(systemName: CompatSystemSymbol.name({
                         if #available(iOS 17.0, *) { return "bubble.left.and.text.bubble.right" }
                         return "plus.message.fill"
-                    }())
+                    }()))
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Self.newChatIconColor)
                 }

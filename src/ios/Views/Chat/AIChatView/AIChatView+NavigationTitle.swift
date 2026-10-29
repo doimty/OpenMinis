@@ -378,7 +378,7 @@ extension AIChatView {
                         // font stands well above the letters beside it and reads
                         // as a stray, oversized mark in this small row.
                         if let symbol = displayedSpeedTier.badgeSymbol {
-                            Image(systemName: symbol)
+                            Image(systemName: CompatSystemSymbol.name(symbol))
                                 .resizable()
                                 .scaledToFit()
                                 .frame(height: ceil(UIFont.systemFont(ofSize: 9).capHeight))

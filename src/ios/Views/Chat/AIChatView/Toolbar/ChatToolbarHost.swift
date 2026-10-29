@@ -433,7 +433,7 @@ private struct ChatTrailingMenu: View, Equatable {
                     )) {
                         // [T-codex-speed-icons] Same outline bolt as Fast in
                         // the Speed submenu; the switch itself is unchanged.
-                        Label(AppLocalized("Enable Fast Mode"), systemImage: SpeedTier.fast.symbol)
+                        Label(AppLocalized("Enable Fast Mode"), systemImage: CompatSystemSymbol.name(SpeedTier.fast.symbol))
                     }
                 } else if showFastModeToggle {
                     Menu {
@@ -442,7 +442,7 @@ private struct ChatTrailingMenu: View, Equatable {
                             set: { setSpeedTier($0) }
                         )) {
                             ForEach(SpeedTier.allCases, id: \.self) { tier in
-                                Label(tier.title, systemImage: tier.symbol).tag(tier)
+                                Label(tier.title, systemImage: CompatSystemSymbol.name(tier.symbol)).tag(tier)
                             }
                         } label: { EmptyView() }
                     } label: {
@@ -452,7 +452,7 @@ private struct ChatTrailingMenu: View, Equatable {
                             Text(AppLocalized("Fast Mode"))
                             Text(verbatim: speedTier.title)
                         } icon: {
-                            Image(systemName: SpeedTier.entrySymbol)
+                            Image(systemName: CompatSystemSymbol.name(SpeedTier.entrySymbol))
                         }
                     }
                 }
@@ -755,21 +755,21 @@ struct ChatTrailingMenuButton: UIViewRepresentable {
             let fastOn = key.speedTier != .standard
             // [T-codex-speed-icons] Outline bolt, as Fast in the Speed submenu.
             modelControlGroup.append(UIAction(title: AppLocalized("Enable Fast Mode"),
-                                              image: UIImage(systemName: SpeedTier.fast.symbol),
+                                              image: UIImage(systemName: CompatSystemSymbol.name(SpeedTier.fast.symbol)),
                                               state: fastOn ? .on : .off) { _ in
                 coordinator.parent.setSpeedTier(fastOn ? .standard : .fast)
             })
         } else if key.showFastModeToggle {
             let tiers = SpeedTier.allCases.map { tier in
                 UIAction(title: tier.title,
-                         image: UIImage(systemName: tier.symbol),
+                         image: UIImage(systemName: CompatSystemSymbol.name(tier.symbol)),
                          state: key.speedTier == tier ? .on : .off) { _ in
                     coordinator.parent.setSpeedTier(tier)
                 }
             }
             // [T-fast-mode-menu-name] Same entry name as the SwiftUI menu.
             let speedMenu = UIMenu(title: AppLocalized("Fast Mode"),
-                                   image: UIImage(systemName: SpeedTier.entrySymbol),
+                                   image: UIImage(systemName: CompatSystemSymbol.name(SpeedTier.entrySymbol)),
                                    options: .singleSelection,
                                    children: tiers)
             speedMenu.subtitle = key.speedTier.title

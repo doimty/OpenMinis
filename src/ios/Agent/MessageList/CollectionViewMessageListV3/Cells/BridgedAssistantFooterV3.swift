@@ -168,7 +168,7 @@ struct BridgedAssistantFooterV3: View {
                         Button {
                             onForceSync()
                         } label: {
-                            Label(AppLocalized("Force Sync"), systemImage: "arrow.triangle.2.circlepath.icloud")
+                            Label(AppLocalized("Force Sync"), systemImage: CompatSystemSymbol.name("arrow.triangle.2.circlepath.icloud"))
                         }
                     }
                     if let onCompact = bridge.onCompact {

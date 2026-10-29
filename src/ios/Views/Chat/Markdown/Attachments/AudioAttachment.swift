@@ -204,7 +204,7 @@ private final class InlineAudioController: NSObject {
                     guard let self, let url = self.fileURL else { return }
                     let isActive = activeURL == url
                     let icon = isActive && playing ? "pause.circle.fill" : "play.circle.fill"
-                    self.playButton?.setImage(UIImage(systemName: icon, withConfiguration: iconConfig), for: .normal)
+                    self.playButton?.setImage(UIImage(systemName: CompatSystemSymbol.name(icon), withConfiguration: iconConfig), for: .normal)
                 }
                 .store(in: &self.cancellables)
 

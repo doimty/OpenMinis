@@ -27,7 +27,7 @@ def make_catalog(source_dir):
     for path in sorted(source_dir.glob("SFSymbol+*.swift")):
         if "AllSymbols" in path.name:
             continue
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         match = re.search(r"@available\(iOS ([0-9.]+),", text)
         if not match:
             continue
@@ -125,7 +125,7 @@ def audit(root, catalog):
     reports = []
     for path in sorted((root / "src/ios").rglob("*.swift")):
         relative = str(path.relative_to(root))
-        if relative == OWNER or EXCLUDED.intersection(path.parts):
+        if relative.replace("\\", "/") == OWNER or EXCLUDED.intersection(path.parts):
             continue
         data = path.read_bytes()
         calls = unsafe_calls(data, catalog, parser)
@@ -147,7 +147,7 @@ def main():
         args.catalog.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
         print(f"Catalog: {len(data['introduced_ios'])} names at {UPSTREAM_SHA}")
         return 0
-    catalog = json.loads(args.catalog.read_text())["introduced_ios"]
+    catalog = json.loads(args.catalog.read_text(encoding="utf-8"))["introduced_ios"]
     reports = audit(args.root, catalog)
     if args.plan:
         args.plan.write_text(json.dumps(reports, ensure_ascii=False, indent=2) + "\n")

@@ -130,7 +130,7 @@ struct BridgedAssistantBlockV3: View {
                         Button {
                             onForceSync()
                         } label: {
-                            Label(AppLocalized("Force Sync"), systemImage: "arrow.triangle.2.circlepath.icloud")
+                            Label(AppLocalized("Force Sync"), systemImage: CompatSystemSymbol.name("arrow.triangle.2.circlepath.icloud"))
                         }
                     }
                     // [T-thinking-autoexpand-toggle-longpress] A thinking block's

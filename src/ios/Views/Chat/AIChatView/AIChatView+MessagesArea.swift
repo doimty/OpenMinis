@@ -169,7 +169,7 @@ extension AIChatView {
     /// Shared label style for the floating scroll buttons (up / down).
     /// Surface lives in `FloatingCircleButtonSurface` (glass on iOS 26+).
     private func scrollFloatingButtonLabel(_ systemName: String) -> some View {
-        Image(systemName: systemName)
+        Image(systemName: CompatSystemSymbol.name(systemName))
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(FloatingCircleButtonSurface.glyphStyle)
             .frame(width: 36, height: 36)

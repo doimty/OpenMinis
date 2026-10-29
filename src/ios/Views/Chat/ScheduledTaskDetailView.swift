@@ -558,7 +558,7 @@ struct ScheduledTaskDetailView: View {
 
     private var headerCard: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: ScheduledAccent.icon)
+            Image(systemName: CompatSystemSymbol.name(ScheduledAccent.icon))
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(ScheduledAccent.color)
                 .frame(width: 44, height: 44)
@@ -790,7 +790,7 @@ struct ScheduledTaskDetailView: View {
     }
 
     private func sectionTitle(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
+        Label(title, systemImage: CompatSystemSymbol.name(systemImage))
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.primary)
             .labelStyle(.titleAndIcon)
@@ -1151,7 +1151,7 @@ struct ScheduledPillFace: View {
                 .trim(from: 0, to: ringFraction)
                 .stroke(ScheduledAccent.color, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Image(systemName: glyph)
+            Image(systemName: CompatSystemSymbol.name(glyph))
                 .font(.system(size: ringSize * 0.46, weight: .semibold))
                 .foregroundStyle(ScheduledAccent.color)
         }
