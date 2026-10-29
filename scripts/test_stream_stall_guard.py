@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 """Offline stream-stall-guard gates. 0=native+static pass, 77=native SKIP, 1=failure.
 Requires tree_sitter + tree_sitter_swift; never installs or touches a device.
-Only the extracted StreamStallGuard unit and the reception slice are inspected;
-the native suite compiles the production guard with Foundation on macOS.
-UIKit/app behavior (the [StreamDiag] call sites, LLMError construction, the
-retry pipeline) is STATIC evidence, never simulated native.
---json writes a versioned report and adjacent .artifacts production-byte package.
+
+1.15 replaced the old `StreamStallGuard.wrap` helper with a per-stream
+`StreamStallWatchdog` plus one ticking task in processStreamEvents().  The
+native half of this gate therefore runs the shipping watchdog suite that lives
+next to the source it proves (`StreamStallWatchdogTests.swift`); the Python half
+pins the source shape and the boundaries the reviewer must not lose:
+
+  * one iterator pump, one watchdog tick task per stream;
+  * the racer waits on the watchdog, never on a per-event sleep;
+  * beginWait/endWait bracket each next();
+  * fire() surfaces the retryable LLMError and the tick is cancelled on exit;
+  * the cancellation/fire hand-off stays lock-protected.
+
+--json writes a report and adjacent .artifacts production-byte package.
 """
 import argparse
 import hashlib
@@ -23,16 +32,9 @@ from tree_sitter import Language, Parser
 import tree_sitter_swift
 
 PARSER = Parser(Language(tree_sitter_swift.language()))
-BASE = "d296e62c566bd09317cb461f78366f43f65fb23f"
+BASE = "5cceb11c020a729d6671ede52d38da174869e7d1"
 SSE = "src/ios/Agent/Chat/AIChatViewModel+SSEStream.swift"
-TEST = "tests/Standalone/StreamStallGuardTests.swift"
-# Frozen 2026-10-12 bytes (sha256 of each pinned production slice). The
-# timeline and tail slices must stay byte-identical to BASE d296e62; the guard
-# and reception slices pin the new [T-stream-stall-guard] shape.
-GUARD_SHA = "a62fa132b03b473c8cde5955d3b3396805fb1c25b5fcbdeefa5329557e512386"
-RECEPTION_SHA = "f1873af5d60f054dfd30cf28327b7f1bc8a3e299bf81eaecb2d2dbc3b46c605a"
-TIMELINE_SHA = "273916d4e402c153a584a52c178944e46abf1153561c3fb891580c76d482510e"
-TAIL_SHA = "86faf2bb1bd9bf11e773b66e9c771facc1c33eb469f9e62e32d8679ee0cd1115"
+TEST = "src/ios/MinisTests/Standalone/StreamStallWatchdogTests.swift"
 
 
 def sha(raw):
@@ -72,19 +74,17 @@ class Swift:
 def slice_between(raw, start, end):
     s = raw.index(start)
     e = raw.index(end, s) + len(end)
-    return raw[s:e]
+    return s, e
 
 
 def parsed(kind, raw):
-    """Each extracted slice must be parse-valid Swift; fragments get balanced braces."""
-    if kind == "guard":
+    """Every extracted slice must be parse-valid Swift; statements get a scope."""
+    if kind in ("source", "watchdog", "box"):
         sf = Swift(raw)
-    elif kind == "reception":  # func { do { while { <slice> -> close while/do/func
-        sf = Swift(b"func __slice() {\n" + raw + b"\n            }\n        }\n}")
-    elif kind == "timeline":  # balanced do-block + func closer
+    elif kind == "tick":
         sf = Swift(b"func __slice() {\n" + raw + b"\n}")
-    elif kind == "tail":  # leading '}' closes the injected do, catches attach to it
-        sf = Swift(b"func __slice() {\n        do {\n" + raw + b"\n}")
+    elif kind == "reception":
+        sf = Swift(b"func __slice() async throws {\n" + raw + b"\n}")
     else:
         raise ValueError("unknown slice kind " + kind)
     if not sf.clean():
@@ -97,131 +97,71 @@ def extract(root):
     sf = Swift(source)
     if not sf.clean():
         raise ValueError("source file has ERROR/missing Swift syntax nodes")
-    guards = [n for n in sf.nodes("class_declaration")
-              if source[n.start_byte:n.start_byte + 40].startswith(b"private enum StreamStallGuard")]
-    if len(guards) != 1:
-        raise ValueError("expected exactly one StreamStallGuard declaration, got %d" % len(guards))
-    slices = {
-        "guard": source[guards[0].start_byte:guards[0].end_byte],
-        "reception": slice_between(
-            source,
-            b"// [T-stream-stall-guard] Per-stream watchdog (one pumper + one",
-            b"try Task.checkCancellation()"),
-        "timeline": slice_between(
-            source,
-            b"// [StreamDiag] Per-event timeline.",
-            b"lastEventAt = now\n            }"),
-        "tail": slice_between(
-            source,
-            b"// The AsyncThrowingStream may silently terminate",
-            b"if let err = _streamError { throw err }"),
+    marks = {
+        "watchdog": (b"private final class StreamStallWatchdog",
+                     b"// MARK: - Background SSE Stream Processing"),
+        "box": (b"private final class StreamIteratorBox",
+                b"/// [T-stream-watchdog-single-timer]"),
+        "tick": (b"let stallTick = Task {", b"defer { stallTick.cancel() }"),
+        "reception": (b"stallWatchdog.beginWait(at: Date())", b"stallWatchdog.endWait()"),
     }
-    units, manifest = {}, {}
-    for kind, raw in slices.items():
+    units, manifest = {"source": source}, {}
+    manifest["source"] = {"file": SSE, "start_byte": 0, "end_byte": len(source),
+                          "sha256": sha(source), "source_sha256": sha(source),
+                          "bytes": len(source)}
+    for kind, (start, end) in marks.items():
+        s, e = slice_between(source, start, end)
+        raw = source[s:e]
         parsed(kind, raw)
         units[kind] = raw
-        manifest[kind] = {"file": SSE, "sha256": sha(raw), "bytes": len(raw),
-                          "source_sha256": sha(source)}
+        manifest[kind] = {"file": SSE, "start_byte": s, "end_byte": e,
+                          "sha256": sha(raw), "source_sha256": sha(source),
+                          "bytes": len(raw)}
     return units, manifest, source
 
 
 def contracts(units):
-    gc = Swift(units["guard"]).code()
+    wc = Swift(units["watchdog"]).code()
+    bc = Swift(units["box"]).code()
+    tc = Swift(units["tick"]).code()
     rc = Swift(units["reception"]).code()
-    raw_r = units["reception"]
-    result = {}
-    result["guard.single_pump_iter"] = (gc.count("iterator.next()") == 1
-                                        and gc.count("makeAsyncIterator()") == 1)
-    result["guard.one_watchdog_sleep"] = gc.count("Task.sleep") == 1
-    result["guard.unbounded_stream"] = "returnAsyncThrowingStream{contin" in gc
-    result["guard.explicit_termination"] = \
-        "cont.onTermination={_inpumper.cancel()watchdog.cancel()}" in gc
-    result["guard.once_finish"] = (
-        "ifsync.beginFinish(){cont.finish()}" in gc
-        and "ifsync.beginFinish(){cont.finish(throwing:error)}" in gc
-        and "ifsync.beginFinish(){leterror=awaitonStall(fire)cont.finish(throwing:error)}" in gc)
-    result["guard.fire_condition"] = \
-        "guardnow.timeIntervalSince(lastEventAt)>=stallTimeoutelse{returnnil}" in gc
-    result["guard.counts_events"] = "lastEventAt=Date()events+=1" in gc
-    result["guard.yields_events"] = "cont.yield(element)" in gc
-    result["guard.locked_state"] = ("privateletlock=NSLock()" in gc
-                                    and gc.count("lock.lock()") >= 4
-                                    and "funcbeginFinish()->Bool" in gc)
-    result["guard.no_taskgroup"] = "withThrowingTaskGroup" not in gc
-    result["guard.frozen_unit"] = sha(units["guard"]) == GUARD_SHA
-    result["reception.no_per_event_group"] = \
-        "withThrowingTaskGroup" not in rc and "cancelAll" not in rc
-    result["reception.single_consumer"] = rc.count("iterBox.next()") == 1
-    result["reception.guard_wired"] = (
-        "letguardedStream=StreamStallGuard.wrap(stream,stallTimeout:stallTimeoutSeconds,onStall:{firein" in rc
-        and "letiterBox=StreamIteratorBox(guardedStream)" in rc)
-    result["reception.recheck_cancellation"] = "tryTask.checkCancellation()" in rc
-    result["reception.stall_message"] = \
-        b"seconds \xe2\x80\x94 the stream stalled mid-generation" in raw_r
-    result["reception.stall_log_fields"] = (
-        b"[StreamDiag][STALL] watchdog fired session=" in raw_r
-        and b"provider=\\(streamDiagProvider) model=\\(streamDiagModel)" in raw_r
-        and b"fire.eventsThisStream" in raw_r
-        and b"fire.iterStart" in raw_r
-        and b"fire.firedAt" in raw_r
-        and b"Self.diagAppStateName()" in raw_r)
-    result["reception.frozen_slice"] = sha(units["reception"]) == RECEPTION_SHA
-    result["frozen.timeline"] = sha(units["timeline"]) == TIMELINE_SHA
-    result["frozen.tail"] = sha(units["tail"]) == TAIL_SHA
-    return result
+    sc = Swift(units["source"]).code()
+    return {
+        # One pump: the box owns the only makeAsyncIterator()/next() pair.
+        "guard.single_pump_iter": (bc.count("iterator.next()") == 1
+                                   and bc.count("makeAsyncIterator()") == 1),
+        # One timer per stream, one second tick; no per-event sleep remains.
+        "guard.one_tick_task": sc.count("letstallTick=Task{") == 1,
+        "guard.one_watchdog_sleep": tc.count("Task.sleep") == 1 and "1_000_000_000" in tc,
+        "guard.tick_cancelled": "defer{stallTick.cancel()}" in tc,
+        "source.no_per_event_sleep": "Task.sleep(nanoseconds:UInt64(stallTimeoutSeconds" not in sc,
+        # The racer waits on the watchdog continuation, and the marks bracket next().
+        "guard.wait_no_timer": "tryawaitstallWatchdog.wait()" in rc and "Task.sleep" not in rc,
+        "guard.wait_marks": (rc.index("beginWait(at:Date())")
+                             < rc.index("withThrowingTaskGroup")
+                             < rc.index("endWait()")),
+        "guard.single_consumer": (rc.count("iterBox.next()") == 1
+                                  and "group.cancelAll()" in rc),
+        # The timeout path fires the retryable LLMError and returns.
+        "guard.fire_on_timeout": "guardmeasured>=stallTimeoutSecondselse{continue}" in tc,
+        "guard.stall_is_retryable": "stallWatchdog.fire(LLMError.transientError(message:" in tc,
+        "reception.stall_message": b"seconds \xe2\x80\x94 the stream stalled mid-generation" in units["tick"],
+        "reception.stall_log_fields": all(s in tc for s in (
+            "[StreamDiag][STALL]watchdogfired", "nominal=", "measured=", "appState=",
+            "iterStart=", "firedAt=", "Self.diagAppStateName()")),
+        # Fire/cancel/continuation share one lock and the waiter is resumable
+        # even when cancellation lands before the continuation is stored.
+        "guard.locked_state": all(s in wc for s in (
+            "privateletlock=NSLock()", "withTaskCancellationHandler",
+            "withCheckedThrowingContinuation", "onCancel:", "firedError",
+            "resume(throwing:error)")),
+        "watchdog.private": units["watchdog"].startswith(b"private final class StreamStallWatchdog"),
+        "source.no_legacy_guard": "StreamStallGuard" not in sc,
+    }
 
 
-def wrapper(units):
-    guard = units["guard"]
-    if not guard.startswith(b"private enum StreamStallGuard"):
-        raise ValueError("guard unit visibility prefix changed; wrapper transform unsafe")
-    stripped = guard.replace(b"private enum StreamStallGuard", b"enum StreamStallGuard", 1)
-    return b"import Foundation\n" + stripped + b"\n"
-
-
-NATIVE_IDS = {
-    "pass": {"pass.events_ordered", "pass.clean_end", "pass.no_stall"},
-    "burst": {"burst.count", "burst.ordered", "burst.clean_end"},
-    "stall": {"stall.first_event", "stall.error_is_stall", "stall.fired_once",
-              "stall.timing", "stall.snapshot_fields", "stall.no_second_fire"},
-    "upstream": {"upstream.events", "upstream.error_is_upstream", "upstream.no_stall"},
-    "cancel": {"cancel.consumer_resumed", "cancel.upstream_terminated", "cancel.no_stall"},
-}
-
-
-def protocol(case, rc, stdout):
-    """Crashes, timeouts, empty/truncated/fabricated summaries are never kills."""
-    lines = stdout.strip().splitlines()
-    if not lines:
-        raise ValueError("empty native output")
-    summary = re.fullmatch(r"SUMMARY case=(\w+) pass=(\d+) fail=(\d+) skip=(\d+)", lines[-1])
-    if not summary or summary[1] != case:
-        raise ValueError("missing/wrong terminal summary")
-    records = [re.fullmatch(r"(PASS|FAIL)\[([^]]+)\]", line) for line in lines[:-1]]
-    if not all(records):
-        raise ValueError("unexpected native output line")
-    ids = [r[2] for r in records]
-    if len(ids) != len(set(ids)) or set(ids) != NATIVE_IDS[case]:
-        raise ValueError("missing/duplicate/unknown assertion id")
-    failures = {r[2] for r in records if r[1] == "FAIL"}
-    p, f, k = map(int, summary.groups()[1:])
-    if (p, f, k) != (len(ids) - len(failures), len(failures), 0) or rc != (1 if f else 0):
-        raise ValueError("summary/count/exit mismatch (crashes are not semantic failures)")
-    return failures
-
-
-def case_result(case, rc, stdout):
-    """JSON-safe per-case failure list. Sets are not serializable and this is a
-    CI-only path (native SKIPs without swiftc), so keep the conversion here —
-    the runner self-test pins it."""
-    return sorted(protocol(case, rc, stdout))
-
-
-def native(units, fixture, work, runner, cases):
+def native(fixture_path, work, runner):
     work.mkdir(parents=True, exist_ok=True)
-    prod = work / "production_wrapper.swift"
-    prod.write_bytes(wrapper(units))
-    (work / "StreamStallGuardTests.swift").write_bytes(fixture)
     env = os.environ.copy()
     for key, dirname in (("HOME", "home"), ("TMPDIR", "tmp")):
         (work / dirname).mkdir(exist_ok=True)
@@ -229,85 +169,75 @@ def native(units, fixture, work, runner, cases):
     sdk = subprocess.check_output(["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True, timeout=30).strip()
     if not sdk or not Path(sdk).is_dir():
         raise ValueError("xcrun returned no valid macOS SDK")
-    exe = work / "stream-stall-guard"
-    command = [runner, "-parse-as-library", "-swift-version", "5", "-sdk", sdk,
-               "-target", platform.machine() + "-apple-macosx13.0", "-module-cache-path", str(work / "ModuleCache"),
-               str(prod), str(work / "StreamStallGuardTests.swift"), "-o", str(exe)]
-    comp = subprocess.run(command, capture_output=True, text=True, timeout=900, env=env, cwd=work)
+    exe = work / "stream-stall-watchdog-tests"
+    # The suite starts with a interpreter shebang.  Strip it in a sibling copy
+    # so #filePath keeps the same depth (three parents up is src/ios) and the
+    # suite can still locate AIChatViewModel+SSEStream.swift.
+    compile_path = fixture_path
+    sibling = None
+    raw = fixture_path.read_bytes()
+    if raw.startswith(b"#!"):
+        sibling = fixture_path.with_name(".gate-" + fixture_path.name)
+        sibling.write_bytes(raw.split(b"\n", 1)[1])
+        compile_path = sibling
+    command = [runner, "-swift-version", "5", "-sdk", sdk,
+               "-target", platform.machine() + "-apple-macosx13.0",
+               "-module-cache-path", str(work / "ModuleCache"),
+               str(compile_path), "-o", str(exe)]
+    try:
+        comp = subprocess.run(command, capture_output=True, text=True, timeout=900, env=env, cwd=work)
+    finally:
+        if sibling is not None:
+            try:
+                sibling.unlink()
+            except OSError:
+                pass
     (work / "compile.txt").write_text(comp.stdout + comp.stderr)
     if comp.returncode != 0 or not exe.is_file():
-        raise ValueError("compile failure is NOT a semantic rejection; see compile.txt")
-    results = {"cases": {}}
-    for case in cases:
-        proc = subprocess.run([str(exe), case], capture_output=True, text=True, timeout=10, env=env, cwd=work)
-        (work / (case + ".stdout.txt")).write_text(proc.stdout)
-        (work / (case + ".stderr.txt")).write_text(proc.stderr)
-        if proc.stderr.strip():
-            raise ValueError("unexpected native stderr (not a semantic rejection)")
-        results["cases"][case] = case_result(case, proc.returncode, proc.stdout)
-    return results
+        raise ValueError("watchdog suite compile failure is NOT a semantic rejection; see compile.txt")
+    proc = subprocess.run([str(exe)], capture_output=True, text=True, timeout=180, env=env, cwd=work)
+    (work / "suite.stdout.txt").write_text(proc.stdout)
+    (work / "suite.stderr.txt").write_text(proc.stderr)
+    return {"command": command, "returncode": proc.returncode,
+            "passed": proc.returncode == 0 and "ALL PASSED" in proc.stdout,
+            "stdout_tail": proc.stdout[-4000:], "stderr_tail": proc.stderr[-2000:]}
 
 
 def mutants(units):
     """Each mutant edits an extracted production slice, never a hand-written body."""
     out = []
-
-    def add(name, kind, raw, gate, case=None, fail=None):
-        out.append((name, kind, raw, gate, case, fail))
-
-    g, r = units["guard"], units["reception"]
-    add("guard.termination_dropped", "guard",
-        g.replace(b"cont.onTermination = { _ in\n                pumper.cancel()\n                watchdog.cancel()\n            }",
-                  b"cont.onTermination = { _ in\n            }", 1),
-        "guard.explicit_termination", "cancel", "cancel.upstream_terminated")
-    add("guard.never_fires", "guard",
-        g.replace(b">= stallTimeout else { return nil }",
-                  b">= stallTimeout * 1000 else { return nil }", 1),
-        "guard.fire_condition")
-    add("guard.double_finish_race", "guard",
-        g.replace(b"if sync.beginFinish() {\n                        let error = await onStall(fire)",
-                  b"if true {\n                        let error = await onStall(fire)", 1),
-        "guard.once_finish")
-    add("guard.non_plain_lock", "guard",
-        g.replace(b"private let lock = NSLock()",
-                  b"private let lock = NSRecursiveLock()", 1),
+    def add(name, kind, raw, gate):
+        out.append((name, kind, raw, gate))
+    w, b, t, r = (units[k] for k in ("watchdog", "box", "tick", "reception"))
+    add("watchdog.fire_never", "tick",
+        t.replace(b">= stallTimeoutSeconds else { continue }",
+                  b">= stallTimeoutSeconds * 1000 else { continue }", 1),
+        "guard.fire_on_timeout")
+    add("watchdog.sleep_dropped", "tick",
+        t.replace(b"try? await Task.sleep(nanoseconds: 1_000_000_000)",
+                  b"try? await Task.yield()", 1),
+        "guard.one_watchdog_sleep")
+    add("watchdog.lock_dropped", "watchdog",
+        w.replace(b"private let lock = NSLock()", b"private let lock = NSRecursiveLock()", 1),
         "guard.locked_state")
-    add("guard.events_not_counted", "guard",
-        g.replace(b"events += 1", b"events += 0", 1),
-        "guard.counts_events", "stall", "stall.snapshot_fields")
-    add("guard.last_event_never", "guard",
-        g.replace(b"lastEventAt = Date()\n            events += 1", b"events += 1", 1),
-        "guard.counts_events")
-    add("guard.yield_dropped", "guard",
-        g.replace(b"cont.yield(element)", b"_ = element", 1),
-        "guard.yields_events", "pass", "pass.events_ordered")
-    add("guard.error_not_forwarded", "guard",
-        g.replace(b"if sync.beginFinish() { cont.finish(throwing: error) }",
-                  b"if sync.beginFinish() { cont.finish() }", 1),
-        "guard.once_finish", "upstream", "upstream.error_is_upstream")
-    add("reception.per_event_group_returns", "reception",
-        r.replace(b"let maybeEvent: AgentStreamEvent? = try await iterBox.next()",
-                  (b"let maybeEvent: AgentStreamEvent? = try await withThrowingTaskGroup(of: AgentStreamEvent?.self) { group in\n"
-                   b"                group.addTask { try await iterBox.next() }\n"
-                   b"                let result = try await group.next()!\n"
-                   b"                group.cancelAll()\n"
-                   b"                return result\n"
-                   b"            }"), 1),
-        "reception.no_per_event_group")
-    add("reception.guard_bypassed", "reception",
-        r.replace(b"let iterBox = StreamIteratorBox(guardedStream)",
-                  b"let iterBox = StreamIteratorBox(stream)", 1),
-        "reception.guard_wired")
-    add("reception.stall_message_rewritten", "reception",
-        r.replace(b"seconds \xe2\x80\x94 the stream stalled mid-generation",
+    add("watchdog.private_dropped", "watchdog",
+        w.replace(b"private final class StreamStallWatchdog", b"final class StreamStallWatchdog", 1),
+        "watchdog.private")
+    add("tick.cancel_dropped", "tick",
+        t.replace(b"defer { stallTick.cancel() }", b"defer { }", 1),
+        "guard.tick_cancelled")
+    add("tick.stall_message_rewritten", "tick",
+        t.replace(b"seconds \xe2\x80\x94 the stream stalled mid-generation",
                   b"seconds \xe2\x80\x94 the stream STALLED mid-generation", 1),
         "reception.stall_message")
-    add("frozen.timeline_edited", "timeline",
-        units["timeline"].replace(b"if eventSeq <= 5 || gap >= 5 {", b"if eventSeq <= 6 || gap >= 5 {", 1),
-        "frozen.timeline")
-    add("frozen.tail_edited", "tail",
-        units["tail"].replace(b"_streamError = error", b"if true { _streamError = error }", 1),
-        "frozen.tail")
+    add("reception.per_event_sleep", "reception",
+        r.replace(b"group.addTask { try await iterBox.next() }",
+                  b"try await Task.sleep(nanoseconds: UInt64(stallTimeoutSeconds * 1_000_000_000))\n"
+                  b"                group.addTask { try await iterBox.next() }", 1),
+        "guard.wait_no_timer")
+    add("reception.wait_removed", "reception",
+        r.replace(b"try await stallWatchdog.wait()", b"return nil", 1),
+        "guard.wait_no_timer")
     return out
 
 
@@ -323,21 +253,22 @@ def main(argv=None):
         items.append({'class': cls, 'name': name, 'status': status, 'detail': detail})
         print('[%s] %s %s: %s' % (cls, status, name, detail), flush=True)
 
-    report = {'schema_version': 1, 'base': BASE, 'source_root': str(args.source_root.resolve()),
+    report = {'schema_version': 2, 'base': BASE, 'source_root': str(args.source_root.resolve()),
               'limits': ['No full App build, UIKit or iOS 15 execution.',
-                         'The native suite compiles the extracted guard with Foundation; the '
-                         'reception slice, [StreamDiag] call sites and LLMError wiring are static contracts.'],
+                         'Native half runs the shipping watchdog suite; the reception loop, '
+                         '[StreamDiag] fields and the retryable error type are static contracts.'],
               'items': items}
     artifact = None
     try:
         units, manifest, _ = extract(args.source_root)
         report['extraction'] = manifest
-        fixture = (args.source_root / TEST).read_bytes()
+        fixture_path = (args.source_root / TEST).resolve()
+        fixture = fixture_path.read_bytes()
         if not Swift(fixture).clean():
-            raise ValueError('Swift test fixture contains syntax ERROR/missing nodes')
+            raise ValueError('watchdog suite fixture contains syntax ERROR/missing nodes')
         report['fixture_sha256'] = sha(fixture)
-        report['visibility_transform'] = 'Guard enum private -> internal only; slice bytes unchanged.'
-        add('extract', 'production_units', 'PASS', '4 exact byte slices; source and slice hashes recorded')
+        add('extract', 'production_units', 'PASS',
+            '5 exact byte slices; source and slice hashes recorded')
         add('syntax', 'fixture', 'PASS', 'tree-sitter only, NOT swiftc type-check')
         current = contracts(units)
         for name, passed in current.items():
@@ -347,8 +278,7 @@ def main(argv=None):
             artifact.mkdir(parents=True, exist_ok=True)
             for kind, raw in units.items():
                 (artifact / (kind + '.swift')).write_bytes(raw)
-            (artifact / 'production_wrapper.swift').write_bytes(wrapper(units))
-            (artifact / 'StreamStallGuardTests.swift').write_bytes(fixture)
+            (artifact / 'StreamStallWatchdogTests.swift').write_bytes(fixture)
             (artifact / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         runner = args.runner or shutil.which('swiftc')
         if args.runner:
@@ -362,18 +292,20 @@ def main(argv=None):
         with tempfile.TemporaryDirectory(prefix='stream-stall-guard-') as td:
             work = artifact if artifact is not None else Path(td)
             if can_native and all(current.values()):
-                result = native(units, fixture, work / 'native-baseline', runner, list(NATIVE_IDS))
+                result = native(fixture_path, work / 'native-baseline', runner)
                 report['native'] = result
-                failures = {case: ids for case, ids in result['cases'].items() if ids}
-                add('native', 'production_methods', 'FAIL' if failures else 'PASS',
-                    json.dumps(failures) if failures else '18 named assertions, 5 modes, real macOS Foundation')
+                add('native', 'shipping_watchdog_suite', 'PASS' if result['passed'] else 'FAIL',
+                    'upstream StreamStallWatchdogTests.swift' if result['passed']
+                    else 'rc=%d stdout=%r stderr=%r' % (result['returncode'],
+                                                        result['stdout_tail'], result['stderr_tail']))
             elif not can_native:
                 report['native'] = {'status': 'SKIP', 'reason': skip_reason}
-                add('native', 'production_methods', 'SKIP', skip_reason)
+                add('native', 'shipping_watchdog_suite', 'SKIP', skip_reason)
             else:
-                add('native', 'production_methods', 'SKIP', 'source contracts failed; do not compile unapproved bytes')
+                add('native', 'shipping_watchdog_suite', 'SKIP',
+                    'source contracts failed; do not compile unapproved bytes')
             variant_results = []
-            for name, kind, raw, gate, case, expected_fail in mutants(units):
+            for name, kind, raw, gate in mutants(units):
                 detail = {'name': name, 'kind': kind, 'gate': gate}
                 variant_results.append(detail)
                 if raw == units[kind]:
@@ -391,19 +323,6 @@ def main(argv=None):
                 if artifact:
                     mdir = artifact / 'mutants' / name; mdir.mkdir(parents=True, exist_ok=True)
                     (mdir / (kind + '.swift')).write_bytes(raw)
-                if case:
-                    if can_native and all(current.values()):
-                        try:
-                            outcome = native(variant, fixture, work / ('native-' + name), runner, [case])
-                            failures = outcome['cases'][case]
-                            detail['native'] = outcome
-                            add('mutant-native', name, 'PASS' if expected_fail in failures else 'FAIL',
-                                'named semantic failures=' + repr(failures))
-                        except (ValueError, subprocess.TimeoutExpired) as exc:
-                            add('mutant-native', name, 'FAIL', 'INVALID native run, not a kill: ' + str(exc))
-                    else:
-                        detail['native'] = {'status': 'SKIP', 'reason': skip_reason}
-                        add('mutant-native', name, 'SKIP', skip_reason)
             report['mutants'] = variant_results
     except Exception as exc:
         add('runner', 'execution', 'FAIL', type(exc).__name__ + ': ' + str(exc))
