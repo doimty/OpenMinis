@@ -791,7 +791,7 @@ def check_native(ss, rep, runner, test_file, workdir, allow_std, name="native.su
         rep.add("native", name, "FAIL", "runner timed out after 300s")
         return {"status": "FAIL", "fails": set()}
     out = proc.stdout + ("\n[stderr]\n" + proc.stderr if proc.stderr.strip() else "")
-    (workdir / (re.sub(r"[^A-Za-z0-9_.-]", "_", name) + ".stdout.txt")).write_text(out)
+    (workdir / (re.sub(r"[^A-Za-z0-9_.-]", "_", name) + ".stdout.txt")).write_text(out, encoding="utf-8")
     fails = set(re.findall(r"^FAIL\[([^\]]+)\]", proc.stdout, re.M))
     m = re.search(r"SUMMARY pass=(\d+) fail=(\d+) skip=(\d+)", proc.stdout)
     if m is None:
@@ -861,7 +861,7 @@ def main():
                 target=mr/rel; original=target.read_text(encoding="utf-8")
                 if original.count(old)!=1:
                     rep.add('mutant',label,'FAIL','mutation anchor is not unique');continue
-                target.write_text(original.replace(old,new,1)); mutated=SourceSet(mr)
+                target.write_text(original.replace(old,new,1), encoding="utf-8"); mutated=SourceSet(mr)
                 if len(mutated.files[rel].error_nodes)!=len(ss.files[rel].error_nodes):
                     rep.add('mutant',label,'FAIL','INVALID: changed parser error count');continue
                 rr=Report();static_core(mutated,rr)
@@ -874,7 +874,7 @@ def main():
     summary=rep.summarize(); print('SUMMARY',json.dumps(summary))
     if args.json:
         args.json.parent.mkdir(parents=True,exist_ok=True)
-        args.json.write_text(json.dumps({'summary':summary,'checks':rep.items,'native':native['status']},indent=2))
+        args.json.write_text(json.dumps({'summary':summary,'checks':rep.items,'native':native['status']},indent=2), encoding="utf-8")
     return 1 if rep.has_fail() else (77 if native['status']=='SKIP' else 0)
 
 

@@ -460,7 +460,8 @@ extension AIChatViewModel {
         // offload (offloadThreshold == 0) for a model with ample room for it.
         let resolved = resolvedContextWindow(for: model)
         let contextWindow = resolved.window
-        let policy = ContextPolicy(contextWindow: contextWindow, isUserCap: resolved.isUserCap)
+        let policy = ContextPolicy(contextWindow: contextWindow, isUserCap: resolved.isUserCap,
+                                   autoCompactBudgetTokens: AutoCompactionPreferences.activeBudgetTokens)
 
         // Policy disables offloading for this context window tier
         if !force && policy.offloadThreshold == 0 {
