@@ -191,7 +191,7 @@ jobs:
             --json "$RUNNER_TEMP/auto-compaction-budget.json"
           python3 scripts/test_keyword_snippet.py \
             --runner "$(xcrun --find swiftc)" \
-            --json "$RUNNER_TEMP/keyword-snippet.json"
+            --json "$RUNNER_TEMP/keyword-snippet.json" || [ $? -eq 77 ]   # 77 = static-only: keywordSnippet() was replaced in 1.15
           "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_ios15_hang_boundaries.py \
             --runner "$(xcrun --find swiftc)" \
             --json "$RUNNER_TEMP/hang-boundaries.json"
