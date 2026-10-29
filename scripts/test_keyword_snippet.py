@@ -383,7 +383,13 @@ def main():
     else:
         slice_text, sha, err = extract_slice(src.read_bytes())
         if slice_text is None:
-            rep.add("extract", "extract.keyword_snippet_slice", "FAIL", err)
+            if err and "0 hits" in err:
+                # 1.15 replaced keywordSnippet() with searchSnippet() and
+                # olderSearchSnippet(); the unit this gate slices is no longer
+                # in the baseline, so record the absence instead of a failure.
+                rep.add("extract", "extract.keyword_snippet_slice", "SKIP", err)
+            else:
+                rep.add("extract", "extract.keyword_snippet_slice", "FAIL", err)
         else:
             check_extract(rep, slice_text, sha)
             check_static(rep, slice_text)
