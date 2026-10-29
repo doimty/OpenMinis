@@ -391,6 +391,18 @@ private struct ChatTrailingMenu: View, Equatable {
             // either is on. Not on a Mac: no auto-lock, no OLED to protect.
             if !ProcessInfo.processInfo.isiOSAppOnMac {
                 Menu {
+                    // [T-auto-compact-budget] The soft budget was only
+                    // reachable from the near-capacity alert; this is the
+                    // discoverable switch next to the other chat toggles.
+                    Toggle(isOn: Binding(
+                        get: { AutoCompactionPreferences.enabled },
+                        set: { newValue in
+                            guard newValue != AutoCompactionPreferences.enabled else { return }
+                            UserDefaults.standard.set(newValue, forKey: AutoCompactionPreferences.enabledKey)
+                        }
+                    )) {
+                        Label(AppLocalized("Auto Compaction"), systemImage: "arrow.triangle.2.circlepath")
+                    }
                     Toggle(isOn: Binding(
                         get: { keepAwakeEnabled },
                         set: { setKeepAwake($0) }
