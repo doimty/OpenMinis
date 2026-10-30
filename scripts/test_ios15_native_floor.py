@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fixture-only native-floor tests. Never download or execute Apple artifacts."""
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -111,6 +112,16 @@ class FloorTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertTrue(any('15.6' in error for error in result['errors']))
 
+    def test_zero_patch_matches_floor_but_nonzero_patch_is_rejected(self):
+        for spelling in ('15', '15.0', '15.0.0'):
+            with self.subTest(minimum=spelling):
+                result = audit_metadata(MODERN.replace('minos 15.0', 'minos ' + spelling),
+                                        'arm64', PLIST_OK, output=True)
+                self.assertTrue(result['ok'], result['errors'])
+        result = audit_metadata(MODERN.replace('minos 15.0', 'minos 15.0.1'),
+                                'arm64', PLIST_OK, output=True)
+        self.assertFalse(result['ok'])
+
     def test_legacy_load_command_minimum_parsed(self):
         result = audit_metadata(LEGACY, 'arm64', PLIST_OK, output=True)
         self.assertTrue(result['ok'], result['errors'])
@@ -180,8 +191,8 @@ class FloorTests(unittest.TestCase):
             result = audit_native_dir(tmp, want='framework')
             self.assertTrue(any('no frameworks found' in error for error in result['errors']))
 
-    @unittest.skipUnless(__import__('os').uname().sysname != 'Darwin',
-                         'Linux refusal control only runs off-mac')
+    @unittest.skipUnless(sys.platform.startswith('linux'),
+                         'Linux refusal control only runs on Linux')
     def test_probe_refuses_non_darwin_before_any_work(self):
         import os, subprocess, sys
         env = dict(os.environ)

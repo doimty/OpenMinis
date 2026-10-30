@@ -87,10 +87,11 @@ def version_to_string(version):
 
 
 def version_gt(version, limit=_FLOOR):
-    """True when version > limit (tuple compare; 15.0.1 > 15.0 rejects)."""
+    """Compare padded version tuples; 15.0.0 equals 15.0, while 15.0.1 is newer."""
     if version is None:
         return True
-    return version > limit
+    width = max(len(version), len(limit))
+    return version + (0,) * (width - len(version)) > limit + (0,) * (width - len(limit))
 
 
 def parse_output(text):

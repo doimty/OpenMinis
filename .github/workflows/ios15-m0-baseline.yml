@@ -143,6 +143,15 @@ jobs:
           ./deps/build_vad_framework.sh
           ls -ld deps/libs deps/frameworks deps/resources vendor/RealTimeCutVADLibrary/Frameworks
 
+      - name: Ensure local iOS 15 VAD framework
+        run: |
+          set -euo pipefail
+          binary="vendor/RealTimeCutVADLibrary/Frameworks/RealTimeCutVADCXXLibrary.xcframework/ios-arm64/RealTimeCutVADCXXLibrary.framework/RealTimeCutVADCXXLibrary"
+          if [ ! -f "$binary" ]; then
+            ./deps/build_vad_framework.sh
+          fi
+          test -f "$binary"
+
       - name: Save native iOS deps cache
         if: steps.native-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -204,6 +213,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/test_package_ios15_ipa.py -v
+          python3 scripts/test_ios15_native_floor.py -v
 
       - name: Compatibility type-check smoke (15/16)
         run: |

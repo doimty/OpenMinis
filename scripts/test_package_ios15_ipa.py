@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import json
 import plistlib
+import struct
+import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 from pathlib import Path
 
 from package_ios15_ipa import (
     PackageError,
+    audit_staged_native_floor,
     package_app,
     parse_version,
     resolve_app,
@@ -103,6 +107,56 @@ class ResolveAndValidateTests(unittest.TestCase):
             (app / "Minis").unlink()
             with self.assertRaises(PackageError):
                 validate_app(app)
+
+
+class NativeFloorAuditTests(unittest.TestCase):
+    def audit_fixture(self, minimum="15.0", architectures="arm64", platform="2", *, plist_minimum=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = Path(tmp) / "Minis.app"
+            write_plist(app / "Info.plist", {"CFBundleExecutable": "Minis", "MinimumOSVersion": "15.0"})
+            header = lambda kind: struct.pack("<IiiIIIII", 0xfeedfacf, 0x100000c, 0, kind, 0, 0, 0, 0)
+            (app / "Minis").write_bytes(header(2))
+            framework = app / "Frameworks/RealTimeCutVADCXXLibrary.framework"
+            framework.mkdir(parents=True)
+            binary = framework / "RealTimeCutVADCXXLibrary"
+            binary.write_bytes(header(6))
+            # SPM object files are not runtime images and must not fail the audit.
+            (app / "Metadata.o").write_bytes(header(1))
+            if plist_minimum is not None:
+                write_plist(framework / "Info.plist", {"MinimumOSVersion": plist_minimum})
+            output = ("Load command 0\n      cmd LC_BUILD_VERSION\n  cmdsize 32\n"
+                      f" platform {platform}\n    minos {minimum}\n      sdk 26.2\n")
+
+            def run(command, **kwargs):
+                text = architectures if command[1] == "lipo" else output
+                return subprocess.CompletedProcess(command, 0, stdout=text, stderr="")
+
+            with patch("package_ios15_ipa.sys.platform", "darwin"), \
+                 patch("package_ios15_ipa.shutil.which", return_value="/usr/bin/xcrun"), \
+                 patch("package_ios15_ipa.subprocess.run", side_effect=run):
+                return audit_staged_native_floor(app)
+
+    def test_ios15_arm64_is_approved(self):
+        result = self.audit_fixture(minimum="15.0.0", plist_minimum="15.0")
+        self.assertEqual(len(result), 2)
+        self.assertEqual({entry["minimum_os"] for entry in result}, {"15.0.0"})
+        self.assertEqual({entry["arch"] for entry in result}, {"arm64"})
+
+    def test_legacy_vad_156_is_rejected(self):
+        with self.assertRaisesRegex(PackageError, r"RealTimeCutVADCXXLibrary.*15\.6"):
+            self.audit_fixture(minimum="15.6")
+
+    def test_high_framework_plist_minimum_is_rejected(self):
+        with self.assertRaisesRegex(PackageError, r"Info.plist minimum 15\.6"):
+            self.audit_fixture(plist_minimum="15.6")
+
+    def test_fat_or_wrong_arch_is_rejected(self):
+        with self.assertRaisesRegex(PackageError, "expected arm64 only"):
+            self.audit_fixture(architectures="arm64 x86_64")
+
+    def test_simulator_platform_is_rejected(self):
+        with self.assertRaisesRegex(PackageError, "platform"):
+            self.audit_fixture(platform="7")
 
 
 class PackageTests(unittest.TestCase):
@@ -226,6 +280,11 @@ class WorkflowWiringTests(unittest.TestCase):
     def test_baseline_workflow_packages_and_uploads_ipa(self):
         source = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("python3 scripts/test_package_ios15_ipa.py -v", source)
+        self.assertIn("python3 scripts/test_ios15_native_floor.py -v", source)
+        ensure_at = source.index("Ensure local iOS 15 VAD framework")
+        probe_at = source.index("Probe iOS 15 app target")
+        self.assertLess(ensure_at, probe_at)
+        self.assertIn("./deps/build_vad_framework.sh", source[ensure_at:probe_at])
         self.assertIn("python3 scripts/package_ios15_ipa.py", source)
         self.assertIn("--derived-data \"$RUNNER_TEMP/m1/DerivedData\"", source)
         self.assertIn("name: minis-ios15-trollstore-ipa", source)

@@ -18,10 +18,13 @@ import plistlib
 import re
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
+
+from audit_ios15_native_floor import audit_metadata
 
 APP_NAME = "Minis.app"
 APP_EXECUTABLE = "Minis"
@@ -236,6 +239,51 @@ def zip_payload(stage: Path, ipa: Path) -> None:
             archive.write(path, arcname=str(path.relative_to(stage).as_posix()))
 
 
+def audit_staged_native_floor(app: Path) -> list[dict]:
+    """Fail closed if a staged device binary cannot be shown to support iOS 15.0."""
+    if sys.platform != "darwin":
+        raise PackageError("native-floor audit requires macOS and xcrun")
+    xcrun = shutil.which("xcrun")
+    if not xcrun:
+        raise PackageError("xcrun not found for native-floor audit")
+    binaries = sorted(path for path in app.rglob("*") if is_macho(path))
+    executable = app / str(load_plist(app / "Info.plist").get("CFBundleExecutable") or APP_EXECUTABLE)
+    if executable not in binaries:
+        raise PackageError("native-floor audit found no Mach-O app executable")
+    results = []
+    for binary in binaries:
+        relative = binary.relative_to(app).as_posix()
+        with binary.open("rb") as stream:
+            header = stream.read(16)
+        if header[:4] in {b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe"} and len(header) == 16:
+            filetype = struct.unpack_from("<I", header, 12)[0]
+            if filetype == 1 and binary != executable:
+                # SPM may place MH_OBJECT metadata in a resource bundle; it is
+                # not a loadable image and has no runtime deployment floor.
+                continue
+        arch = subprocess.run([xcrun, "lipo", "-archs", str(binary)], capture_output=True, text=True)
+        if arch.returncode != 0:
+            raise PackageError(f"native-floor audit could not read architectures for {relative}: {arch.stderr.strip()}")
+        architectures = arch.stdout.split()
+        if architectures != ["arm64"]:
+            raise PackageError(f"native-floor audit expected arm64 only for {relative}: {architectures}")
+        commands = subprocess.run([xcrun, "otool", "-l", "-arch", "arm64", str(binary)],
+                                  capture_output=True, text=True)
+        if commands.returncode != 0:
+            raise PackageError(f"native-floor audit could not read load commands for {relative}: {commands.stderr.strip()}")
+        audit = audit_metadata(commands.stdout, "arm64", None, output=True)
+        if not audit["ok"]:
+            raise PackageError(f"native-floor audit failed for {relative}: {'; '.join(audit['errors'])}")
+        plist_path = binary.parent / "Info.plist"
+        if binary.parent.suffix == ".framework" and plist_path.is_file():
+            minimum = bundle_minimum_os(load_plist(plist_path))
+            if minimum is not None and parse_version(minimum) > PRODUCT_FLOOR:
+                raise PackageError(f"native-floor audit failed for {relative}: framework Info.plist minimum {minimum} > 15.0")
+        results.append({"path": relative, "arch": "arm64",
+                        "minimum_os": audit["images"][0]["minimum"]})
+    return results
+
+
 def default_ipa_name(info: dict) -> str:
     version = str(info.get("CFBundleShortVersionString") or "unknown")
     return f"Minis-{version}-ios15-trollstore.ipa"
@@ -279,6 +327,7 @@ def package_app(
     else:
         kept, stripped = strip_incompatible_plugins(staged_app)
     validate_app(staged_app)
+    native_floor = None if skip_sign else audit_staged_native_floor(staged_app)
     signed = False
     if not skip_sign:
         entitlement_path = entitlements or DEFAULT_ENTITLEMENTS
@@ -316,6 +365,7 @@ def package_app(
         "signed": signed,
         "plugins_kept": kept,
         "plugins_stripped": stripped,
+        "native_floor_audit": native_floor,
         "purpose": "diagnostic-only re-entry trace (not a layout fix)" if diagnostic_commit else "TrollStore / jailbreak sideload",
         "source_app": str(source_app),
     }
