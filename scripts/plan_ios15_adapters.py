@@ -116,9 +116,9 @@ def replacements(data, parser):
             if match:
                 found.append((node.start_byte, node.end_byte + match.end(), b'compatHiddenScrollBackground()', name))
         elif name == 'scrollDismissesKeyboard':
-            match = re.match(rb'\(\s*\.interactively\s*\)', data[node.end_byte:])
+            match = re.match(rb'\(\s*\.immediately\s*\)', data[node.end_byte:])
             if match:
-                found.append((node.start_byte, node.end_byte + match.end(), b'compatScrollDismissesKeyboardInteractively()', name))
+                found.append((node.start_byte, node.end_byte + match.end(), b'compatScrollDismissesKeyboardImmediately()', name))
         else:
             found.append((node.start_byte, node.end_byte, RENAMES[name].encode(), name))
     return sorted(found)

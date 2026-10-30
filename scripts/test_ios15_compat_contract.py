@@ -239,6 +239,19 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("bounds.width.isFinite", source)
         self.assertIn("sizeThatFits(CGSize(width: bounds.width", source)
 
+    def test_sheet_editors_keep_immediate_keyboard_dismissal(self):
+        compat = COMPAT.read_text(encoding="utf-8")
+        helper = compat.split("func compatScrollDismissesKeyboardImmediately()", 1)[1]
+        helper = helper.split("\n    }", 1)[0]
+        self.assertIn("if #available(iOS 16.0, *)", helper)
+        self.assertIn("self.scrollDismissesKeyboard(.immediately)", helper)
+        self.assertNotIn(".scrollDismissesKeyboard(.interactively)", compat)
+        for name in ("ProviderInstanceDetailView.swift", "ModelGroupDetailView.swift"):
+            with self.subTest(file=name):
+                view = (ROOT / "src/ios/Views/Providers" / name).read_text(encoding="utf-8")
+                self.assertIn(".compatScrollDismissesKeyboardImmediately()", view)
+                self.assertNotIn(".compatScrollDismissesKeyboardInteractively()", view)
+
     def test_chat_toolbar_condition_and_popup_indicators_are_ios15_safe(self):
         host = (ROOT / "src/ios/Views/Chat/AIChatView/Toolbar/ChatToolbarHost.swift").read_text(encoding="utf-8")
         toolbar = host.split("private var toolbarHost: some View {", 1)[1]

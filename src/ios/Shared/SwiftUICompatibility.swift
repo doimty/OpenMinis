@@ -428,11 +428,11 @@ extension View {
     }
 
     @ViewBuilder
-    func compatScrollDismissesKeyboardInteractively() -> some View {
+    func compatScrollDismissesKeyboardImmediately() -> some View {
         if #available(iOS 16.0, *) {
-            self.scrollDismissesKeyboard(.interactively)
+            self.scrollDismissesKeyboard(.immediately)
         } else {
-            // Retain the standard keyboard behavior of the legacy Form/List.
+            // iOS 15 retains the standard keyboard behavior of the legacy Form/List.
             self
         }
     }

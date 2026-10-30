@@ -3,7 +3,7 @@
 import unittest
 from tree_sitter import Language, Parser
 import tree_sitter_swift
-from plan_ios15_adapters import toolbar_conditionals
+from plan_ios15_adapters import replacements, toolbar_conditionals
 
 
 class ToolbarAuditTests(unittest.TestCase):
@@ -58,6 +58,16 @@ class ToolbarAuditTests(unittest.TestCase):
                     Text("Editor").toolbar { if dirty { ToolbarItem { Text("Save") } } }
                 } else { Text("Editor") }
             }}'''), [])
+
+    def test_keyboard_dismissal_adapter_preserves_immediate_mode(self):
+        parser = Parser(Language(tree_sitter_swift.language()))
+        source = b'struct Example: View { var body: some View { Text("Editor").scrollDismissesKeyboard(.immediately) } }'
+        changes = replacements(source, parser)
+        self.assertEqual(len(changes), 1)
+        self.assertEqual(changes[0][2], b'compatScrollDismissesKeyboardImmediately()')
+        interactive = source.replace(b'.immediately', b'.interactively')
+        self.assertEqual(replacements(interactive, parser), [],
+                         "interactive dismissal requires a deliberate review")
 
     def test_comments_and_strings_are_not_executable_builders(self):
         self.assertEqual(self.matches('''

@@ -357,7 +357,7 @@ struct ModelGroupDetailView: View {
         // keyboard drag and the sheet's drag-to-dismiss can share one gesture —
         // the iPadOS 27 abort described at ModelEntryDetailSheet
         // (ProviderInstanceDetailView.swift).
-        .compatScrollDismissesKeyboardInteractively()
+        .compatScrollDismissesKeyboardImmediately()
         .environment(\.editMode, $editMode)
         .sheet(isPresented: $showAddModels) {
             CompatNavigationStack {

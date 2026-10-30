@@ -24,9 +24,13 @@ let group = src("Views/Providers/ModelGroupDetailView.swift")
 check("sources readable", !detail.isEmpty && !group.isEmpty)
 
 check("Model Details sheet dismisses the keyboard immediately on scroll",
-      detail.contains(".scrollDismissesKeyboard(.immediately)\n            .toolbar {"))
+      detail.contains(".compatScrollDismissesKeyboardImmediately()\n            .toolbar {"))
 check("Model Group detail (inside the Settings sheet) too",
-      group.contains(".scrollDismissesKeyboard(.immediately)\n        .environment(\\.editMode, $editMode)"))
+      group.contains(".compatScrollDismissesKeyboardImmediately()\n        .environment(\\.editMode, $editMode)"))
+let compat = src("Shared/SwiftUICompatibility.swift")
+check("the compatibility helper keeps immediate dismissal on iOS 16+",
+      compat.contains("func compatScrollDismissesKeyboardImmediately() -> some View")
+      && compat.contains("self.scrollDismissesKeyboard(.immediately)"))
 check("Cancel / Save end editing before the sheet goes away",
       detail.contains("Self.endEditing()\n                        dismiss()")
       && detail.contains("Self.endEditing()\n                        save()"))
