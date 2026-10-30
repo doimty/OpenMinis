@@ -193,14 +193,14 @@ private struct SessionMCPDetailView: View {
         let envNames = MCPServerDetailRules.secretNames(server.env)
         List {
             Section {
-                LabeledContent(AppLocalized("Transport"),
+                CompatLabeledContent(AppLocalized("Transport"),
                                value: MCPServerDetailRules.transportLabel(isSTDIO: server.isSTDIO))
                 if server.isSTDIO {
                     detailRow(AppLocalized("Command"), server.command ?? "")
                     if let args = MCPServerDetailRules.argsLine(server.args) {
                         detailRow(AppLocalized("Arguments"), args)
                     }
-                    LabeledContent(AppLocalized("Startup timeout (seconds)"),
+                    CompatLabeledContent(AppLocalized("Startup timeout (seconds)"),
                                    value: server.startupTimeoutSeconds.map(String.init) ?? AppLocalized("Default 60"))
                 } else {
                     let url = server.url ?? ""
@@ -209,7 +209,7 @@ private struct SessionMCPDetailView: View {
                         .modifier(SkillSourceURLContextMenu(url: url.isEmpty ? nil : url,
                                                             title: AppLocalized("Copy URL")) {})
                     if server.oauth != nil {
-                        LabeledContent("OAuth",
+                        CompatLabeledContent("OAuth",
                                        value: authorized ? AppLocalized("Authorized") : AppLocalized("Not authorized"))
                     }
                 }

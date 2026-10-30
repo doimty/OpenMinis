@@ -107,7 +107,7 @@ struct QuotaDetailSheet: View {
         Section {
             if let instance = ProviderConfigStore.shared.instance(for: instanceId),
                let detection = quota.relayDetection(for: instance), detection.found {
-                LabeledContent(String(localized: "Relay type")) {
+                CompatLabeledContent(String(localized: "Relay type")) {
                     VStack(alignment: .trailing, spacing: 1) {
                         Text(detection.text)
                         Text(String(format: String(localized: "detected %@"), ProviderQuotaSection.relative(detection.at)))
@@ -117,7 +117,7 @@ struct QuotaDetailSheet: View {
                 }
             }
             if let refreshed = subject?.lastRefresh?.succeededAt {
-                LabeledContent(String(localized: "Last checked")) {
+                CompatLabeledContent(String(localized: "Last checked")) {
                     Text(Self.stamp(refreshed))
                 }
             }
@@ -154,11 +154,11 @@ struct QuotaDetailSheet: View {
         let scopes = quota.bindings.filter { $0.poolKey == pool.id }
         Section {
             QuotaPoolRow(pool: pool, status: status, detailed: true)
-            LabeledContent(String(localized: "Source")) {
+            CompatLabeledContent(String(localized: "Source")) {
                 Text(Self.sourceText(pool.provenance))
                     .multilineTextAlignment(.trailing)
             }
-            LabeledContent(String(localized: "Updated")) {
+            CompatLabeledContent(String(localized: "Updated")) {
                 Text(Self.stamp(pool.observedAt))
             }
             ForEach(Array(scopes.enumerated()), id: \.offset) { _, binding in

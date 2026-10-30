@@ -120,7 +120,7 @@ struct BackupHistoryDetailView: View {
 
     private var summarySection: some View {
         Section {
-            LabeledContent("Status") {
+            CompatLabeledContent("Status") {
                 // An HStack, NOT a Label. `Label` reserves an icon column and
                 // sizes it from the environment; dropped into LabeledContent's
                 // value slot that column stretched, making this one row 245pt
@@ -133,20 +133,20 @@ struct BackupHistoryDetailView: View {
                 }
                 .foregroundStyle(BackupHistoryRow.statusColour(record.status))
             }
-            LabeledContent("Started",
+            CompatLabeledContent("Started",
                            value: record.startedAt.formatted(date: .abbreviated, time: .shortened))
             if let d = record.duration {
-                LabeledContent("Duration", value: durationText(d))
+                CompatLabeledContent("Duration", value: durationText(d))
             }
             if record.totalBytes > 0 {
-                LabeledContent("Size", value: ByteCountFormatter.string(
+                CompatLabeledContent("Size", value: ByteCountFormatter.string(
                     fromByteCount: record.totalBytes, countStyle: .file))
             }
             // `value:` takes a plain String, which does NOT route through the
             // string catalog the way a bare `Text("…")` literal does — so the
             // Yes/No here has to be localized explicitly or it stays English
             // in every locale.
-            LabeledContent("Encrypted",
+            CompatLabeledContent("Encrypted",
                            value: record.encrypted ? AppLocalized("Yes") : AppLocalized("No"))
             if let name = record.packageName {
                 // A hand-built HStack, NOT `LabeledContent`.
@@ -191,12 +191,12 @@ struct BackupHistoryDetailView: View {
                 // "how many" but never "which ones", which is the actual
                 // question. Older records predate the list and stay plain.
                 if record.skippedEntries.isEmpty {
-                    LabeledContent("Files excluded", value: "\(record.skippedFiles) file(s)")
+                    CompatLabeledContent("Files excluded", value: "\(record.skippedFiles) file(s)")
                 } else {
                     NavigationLink {
                         BackupSkippedFilesView(record: record)
                     } label: {
-                        LabeledContent("Files excluded",
+                        CompatLabeledContent("Files excluded",
                                        value: "\(record.skippedFiles) file(s)")
                     }
                 }

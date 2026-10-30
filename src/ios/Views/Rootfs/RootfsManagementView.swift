@@ -374,7 +374,7 @@ struct ContainerNetworkSection: View {
                     .disabled(!parsed.invalid.isEmpty || parsed.servers.isEmpty || !draftChanged)
             }
             if !inUse.isEmpty {
-                LabeledContent("In Use", value: inUse.joined(separator: "\n"))
+                CompatLabeledContent("In Use", value: inUse.joined(separator: "\n"))
                     .font(.system(.footnote, design: .monospaced))
             }
         } header: {

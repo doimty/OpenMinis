@@ -23,13 +23,13 @@ struct ConfigAuditDetailView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("Status") { ConfigAuditStatusBadge(status: status) }
-                LabeledContent("Changed by") { Text(Self.actorLabel(entry.actor)) }
-                LabeledContent("Requested") {
+                CompatLabeledContent("Status") { ConfigAuditStatusBadge(status: status) }
+                CompatLabeledContent("Changed by") { Text(Self.actorLabel(entry.actor)) }
+                CompatLabeledContent("Requested") {
                     Text(entry.at.formatted(date: .abbreviated, time: .standard))
                 }
                 if let confirmed = entry.confirmedAt {
-                    LabeledContent("Resolved") {
+                    CompatLabeledContent("Resolved") {
                         Text(confirmed.formatted(date: .abbreviated, time: .standard))
                     }
                 }
