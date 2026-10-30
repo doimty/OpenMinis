@@ -17,8 +17,8 @@
 //       streaming" path), move-to, notification opens, quick actions and the
 //       launch / share appends keep their exact code, the background gate runs
 //       first, every other write stays non-animated.
-//   [3] Path semantics with real NavigationPath: the row write and the new-chat
-//       write each leave exactly one page.
+//   [3] Path semantics with the shipping typed [String] route: the row write and
+//       the new-chat write each leave exactly one page.
 //
 // Run: swift NavRowPushAnimationTests.swift   (needs swiftc)
 import Foundation
@@ -49,6 +49,7 @@ let nav = source("Views/ContentView/ContentView+Navigation.swift")
 let menu = source("Views/ContentView/ContentView+SessionMenu.swift")
 let rows = source("Views/ContentView/Sidebar/SessionListRows.swift")
 let content = source("Views/ContentView/ContentView.swift")
+let layout = source("Views/ContentView/ContentView+Layout.swift")
 let headers = source("Views/ContentView/ContentView+SectionHeaders.swift")
 let empty = source("Views/ContentView/ContentView+EmptyState.swift")
 guard let rule = between(nav, "// BEGIN NavPushAnimationRule", "// END NavPushAnimationRule"),
@@ -85,8 +86,8 @@ for requested in [false, true] { for empty in [false, true] { for pending in [fa
 out("combos", animatedCombos.joined(separator: ","))
 
 // switchToSession's path write (always a REPLACE), animated or not.
-var path = NavigationPath()
-func switchTo(_ id: String) { path = NavigationPath([id]) }   // what switchToSession commits
+var path: [String] = []
+func switchTo(_ id: String) { path = [id] }   // what switchToSession commits
 switchTo("FD704863")              // row tap (now animated: the stack was empty)
 out("afterRow", path.count)
 path.removeLast()                 // swipe back
@@ -98,30 +99,30 @@ out("afterMoveTo", path.count)
 
 // [T-nav-stack-diag]
 @MainActor func diag() {
-    var p = NavigationPath(["A-1"]); p.append("B-2"); p.append("C-3")
-    out("d.ids", (NavDiag.ids(p) ?? []).joined(separator: ","))
+    var p = ["A-1"]; p.append("B-2"); p.append("C-3")
+    out("d.ids", NavDiag.ids(p).joined(separator: ","))
     // A running session that is not the target ends up on the stack.
     SessionActivityTracker.shared.activeSessions = ["RUN-9"]
     logged = []
-    NavDiag.write(event: "commit", target: "NEW-1", before: NavigationPath(), after: NavigationPath(["RUN-9", "NEW-1"]),
+    NavDiag.write(event: "commit", target: "NEW-1", before: [], after: ["RUN-9", "NEW-1"],
                   animated: false, outcome: "committed", caller: "X.swift:1")
     out("d.writeStray", logged.last?.hasPrefix("W ⚠️") == true && logged.last?.contains("RUNNING-SESSION-NOT-TARGET-IN-STACK=[RUN-9]") == true)
     // Clean write: target only, running session elsewhere.
     logged = []
-    NavDiag.write(event: "commit", target: "NEW-1", before: NavigationPath(), after: NavigationPath(["NEW-1"]),
+    NavDiag.write(event: "commit", target: "NEW-1", before: [], after: ["NEW-1"],
                   animated: true, outcome: "committed", caller: "X.swift:2")
     out("d.writeClean", logged.last?.hasPrefix("I [NavDiag] write") == true && logged.last?.contains("animated=true") == true
         && logged.last?.contains("running=[RUN-9]") == true)
     // Observed: the path the app wrote -> clean; a pop of it -> clean.
     logged = []
-    NavDiag.observe(NavigationPath(["NEW-1"]), currentTarget: "NEW-1")
+    NavDiag.observe(["NEW-1"], currentTarget: "NEW-1")
     out("d.observeOwn", logged.last?.hasPrefix("I ") == true)
     logged = []
-    NavDiag.observe(NavigationPath(), currentTarget: "NEW-1")
+    NavDiag.observe([], currentTarget: "NEW-1")
     out("d.observePop", logged.last?.hasPrefix("I ") == true)
     // Observed: a path the app never wrote, carrying the running session.
     logged = []
-    NavDiag.observe(NavigationPath(["RUN-9", "NEW-1"]), currentTarget: "NEW-1")
+    NavDiag.observe(["RUN-9", "NEW-1"], currentTarget: "NEW-1")
     let w = logged.last ?? ""
     out("d.observeGhost", w.hasPrefix("W ⚠️") && w.contains("NOT-WRITTEN-BY-APP lastWritten=[NEW-1]")
         && w.contains("RUNNING-SESSION-NOT-TARGET-IN-STACK=[RUN-9]") && w.contains("path=[RUN-9,NEW-1]"))
@@ -148,6 +149,9 @@ check("only a requested push onto an empty stack, nothing deferred, app active",
       r["combos"] == "true-true-false-true")
 
 print("\n2. The 5d912c58f ghost-page fix still holds")
+check("compact navigation uses typed routes and the compatibility stack",
+      content.contains("@State var navigationPath: [String] = []")
+      && layout.contains("CompatPathNavigationStack(path: $navigationPath) {"))
 let stackRow = between(rows, "struct SessionStackRow: View {", "struct SessionSplitRow") ?? ""
 check("the iPhone row has no NavigationLink (the source of the ghost page)",
       !stackRow.isEmpty && !stackRow.contains("NavigationLink"))
@@ -157,7 +161,7 @@ check("…whose handler switches (replaces), asking for the animation",
       menu.contains("case .open(let sid):") && menu.contains("switchToSession(sid, animated: true)"))
 let switchBody = between(nav, "func switchToSession(_ id: String, animated: Bool = false,", "\n    }\n") ?? ""
 check("switchToSession still REPLACES the path with [id] - one write, animated or not",
-      switchBody.contains("commitNavigationPath(NavigationPath([id]), animated: animate, target: id")
+      switchBody.contains("commitNavigationPath([id], animated: animate, target: id")
       && !switchBody.contains(".append("))
 check("the animation decision is the tested rule, fed the live stack / deferral / app state",
       switchBody.contains("pathIsEmpty: navigationPath.isEmpty")
@@ -171,7 +175,7 @@ check("home-list new chats still replace, without animation (FAB, group FAB, fol
 check("move-to and notification opens keep the atomic non-animated replace",
       content.contains("switchToSession(targetId)") && content.contains("switchToSession(sessionId)")
       && !content.contains("animated: true"))
-let commitBody = between(nav, "private func commitNavigationPath(_ newPath: NavigationPath, animated: Bool = false,", "\n    }\n") ?? ""
+let commitBody = between(nav, "private func commitNavigationPath(_ newPath: [String], animated: Bool = false,", "\n    }\n") ?? ""
 let gateAt = commitBody.range(of: "if appState == .background {")?.lowerBound
 let animAt = commitBody.range(of: "if animated {")?.lowerBound
 check("the background gate still runs before any write, animated or not",
@@ -186,18 +190,18 @@ let openBody = between(nav, "func openSession(_ id: String, file: String = #file
 check("launch / share / notification opens keep their original append, untouched",
       openBody.contains("var next = pendingBackgroundNavigation?.path ?? navigationPath\n            next.append(id)\n            commitNavigationPath(next, target: id, file: file, line: line)"))
 check("quick-action new chats keep their original non-animated replace, untouched",
-      nav.components(separatedBy: "commitNavigationPath(NavigationPath([newId]))").count - 1 == 2)
+      nav.components(separatedBy: "commitNavigationPath([newId])").count - 1 == 2)
 check("only the row tap asks for animation anywhere in ContentView",
       [menu, content, headers, empty, nav].joined().components(separatedBy: "animated: true").count - 1 == 1)
 
-print("\n3. Path semantics with real NavigationPath")
+print("\n3. Path semantics with typed String routes")
 check("row tap: one page", r["afterRow"] == "1")
 check("swipe back: home", r["afterBack"] == "0")
 check("a home-list new chat afterwards: exactly one page", r["afterNewChat"] == "1")
 check("move-to while a chat is open: still one page (replace, not push)", r["afterMoveTo"] == "1")
 
 print("\n4. [NavDiag] diagnostics (compiled from the shipping block)")
-check("path ids decode bottom to top", r["d.ids"] == "A-1,B-2,C-3")
+check("path ids remain bottom to top", r["d.ids"] == "A-1,B-2,C-3")
 check("a write that puts a running non-target session on the stack is flagged", r["d.writeStray"] == "true")
 check("a clean write logs caller, animation and the running sessions", r["d.writeClean"] == "true")
 check("observing the app's own write, or a pop of it, is not flagged", r["d.observeOwn"] == "true" && r["d.observePop"] == "true")
@@ -205,7 +209,7 @@ check("a path the app never wrote, carrying a running session, is flagged with b
       r["d.observeGhost"] == "true")
 check("every write goes through NavDiag with its caller (commit, deferral, flush)",
       nav.components(separatedBy: "NavDiag.write(").count - 1 >= 4
-      && nav.contains("commitNavigationPath(NavigationPath([id]), animated: animate, target: id, file: file, line: line)")
+      && nav.contains("commitNavigationPath([id], animated: animate, target: id, file: file, line: line)")
       && nav.contains("commitNavigationPath(next, target: id, file: file, line: line)"))
 check("every path change is observed", content.contains("NavDiag.observe(navigationPath, currentTarget: currentStackSessionId)"))
 

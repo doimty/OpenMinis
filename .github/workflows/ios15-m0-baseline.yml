@@ -182,6 +182,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/test_ios15_compat_contract.py -v
+          xcrun swift "$GITHUB_WORKSPACE/src/ios/MinisTests/Standalone/NavRowPushAnimationTests.swift"
 
       - name: Automatic compaction budget native and source gates
         run: |
