@@ -857,20 +857,20 @@ struct UnifiedModelPicker: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if isMulti {
-            ToolbarItem(placement: .topBarLeading) {
+        ToolbarItemGroup(placement: .topBarLeading) {
+            if isMulti {
                 Button("Cancel") { dismiss() }
             }
-            ToolbarItem(placement: .topBarTrailing) {
+        }
+        ToolbarItemGroup(placement: .topBarTrailing) {
+            if isMulti {
                 Button("Add (\(selectedEntryIds.count))") {
                     config.onAddMulti?(selectedEntryIds)
                     dismiss()
                 }
                 .font(.body.weight(.semibold))
                 .disabled(selectedEntryIds.isEmpty)
-            }
-        } else {
-            ToolbarItem(placement: .topBarTrailing) {
+            } else {
                 Button("Done") { dismiss() }
             }
         }
@@ -1154,12 +1154,21 @@ struct UnifiedModelPicker: View {
                 // to make room for the fixed-size tags ("Claude / Sonnet 5 [pill]
                 // [Active]"), and a wrapped text is only as wide as its longest
                 // line, which left the unused space on the right.
+                if #available(iOS 16.0, *) {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .quotaCapCenter, spacing: 4) {
                         memberRowName(entry, disabled: disabled)
                             .fixedSize(horizontal: true, vertical: false)
                         memberRowTags(entry, isSystem: isSystem, isActive: isActive, disabled: disabled)
                     }
+                    VStack(alignment: .leading, spacing: 2) {
+                        memberRowName(entry, disabled: disabled)
+                        HStack(alignment: .center, spacing: 4) {
+                            memberRowTags(entry, isSystem: isSystem, isActive: isActive, disabled: disabled)
+                        }
+                    }
+                }
+                } else {
                     VStack(alignment: .leading, spacing: 2) {
                         memberRowName(entry, disabled: disabled)
                         HStack(alignment: .center, spacing: 4) {
@@ -1484,6 +1493,7 @@ struct UnifiedModelPicker: View {
                     // of a 245 pt column). One line when it all fits; otherwise the
                     // id keeps the full width and the tags drop below it.
                     let badges = traits.subtitle == nil ? modalityBadges(entry.model) : []
+                    if #available(iOS 16.0, *) {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 4) {
                             entryRowSubtitle(entry, traits: traits)
@@ -1495,6 +1505,16 @@ struct UnifiedModelPicker: View {
                             }
                             entryRowTags(badges, disabled: disabled)
                         }
+                        VStack(alignment: .leading, spacing: 2) {
+                            entryRowSubtitle(entry, traits: traits)
+                            if !badges.isEmpty || disabled {
+                                HStack(spacing: 4) {
+                                    entryRowTags(badges, disabled: disabled)
+                                }
+                            }
+                        }
+                    }
+                    } else {
                         VStack(alignment: .leading, spacing: 2) {
                             entryRowSubtitle(entry, traits: traits)
                             if !badges.isEmpty || disabled {

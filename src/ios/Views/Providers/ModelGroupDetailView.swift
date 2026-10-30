@@ -84,7 +84,7 @@ struct ModelGroupDetailView: View {
         .navigationTitle(group?.name ?? "Group")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .compatSecondaryAction) {
                 if let group {
                     Button {
                         UIPasteboard.general.string = "group:\(group.id)"
