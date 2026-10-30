@@ -2425,7 +2425,7 @@ final class DebugJSONRPC: @unchecked Sendable {
         }
 
         let decided = full &+ single
-        return [
+        let result: [String: Any] = [
             "clusterCalls": calls,
             "clusterFull": full,
             "clusterSingle": single,
@@ -2444,6 +2444,7 @@ final class DebugJSONRPC: @unchecked Sendable {
             "hostPageSize": hostPage,
             "appFootprintMB": footprintMB,
         ]
+        return result
     }
 
     private func handleAppInfo(params: [String: Any] = [:]) -> Any {
