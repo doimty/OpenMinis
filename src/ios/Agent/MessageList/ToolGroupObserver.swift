@@ -1,6 +1,32 @@
 import Foundation
 import Combine
 
+/// Status categories deliberately ignore streaming byte counts: the summary
+/// doesn't grow every token and cannot be frozen by a stale text-height memo.
+enum ToolGroupPhase: Equatable {
+    case pending, active, success, failed, cancelled
+}
+
+struct ToolGroupSummary: Equatable {
+    let total: Int
+    let active: Int
+    let pending: Int
+    let failed: Int
+    let cancelled: Int
+    let succeeded: Int
+
+    init(phases: [ToolGroupPhase]) {
+        total = phases.count
+        active = phases.filter { $0 == .active }.count
+        pending = phases.filter { $0 == .pending }.count
+        failed = phases.filter { $0 == .failed }.count
+        cancelled = phases.filter { $0 == .cancelled }.count
+        succeeded = phases.filter { $0 == .success }.count
+    }
+    var isActive: Bool { active > 0 }
+    var allSucceeded: Bool { total > 0 && succeeded == total }
+}
+
 /// Observe only status CATEGORIES, not output text or byte counters. A hidden
 /// tool's status still updates the visible summary without rebuilding the list.
 /// Kept separate from SwiftUI so host tests can run the real Combine observer.
