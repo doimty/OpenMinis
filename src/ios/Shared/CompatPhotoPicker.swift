@@ -23,7 +23,7 @@ struct CompatPhotoPickerItem: Equatable, @unchecked Sendable {
         itemIdentifier = item.itemIdentifier
         supportedContentTypes = item.supportedContentTypes
         imageLoader = { try await item.loadTransferable(type: Data.self) }
-        videoLoader = { try await item.loadTransferable(type: VideoFileTransferable.self)?.url }
+        videoLoader = { try await item.loadTransferable(type: CompatVideoFileTransferable.self)?.url }
     }
 
     init(_ result: PHPickerResult) {
@@ -62,6 +62,22 @@ struct CompatPhotoPickerItem: Equatable, @unchecked Sendable {
                     }
                 }
             }
+        }
+    }
+}
+
+@available(iOS 16.0, *)
+struct CompatVideoFileTransferable: Transferable, @unchecked Sendable {
+    let url: URL
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(contentType: .movie) { video in
+            SentTransferredFile(video.url)
+        } importing: { received in
+            let owned = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString + "_" + received.file.lastPathComponent)
+            try FileManager.default.copyItem(at: received.file, to: owned)
+            return Self(url: owned)
         }
     }
 }
