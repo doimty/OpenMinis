@@ -255,8 +255,26 @@ private struct EnvVarFormSheet: View {
         EnvVarStore.isValidKey(key)
     }
 
+    /// `TextField(axis:)` and the range `lineLimit` are iOS 16; iOS 15 keeps a
+    /// single-line field and the same save path.
+    @ViewBuilder
+    private var shortcutValueField: some View {
+        if #available(iOS 16.0, *) {
+            TextField("Value", text: $value, axis: .vertical)
+                .lineLimit(1...8)
+                .font(.system(.body, design: .monospaced))
+                .autocorrectionDisabled()
+                .focused($focusedField, equals: .value)
+        } else {
+            TextField("Value", text: $value)
+                .font(.system(.body, design: .monospaced))
+                .autocorrectionDisabled()
+                .focused($focusedField, equals: .value)
+        }
+    }
+
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 Section {
                     TextField("NAME", text: Binding(
@@ -283,11 +301,7 @@ private struct EnvVarFormSheet: View {
                         // [T-shortcut-envvar] Shortcut-stored text (an SMS, a
                         // note) can span lines; a single-line field would
                         // flatten it on save.
-                        TextField("Value", text: $value, axis: .vertical)
-                            .lineLimit(1...8)
-                            .font(.system(.body, design: .monospaced))
-                            .autocorrectionDisabled()
-                            .focused($focusedField, equals: .value)
+                        shortcutValueField
                     } else {
                         TextField("Value", text: $value)
                             .font(.system(.body, design: .monospaced))
@@ -310,7 +324,7 @@ private struct EnvVarFormSheet: View {
                         TextEditor(text: $note)
                             .frame(minHeight: 80)
                             .focused($focusedField, equals: .note)
-                            .scrollContentBackground(.hidden)
+                            .compatHiddenScrollBackground()
                     }
                 }
 
@@ -356,7 +370,7 @@ private struct EnvVarFormSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .compatPresentationDetentsMediumLarge()
         .alert(
             AppLocalized("Delete this variable?"),
             isPresented: $showingDeleteConfirm

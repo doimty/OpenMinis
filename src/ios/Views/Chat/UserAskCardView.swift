@@ -972,25 +972,38 @@ private struct UserAskPendingCard: View {
             // A long locale at a large font falls back to the pair on its own
             // right-aligned row with Previous below on the left, then to a stack.
             let showsPrevious = PendingAsk.showsPrevious(at: index)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    if showsPrevious {
-                        previousButton(fill: false)
-                    }
-                    Spacer(minLength: 12)
-                    cancelButton
-                    allowOnceButton
-                }
-                VStack(alignment: .leading, spacing: 12) {
+            if #available(iOS 16.0, *) {
+                ViewThatFits(in: .horizontal) {
                     HStack(spacing: 8) {
-                        Spacer(minLength: 0)
+                        if showsPrevious {
+                            previousButton(fill: false)
+                        }
+                        Spacer(minLength: 12)
                         cancelButton
                         allowOnceButton
                     }
-                    if showsPrevious {
-                        previousButton(fill: false)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Spacer(minLength: 0)
+                            cancelButton
+                            allowOnceButton
+                        }
+                        if showsPrevious {
+                            previousButton(fill: false)
+                        }
+                    }
+                    VStack(alignment: .trailing, spacing: 8) {
+                        cancelButton
+                        allowOnceButton
+                        if showsPrevious {
+                            previousButton(fill: false)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
+            } else {
+                // iOS 15 uses the most conservative arrangement the iOS 16
+                // ViewThatFits ladder falls back to.
                 VStack(alignment: .trailing, spacing: 8) {
                     cancelButton
                     allowOnceButton
@@ -1388,8 +1401,7 @@ private struct UserAskInputSheet: View {
                 // editing with the keyboard. Grows with the text between 3 and 8
                 // lines, then scrolls. One hairline frame: a TextEditor in a
                 // filled box read as a thick double frame in dark mode.
-                TextField("", text: $text, axis: .vertical)
-                    .lineLimit(3...8)
+                CompatMultilineTextField("", text: $text, lineLimit: 3...8)
                     .font(.system(size: t.question))
                     .focused($focused)
                     .padding(.horizontal, 12)

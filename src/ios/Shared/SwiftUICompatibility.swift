@@ -378,6 +378,15 @@ extension View {
     }
 
     @ViewBuilder
+    func compatContextMenuPreviewShape<S: Shape>(_ shape: S) -> some View {
+        if #available(iOS 16.0, *) {
+            contentShape(.contextMenuPreview, shape)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
     func compatHiddenScrollBackground() -> some View {
         if #available(iOS 16.0, *) {
             self.scrollContentBackground(.hidden)
