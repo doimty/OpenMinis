@@ -159,10 +159,11 @@ struct SessionSplitRow: View {
                     // band takes the container's bottom radii.
                     if isHighlighted {
                         CompatUnevenRoundedRectangle(
-                            topLeading: 0,
-                            bottomLeading: isLastInFolder ? 16 : 0,
-                            bottomTrailing: isLastInFolder ? 16 : 0,
-                            topTrailing: 0
+                            topLeadingRadius: 0,
+                            bottomLeadingRadius: isLastInFolder ? 16 : 0,
+                            bottomTrailingRadius: isLastInFolder ? 16 : 0,
+                            topTrailingRadius: 0,
+                            style: .continuous
                         )
                         .fill(Self.highlightFill)
                         .padding(.horizontal, 6)

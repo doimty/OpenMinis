@@ -453,27 +453,3 @@ extension View {
         }
     }
 }
-
-/// `UnevenRoundedRectangle`/`AnyShape` are iOS 16 only. The sidebar only needs
-/// per-corner rounding up to 16pt; iOS 15 falls back to a uniform continuous
-/// rounded rectangle using the largest requested radius.
-struct CompatUnevenRoundedRectangle: Shape {
-    var topLeading: CGFloat = 0
-    var bottomLeading: CGFloat = 0
-    var bottomTrailing: CGFloat = 0
-    var topTrailing: CGFloat = 0
-
-    func path(in rect: CGRect) -> Path {
-        if #available(iOS 16.0, *) {
-            return UnevenRoundedRectangle(
-                topLeadingRadius: topLeading,
-                bottomLeadingRadius: bottomLeading,
-                bottomTrailingRadius: bottomTrailing,
-                topTrailingRadius: topTrailing,
-                style: .continuous
-            ).path(in: rect)
-        }
-        let radius = max(max(topLeading, bottomLeading), max(bottomTrailing, topTrailing))
-        return RoundedRectangle(cornerRadius: radius, style: .continuous).path(in: rect)
-    }
-}

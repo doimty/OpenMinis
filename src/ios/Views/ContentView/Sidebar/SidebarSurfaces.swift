@@ -205,19 +205,20 @@ private struct FolderSurface: ViewModifier {
             : UIColor(red: 252/255.0, green: 252/255.0, blue: 252/255.0, alpha: 1)
     })
 
-    private var shape: CompatUnevenRoundedRectangle {
+    private var shape: CompatAnyShape {
         switch kind {
         case .lone:
-            return CompatUnevenRoundedRectangle(topLeading: 16, bottomLeading: 16,
-                                                bottomTrailing: 16, topTrailing: 16)
+            return CompatAnyShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         case .top:
-            return CompatUnevenRoundedRectangle(topLeading: 16, bottomLeading: 0,
-                                                bottomTrailing: 0, topTrailing: 16)
+            return CompatAnyShape(CompatUnevenRoundedRectangle(
+                topLeadingRadius: 16, bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0, topTrailingRadius: 16, style: .continuous))
         case .middle:
-            return CompatUnevenRoundedRectangle()
+            return CompatAnyShape(Rectangle())
         case .bottom:
-            return CompatUnevenRoundedRectangle(topLeading: 0, bottomLeading: 16,
-                                                bottomTrailing: 16, topTrailing: 0)
+            return CompatAnyShape(CompatUnevenRoundedRectangle(
+                topLeadingRadius: 0, bottomLeadingRadius: 16,
+                bottomTrailingRadius: 16, topTrailingRadius: 0, style: .continuous))
         }
     }
 
@@ -284,12 +285,12 @@ struct FolderCardBackground: ViewModifier {
     let isDropTarget: Bool
     let isExpanded: Bool
 
-    private var dropShape: CompatUnevenRoundedRectangle {
+    private var dropShape: CompatAnyShape {
         isExpanded
-            ? CompatUnevenRoundedRectangle(topLeading: 16, bottomLeading: 0,
-                                           bottomTrailing: 0, topTrailing: 16)
-            : CompatUnevenRoundedRectangle(topLeading: 16, bottomLeading: 16,
-                                           bottomTrailing: 16, topTrailing: 16)
+            ? CompatAnyShape(CompatUnevenRoundedRectangle(
+                topLeadingRadius: 16, bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0, topTrailingRadius: 16, style: .continuous))
+            : CompatAnyShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     func body(content: Content) -> some View {
