@@ -1,5 +1,11 @@
 import SwiftUI
 
+enum ToolGroupMetrics {
+    /// Fixed single-line summary height. Shared by the SwiftUI row and the
+    /// list's height estimator so the seed can never disagree with the render.
+    static let rowHeight: CGFloat = 44
+}
+
 /// Exact identity, not a hash-only surrogate: replacing message objects under
 /// unchanged block IDs must replace the StateObject's Combine subscriptions.
 struct ToolGroupObserverIdentity: Hashable {
