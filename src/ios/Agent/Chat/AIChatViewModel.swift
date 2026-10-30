@@ -794,6 +794,10 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// messages were dropped to fit. Decided once, then reused, so the request
     /// prefix stays stable across turns (see trimWarmUpToFit).
     var warmUpDropByMarker: [String: Int] = [:]
+    /// [T-auto-compact-budget] The soft budget the warm-up drop map was built
+    /// for. When the user changes the budget (or toggles the opt-in) the map is
+    /// stale, so it is dropped and the next request re-decides.
+    var warmUpCompactionBudgetTokens: Int = 0
     var contextFixedTokens = 0
     /// [T-ctx-count-reasoning] Whether the provider serving this session sends
     /// past `reasoningContent` back (AgentProvider.echoesReasoningContent). Set

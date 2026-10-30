@@ -2125,11 +2125,6 @@ extension AIChatViewModel {
     /// [T-ctx-trim-ladder] The compaction slice with the frozen trim plan
     /// applied. Measurement and requests both read this, so they always see
     /// the same bytes.
-    /// [T-auto-compact-budget] The soft budget the warm-up drop map was built
-    /// for. When the user changes the budget (or toggles the opt-in) the map is
-    /// stale, so it is dropped and the next request re-decides.
-    var warmUpCompactionBudgetTokens: Int = 0
-
     func effectiveAgentHistoryUncounted() -> [AgentMessage] {
         let compactionBudget = AutoCompactionPreferences.activeBudgetTokens
         if warmUpCompactionBudgetTokens != compactionBudget {
