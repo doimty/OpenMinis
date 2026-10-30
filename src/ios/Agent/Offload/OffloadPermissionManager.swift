@@ -111,9 +111,9 @@ struct OffloadCommandInfo {
     /// These fields are stored as English source keys and localized at read
     /// time so switching the in-app language updates an already-open settings
     /// page without rebuilding the static command table.
-    var localizedDisplayLabel: String { AppLocalized(displayLabel) }
+    var localizedDisplayLabel: String { AppLocalized(String.LocalizationValue(displayLabel)) }
     var localizedDescription: String {
-        description.isEmpty ? "" : AppLocalized(description)
+        description.isEmpty ? "" : AppLocalized(String.LocalizationValue(description))
     }
 }
 

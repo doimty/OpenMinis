@@ -57,7 +57,7 @@ enum ProviderType: String, Codable, CaseIterable, Hashable, Sendable {
     /// User-facing provider label. `displayName` remains a stable semantic
     /// value because it is stored in model metadata and used for matching.
     var localizedDisplayName: String {
-        AppLocalized(displayName)
+        AppLocalized(String.LocalizationValue(displayName))
     }
 
     /// Whether an OAuth instance of this provider can discover its model list
