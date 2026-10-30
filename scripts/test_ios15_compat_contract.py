@@ -239,6 +239,18 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("bounds.width.isFinite", source)
         self.assertIn("sizeThatFits(CGSize(width: bounds.width", source)
 
+    def test_chat_toolbar_condition_and_popup_indicators_are_ios15_safe(self):
+        host = (ROOT / "src/ios/Views/Chat/AIChatView/Toolbar/ChatToolbarHost.swift").read_text(encoding="utf-8")
+        toolbar = host.split("private var toolbarHost: some View {", 1)[1]
+        toolbar = toolbar.split("private var toolbarAnchor: some View {", 1)[0]
+        shown, hidden = toolbar.split("} else {", 1)
+        self.assertIn("if showsTrailing {", shown)
+        self.assertIn("ToolbarItem(placement: .topBarTrailing) { trailing() }", shown)
+        self.assertNotIn(".topBarTrailing", hidden)
+        popups = (ROOT / "src/ios/Views/Chat/AIChatView/AIChatView+InputPopups.swift").read_text(encoding="utf-8")
+        self.assertEqual(popups.count(".compatVisibleScrollIndicators()"), 2)
+        self.assertNotIn(".scrollIndicators(.visible)", popups)
+
     def test_settings_navigation_uses_compat_stack_and_sectioned_root(self):
         source = (ROOT / "src/ios/Views/Settings/SettingsSheet.swift").read_text(encoding="utf-8")
         self.assertRegex(

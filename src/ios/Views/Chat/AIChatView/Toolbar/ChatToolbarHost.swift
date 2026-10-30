@@ -213,15 +213,27 @@ struct ChatToolbarHost<Title: View, Trailing: View>: View, Equatable {
             NavbarEvalStats.logger.info("[NavbarEval] toolbarHostEval=\(NavbarEvalStats.titleEval) (toolbarPass=\(NavbarEvalStats.toolbarPass))")
         }()
         #endif
+        toolbarHost
+    }
+
+    @ViewBuilder
+    private var toolbarHost: some View {
+        if showsTrailing {
+            toolbarAnchor.toolbar {
+                ToolbarItem(placement: .principal) { title() }
+                ToolbarItem(placement: .topBarTrailing) { trailing() }
+            }
+        } else {
+            toolbarAnchor.toolbar {
+                ToolbarItem(placement: .principal) { title() }
+            }
+        }
+    }
+
+    private var toolbarAnchor: some View {
         Color.clear
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
-            .toolbar {
-                ToolbarItem(placement: .principal) { title() }
-                if showsTrailing {
-                    ToolbarItem(placement: .topBarTrailing) { trailing() }
-                }
-            }
     }
 }
 

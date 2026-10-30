@@ -186,7 +186,7 @@ extension AIChatView {
                 // reserves the top/bottom share.
                 .padding(Self.popupRowInset)
             }
-            .scrollIndicators(.visible)
+            .compatVisibleScrollIndicators()
             .frame(height: Self.slashPickerFixedHeight)
         }
     }
@@ -257,7 +257,7 @@ extension AIChatView {
                         // [T-slash-picker-fixed-height] Match slash popup:
                         // exactly 4 rows tall, scrolls on overflow with the
                         // visible indicator above.
-                        .scrollIndicators(.visible)
+                        .compatVisibleScrollIndicators()
                         .frame(height: Self.slashPickerFixedHeight)
                         .onChange(of: vm.mentionSelectedIndex) { newIndex in
                             guard newIndex >= 0, newIndex < rows.count else { return }
