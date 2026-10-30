@@ -171,6 +171,7 @@ class SelfSizingCell: UICollectionViewCell {
         lastComputedHeight = nil
         lastComputedWidth = nil
         lastMeasureMediaTime = nil
+        legacyMeasuredSize = nil
         // [T-ios-scroll-decel-height-drift] Drop any prior seed — content just
         // changed, so a seed from the old content would be wrong. configureCell
         // re-seeds (from the memo, keyed by the NEW content) right after this.
@@ -802,6 +803,7 @@ class SelfSizingCell: UICollectionViewCell {
         lastComputedHeight = nil
         lastComputedWidth = nil
         lastMeasureMediaTime = nil
+        legacyMeasuredSize = nil
         // [T-ios-contextmenu-liquidmorph-reuse] Cancel any context-menu
         // presentation still in flight for THIS cell before UIKit hands it to a
         // different message.

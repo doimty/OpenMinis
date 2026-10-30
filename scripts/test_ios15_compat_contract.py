@@ -163,6 +163,16 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("func hitRegionContains(_ point: CGPoint) -> Bool", legacy)
         self.assertIn("return host.view.bounds.contains(hostPoint)", legacy)
 
+    def test_ios15_legacy_hosting_forgets_size_on_reconfigure_and_reuse(self):
+        source = (ROOT / "src/ios/Agent/MessageList/MessageListInfrastructure.swift").read_text(encoding="utf-8")
+        configure = source.split("func applyContentConfiguration(_ config: any UIContentConfiguration) {", 1)[1]
+        configure = configure.split("func applyHostedContent", 1)[0]
+        reuse = source.split("override func prepareForReuse() {", 1)[1]
+        reuse = reuse.split("// MARK: - NoAnimationCollectionView", 1)[0]
+        self.assertIn("legacyMeasuredSize = nil", configure)
+        self.assertIn("legacyMeasuredSize = nil", reuse)
+        self.assertIn("self.configGeneration == generation", source)
+
     def test_ios15_self_sizing_cell_extends_hit_region_on_legacy_path(self):
         # The 762a178 content-view-only hitTest forwarding could not fix the
         # footer Retry/Resume capsules on device: UIKit rejects touches at the
