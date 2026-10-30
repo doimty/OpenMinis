@@ -80,17 +80,74 @@ struct RcloneAddServerView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            .compatTextInputAlert(
-                Text("Go to Path"),
-                isPresented: $showPathEditor,
-                confirmLabel: Text("Go"),
-                onConfirm: {
-                    let target = Self.normalizedInputPath(pathInput,
-                                                          isSFTP: RcloneBackendCatalog.usesAbsolutePaths(backend?.type ?? ""))
-                    Task { await list(dir: target) }
+        CompatNavigationStack {
+            Form {
+                if connectedRemote == nil {
+                    typeSection
+                    if backend != nil {
+                        detailsSection
+                        connectSection
+                    }
+                } else {
+                    browseSection
                 }
-            ) {
+
+                // Connect-time errors stay inline: the user is looking at
+                // the form they just filled in, and the message belongs next
+                // to it. Errors raised while BROWSING (mkdir, listing) go to
+                // the HUD instead — see backupHUD below — because the folder
+                // list can be long enough to push an inline row off screen.
+                if let errorText, connectedRemote == nil {
+                    Section {
+                        Text(errorText)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .backupHUD(Binding(
+                get: { connectedRemote == nil ? nil : errorText },
+                set: { if $0 == nil { errorText = nil } }))
+            .navigationTitle(connectedRemote == nil ? "Add Server" : "Choose Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { cancelAndDismiss() }
+                }
+                // The confirming action belongs in the top-right slot, where
+                // iOS puts Done/Save everywhere else. As a row at the bottom
+                // of a long directory listing it moved with the scroll and
+                // could sit off-screen entirely in a folder with many
+                // entries — the one control the screen exists to offer.
+                ToolbarItem(placement: .confirmationAction) {
+                    if connectedRemote != nil {
+                        Button("Save Here") { saveHere() }
+                            .disabled(isListing)
+                    }
+                }
+            }
+            // [T-backup-newfolder-create-missing] Keep Create visible. The
+            // native alert path can omit a disabled action entirely (the
+            // earlier "只有取消" report). createFolder() owns blank-name
+            // validation, just as the sibling destination browser does.
+            .compatTextInputAlert(Text("New Folder"), isPresented: $showNewFolder,
+                                  confirmLabel: Text("Create"),
+                                  onConfirm: { Task { await createFolder() } },
+                                  onCancel: { newFolderName = "" }) {
+                TextField("Folder name", text: $newFolderName)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            } message: {
+                Text("Created inside \(displayPath).")
+            }
+            // [T-sftp-absolute-path] Keep normalization and navigation at
+            // this owner; closing the input prompt must not dismiss Add Server.
+            .compatTextInputAlert(Text("Go to Path"), isPresented: $showPathEditor,
+                                  confirmLabel: Text("Go"), onConfirm: {
+                let target = Self.normalizedInputPath(pathInput,
+                                                      isSFTP: RcloneBackendCatalog.usesAbsolutePaths(backend?.type ?? ""))
+                Task { await list(dir: target) }
+            }) {
                 TextField("Path", text: $pathInput)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()

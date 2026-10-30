@@ -55,12 +55,24 @@ struct BackupDestinationDetailView: View {
     @State private var folderPackages: [BackupDestinations.FoundPackage] = []
 
     var body: some View {
-        .compatTextInputAlert(
-            Text("Rename Destination"),
-            isPresented: $showRename,
-            confirmLabel: Text("Save"),
-            onConfirm: { if let r = activeRemote { rename(r) } }
-        ) {
+        Form {
+            switch target {
+            case .remote(let r): remoteSections(r)
+            case .folder(let f): folderSections(f)
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        // These MUST hang off the Form, not off a Section inside
+        // remoteSections. That builder re-runs whenever the package list
+        // finishes loading (isLoadingPackages / packages change), and a
+        // presentation modifier attached to a view that gets rebuilt is torn
+        // down with it — the sheet opened and then closed itself. Only
+        // reproducible on FIRST entry, because that is when the load is still
+        // in flight; afterwards the state had already settled.
+        .compatTextInputAlert(Text("Rename Destination"), isPresented: $showRename,
+                              confirmLabel: Text("Save"),
+                              onConfirm: { if let r = activeRemote { rename(r) } }) {
             TextField("Name", text: $draftName)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -143,7 +155,6 @@ struct BackupDestinationDetailView: View {
         isDeleting = true
         defer { isDeleting = false }
         do {
-            // [T-restore-list-sync-race] Awaited: see ServerPackageListView.reload().
             await RcloneRemoteStore.syncToRcloneAndWait()
             try await Task.detached(priority: .utility) {
                 try RcloneTransfer.deletePackage(pkg, from: r)
@@ -214,7 +225,7 @@ struct BackupDestinationDetailView: View {
     private func remoteSections(_ r: RcloneRemoteStore.Remote) -> some View {
         let current = edited ?? r
         Section {
-            LabeledContent("Type",
+            CompatLabeledContent("Type",
                            value: RcloneBackendCatalog.backend(for: current.backend)?.title
                            ?? current.backend.uppercased())
             // Name and folder are the two things a user actually revises
@@ -227,7 +238,7 @@ struct BackupDestinationDetailView: View {
                 draftName = current.name
                 showRename = true
             } label: {
-                LabeledContent("Name") {
+                CompatLabeledContent("Name") {
                     HStack(spacing: 6) {
                         Text(current.name).foregroundStyle(.secondary)
                         Image(systemName: "chevron.right")
@@ -240,7 +251,7 @@ struct BackupDestinationDetailView: View {
             Button {
                 showFolderBrowser = true
             } label: {
-                LabeledContent("Backup folder") {
+                CompatLabeledContent("Backup folder") {
                     HStack(spacing: 6) {
                         Text(current.path.isEmpty ? "/" : "/\(current.path)")
                             .foregroundStyle(.secondary)
@@ -261,9 +272,9 @@ struct BackupDestinationDetailView: View {
             ForEach(current.params.sorted(by: { $0.key < $1.key })
                         .filter { isShownField($0.key, backend: current.backend) },
                     id: \.key) { k, v in
-                LabeledContent(fieldLabel(k, backend: current.backend), value: v)
+                CompatLabeledContent(fieldLabel(k, backend: current.backend), value: v)
             }
-            LabeledContent("Added", value: current.createdAt.formatted(date: .abbreviated,
+            CompatLabeledContent("Added", value: current.createdAt.formatted(date: .abbreviated,
                                                                        time: .shortened))
 
             // Address and credentials change in the real world — a NAS
@@ -424,11 +435,11 @@ struct BackupDestinationDetailView: View {
     @ViewBuilder
     private func folderSections(_ f: MountedFolderEntry) -> some View {
         Section {
-            LabeledContent("Source", value: f.sourceDisplayName)
-            LabeledContent("Can save backups",
+            CompatLabeledContent("Source", value: f.sourceDisplayName)
+            CompatLabeledContent("Can save backups",
                            value: f.effectiveWritable ? AppLocalized("Yes")
                                                       : AppLocalized("No"))
-            LabeledContent("Added", value: f.createdAt.formatted(date: .abbreviated,
+            CompatLabeledContent("Added", value: f.createdAt.formatted(date: .abbreviated,
                                                                  time: .shortened))
         } header: {
             Text("Configuration")
@@ -485,7 +496,6 @@ struct BackupDestinationDetailView: View {
         isTesting = true
         testResult = nil
         defer { isTesting = false }
-        // [T-restore-list-sync-race] Awaited: see ServerPackageListView.reload().
         await RcloneRemoteStore.syncToRcloneAndWait()
         do {
             _ = try await Task.detached(priority: .userInitiated) {
@@ -504,7 +514,6 @@ struct BackupDestinationDetailView: View {
     private func loadPackages(_ r: RcloneRemoteStore.Remote) async {
         isLoadingPackages = true
         defer { isLoadingPackages = false }
-        // [T-restore-list-sync-race] Awaited: see ServerPackageListView.reload().
         await RcloneRemoteStore.syncToRcloneAndWait()
         packages = (try? await Task.detached(priority: .utility) {
             try RcloneTransfer.listPackages(remote: r)
@@ -575,14 +584,84 @@ struct RcloneFolderBrowser: View {
     }
 
     var body: some View {
-        NavigationStack {
-            .compatTextInputAlert(
-                Text("New Folder"),
-                isPresented: $showNewFolder,
-                confirmLabel: Text("Create"),
-                onConfirm: { Task { await createFolder() } },
-                onCancel: { newFolderName = "" }
-            ) {
+        CompatNavigationStack {
+            Form {
+                Section {
+                    if !currentDir.isEmpty {
+                        Button {
+                            let parent = (currentDir as NSString).deletingLastPathComponent
+                            Task { await list(parent == "." ? "" : parent) }
+                        } label: {
+                            Label("Up one level", systemImage: "arrow.up.left")
+                        }
+                    }
+                    if isListing {
+                        HStack { ProgressView(); Text("Loading…").foregroundStyle(.secondary) }
+                    } else if visibleEntries.isEmpty {
+                        Text(showsFiles ? "This folder is empty."
+                                        : "No folders here.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(visibleEntries) { e in
+                            if e.isDir {
+                                Button {
+                                    Task { await list(e.path) }
+                                } label: {
+                                    HStack {
+                                        Label(e.name, systemImage: "folder.fill")
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption2).foregroundStyle(.tertiary)
+                                    }
+                                }
+                            } else {
+                                Label(e.name, systemImage: "doc")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    HStack(spacing: 8) {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            Text(currentDir.isEmpty ? "/" : "/\(currentDir)")
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color(.secondarySystemFill), in: Capsule())
+                        }
+                        Button {
+                            newFolderName = ""
+                            showNewFolder = true
+                        } label: {
+                            Label("New Folder", systemImage: "folder.badge.plus")
+                                .labelStyle(.iconOnly)
+                                .font(.body)
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(isListing)
+                    }
+                    .textCase(nil)
+                }
+
+            }
+            .backupHUD($errorText)
+            .navigationTitle("Backup Folder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save Here") { onPicked(currentDir) }
+                        .disabled(isListing)
+                }
+            }
+            .compatTextInputAlert(Text("New Folder"), isPresented: $showNewFolder,
+                                  confirmLabel: Text("Create"),
+                                  onConfirm: { Task { await createFolder() } },
+                                  onCancel: { newFolderName = "" }) {
                 TextField("Folder name", text: $newFolderName)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -685,7 +764,7 @@ struct RcloneConnectionEditor: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 if let b = backend {
                     Section {
@@ -790,7 +869,7 @@ struct RcloneConnectionEditor: View {
             // because re-entering it is the more likely intent after a
             // failure, and it cannot be read back to restore anyway.
             _ = try? RcloneRemoteStore.update(name: remote.name, newParams: previousParams)
-            errorText = AppLocalized("Couldn't connect with these settings, so they weren't saved. \(error.localizedDescription)")
+            errorText = String(format: AppLocalized("Couldn't connect with these settings, so they weren't saved. %@"), String(error.localizedDescription))
         }
     }
 
