@@ -43,32 +43,7 @@ struct FolderAlertsModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        .compatTextInputAlert(
-                Text("Rename Group"),
-                isPresented: Binding(
-                    get: { folderToRename != nil },
-                    set: { if !$0 { folderToRename = nil } }
-                ),
-                confirmLabel: Text("Rename"),
-                onConfirm: {
-                    let name = renameFolderText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if let folder = folderToRename, !name.isEmpty {
-                        // [T-folder-duplicate-name] Renaming onto an existing
-                        // name would leave two groups the picker cannot tell
-                        // apart. Stop and offer the merge instead of writing.
-                        if let clash = duplicate(of: name, excluding: folder.id) {
-                            renameCollision = (source: folder, target: clash)
-                        } else {
-                            onRename(folder, name, renameFolderDesc)
-                        }
-                    }
-                    folderToRename = nil
-                },
-                onCancel: { folderToRename = nil }
-            ) {
-                TextField("Group Name", text: $renameFolderText)
-                TextField("Description (optional)", text: $renameFolderDesc)
-            } message: { EmptyView() }
+        renameDialog(content)
             // [T-folder-duplicate-name] Follow-up for a blocked rename. A plain
             // `.alert` cannot host a picker, so the choice is spelled out: go
             // back and pick another name, or move this group's chats into the
@@ -115,5 +90,38 @@ struct FolderAlertsModifier: ViewModifier {
                 // wording is what keeps them apart.
                 Text("\(memberCount(folder.id)) sessions will move back to the main list. No session will be deleted.")
             }
+    }
+
+    /// Kept out of `body` so the type checker sees the generic
+    /// `compatTextInputAlert` call in its own small expression.
+    private func renameDialog(_ content: Content) -> some View {
+        content.compatTextInputAlert(
+            Text("Rename Group"),
+            isPresented: Binding(
+                get: { folderToRename != nil },
+                set: { if !$0 { folderToRename = nil } }
+            ),
+            confirmLabel: Text("Rename"),
+            onConfirm: confirmRename,
+            onCancel: { folderToRename = nil }
+        ) {
+            TextField("Group Name", text: $renameFolderText)
+            TextField("Description (optional)", text: $renameFolderDesc)
+        } message: { EmptyView() }
+    }
+
+    private func confirmRename() {
+        let name = renameFolderText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let folder = folderToRename, !name.isEmpty {
+            // [T-folder-duplicate-name] Renaming onto an existing name would
+            // leave two groups the picker cannot tell apart. Stop and offer
+            // the merge instead of writing.
+            if let clash = duplicate(of: name, excluding: folder.id) {
+                renameCollision = (source: folder, target: clash)
+            } else {
+                onRename(folder, name, renameFolderDesc)
+            }
+        }
+        folderToRename = nil
     }
 }
