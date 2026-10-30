@@ -4,6 +4,13 @@ import PDFKit
 
 private let logger = AppLogger(category: "ChatExport")
 
+/// TextKit 2 is iOS 16+; on iOS 15 every UITextView uses the TextKit 1
+/// layout manager.
+private func usesTextKit1(_ textView: UITextView) -> Bool {
+    if #available(iOS 16.0, *) { return textView.textLayoutManager == nil }
+    return true
+}
+
 // [T-multi-select-share] Renders the selected cells of a chat into one long PNG or a
 // paged, vector PDF.
 //
@@ -314,9 +321,19 @@ private struct ChatExportHeaderView: View {
     @ViewBuilder
     private var subtitleLine: some View {
         let font = UIFont.systemFont(ofSize: 13)
-        ViewThatFits(in: .horizontal) {
-            ExportLabel(text: subtitle.joined(separator: " · "), font: font, color: .secondaryLabel, lines: 1)
-                .fixedSize()
+        if #available(iOS 16.0, *) {
+            ViewThatFits(in: .horizontal) {
+                ExportLabel(text: subtitle.joined(separator: " · "), font: font, color: .secondaryLabel, lines: 1)
+                    .fixedSize()
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(subtitle.enumerated()), id: \.offset) { i, part in
+                        ExportLabel(text: i < subtitle.count - 1 ? part + " ·" : part,
+                                    font: font, color: .secondaryLabel)
+                    }
+                }
+            }
+        } else {
+            // iOS 15 has no ViewThatFits: use the multi-line arrangement.
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(subtitle.enumerated()), id: \.offset) { i, part in
                     ExportLabel(text: i < subtitle.count - 1 ? part + " ·" : part,
@@ -385,6 +402,7 @@ private struct ExportLabel: UIViewRepresentable {
         label.numberOfLines = lines
     }
 
+    @available(iOS 16.0, *)
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UILabel, context: Context) -> CGSize? {
         let width = proposal.width ?? .greatestFiniteMagnitude
         let size = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
@@ -485,7 +503,7 @@ final class ChatExportRenderer {
     }
 
     private func collectLineBreaks(in view: UIView, root: UIView, into breaks: inout [CGFloat]) {
-        if let tv = view as? UITextView, tv.textLayoutManager == nil {
+        if let tv = view as? UITextView, usesTextKit1(tv) {
             let lm = tv.layoutManager
             let glyphs = lm.glyphRange(for: tv.textContainer)
             let inset = tv.textContainerInset.top
@@ -773,7 +791,7 @@ final class ChatExportRenderer {
         func isPrivate(_ v: UIView) -> Bool { NSStringFromClass(type(of: v)).hasPrefix("_") }
         func walk(_ v: UIView) {
             guard !v.isHidden, v.alpha > 0.01 else { return }
-            if let tv = v as? UITextView, tv.textLayoutManager == nil {
+            if let tv = v as? UITextView, usesTextKit1(tv) {
                 textViews.append(tv)
                 for sub in tv.subviews where isPrivate(sub) && !sub.isHidden {
                     sub.isHidden = true

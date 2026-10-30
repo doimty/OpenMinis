@@ -111,7 +111,7 @@ struct ChatShareSelectionView: View {
 
     var body: some View {
         let messages = byId
-        NavigationStack {
+        CompatNavigationStack {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -428,6 +428,9 @@ private struct ChatSharePreviewSheet: View {
     /// [T-share-link-anchor-crash] The last finished render the ShareLink offered; keeps
     /// the ShareLink (a presented share sheet's anchor) in place while a new one is made.
     @State private var lastShareURL: URL?
+    /// iOS 15 replaces ShareLink with a button + UIActivityViewController.
+    @State private var shareURL: URL?
+    @State private var showShare = false
     @State private var rendered: [RenderKey: Rendered] = [:]
     @State private var progress: (done: Int, total: Int)?
     @State private var errorText: String?
@@ -563,7 +566,7 @@ private struct ChatSharePreviewSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(spacing: 0) {
                 ZStack {
                     if let result = rendered[key] {
@@ -613,10 +616,18 @@ private struct ChatSharePreviewSheet: View {
                     // anything is rendered: removing it under a presented share sheet traps
                     // in SwiftUI when the sheet re-anchors.
                     if let target = ChatShareLinkTarget.resolve(current: rendered[key]?.url, last: lastShareURL) {
-                        ShareLink(item: target.url) { Image(systemName: "square.and.arrow.up") }
-                            .disabled(!target.enabled)
+                        Button {
+                            shareURL = target.url
+                            showShare = true
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .disabled(!target.enabled)
                     }
                 }
+            }
+            .sheet(isPresented: $showShare) {
+                if let shareURL { MinisShareSheet(url: shareURL) }
             }
             .task(id: key) { await render(key) }
             .onAppear {
