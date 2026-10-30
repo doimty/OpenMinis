@@ -158,12 +158,11 @@ struct SessionSplitRow: View {
                     // Flush selection band inside the group; the last member's
                     // band takes the container's bottom radii.
                     if isHighlighted {
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 0,
-                            bottomLeadingRadius: isLastInFolder ? 16 : 0,
-                            bottomTrailingRadius: isLastInFolder ? 16 : 0,
-                            topTrailingRadius: 0,
-                            style: .continuous
+                        CompatUnevenRoundedRectangle(
+                            topLeading: 0,
+                            bottomLeading: isLastInFolder ? 16 : 0,
+                            bottomTrailing: isLastInFolder ? 16 : 0,
+                            topTrailing: 0
                         )
                         .fill(Self.highlightFill)
                         .padding(.horizontal, 6)

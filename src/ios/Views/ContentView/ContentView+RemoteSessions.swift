@@ -44,9 +44,12 @@ extension ContentView {
             Section {
                 ForEach(entry.ids, id: \.self) { sessionId in
                     if let session = byId["\(entry.deviceId):\(sessionId)"] {
-                        NavigationLink(value: "remote:\(entry.deviceId):\(session.id)") {
+                        Button {
+                            navigationPath.append("remote:\(entry.deviceId):\(session.id)")
+                        } label: {
                             RemoteSessionRow(session: session)
                         }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
                         .contextMenu {

@@ -29,7 +29,7 @@ extension ContentView {
         // session-switch / tap lag is a separate issue (ChatSession Array `==`
         // in SwiftUI's transaction flush; an A/B test confirmed the font
         // injection is not its cause), so per-column injection is safe here.
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        CompatSplitNavigationView {
             sessionList(useNavigationLinks: false)
                 .appFontScale()
         } detail: {

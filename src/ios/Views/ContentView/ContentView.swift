@@ -364,8 +364,6 @@ struct ContentView: View {
     @State var sessionRefreshCooldownDeadline: Date?
     /// Whether the initial session load has completed (prevents showing the list before we decide to auto-navigate).
     @State var didInitialLoad = false
-    /// Controls sidebar visibility on iPad (automatic handles iPhone collapse).
-    @State var columnVisibility: NavigationSplitViewVisibility = .automatic
 
     /// Launch screen preference: 0=Auto, 1=Last Session, 2=New Chat.
     @AppStorage("launchScreen") private var launchScreen: Int = 0

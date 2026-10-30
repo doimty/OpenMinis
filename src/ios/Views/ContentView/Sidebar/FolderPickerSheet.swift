@@ -133,7 +133,7 @@ struct FolderPickerSheet: View {
                         Spacer()
                         Button("Create", action: createIfNamed)
                             .buttonStyle(.borderless)
-                            .fontWeight(.semibold)
+                            .font(.body.weight(.semibold))
                             .disabled(trimmedName.isEmpty || duplicateFolder != nil)
                     }
                     // [T-folder-duplicate-name] Name already taken. Says so, and
