@@ -456,7 +456,7 @@ struct ContentView: View {
     /// Whether the current window is wide enough for two-column layout.
     @State var isWideLayout = false
     /// Navigation path for stack (compact) layout.
-    @State var navigationPath = NavigationPath()
+    @State var navigationPath: [String] = []
     /// Tracks the session ID currently visible on the compact navigation stack.
     @State var currentStackSessionId: String?
     /// [T-ios-stacknav-transition-attributegraph-race] Compact-layout analogue
@@ -537,7 +537,7 @@ struct ContentView: View {
     ///
     /// Carries the deferral instant so a stale request can be dropped rather
     /// than flushed — see `pendingBackgroundNavigationTTL`.
-    @State var pendingBackgroundNavigation: (path: NavigationPath, deferredAt: Date)?
+    @State var pendingBackgroundNavigation: (path: [String], deferredAt: Date)?
 
     /// [T-ios-bg-nav-push-watchdog] How long a deferred push stays valid.
     ///
@@ -1226,9 +1226,8 @@ struct ContentView: View {
             // iPhone (only the launch / share / notification paths append), so
             // name every page: a ghost page under a new chat shows up here.
             if navigationPath.count > 1 {
-                let ids = navigationPath.codable
-                    .flatMap { try? JSONEncoder().encode($0) }
-                    .map { String(decoding: $0, as: UTF8.self) } ?? "?"
+                let ids = (try? JSONEncoder().encode(navigationPath))
+                    .map { String(decoding: $0, as: UTF8.self) } ?? "[]"
                 shareLog.warning("[NavStack] depth=\(navigationPath.count) top=\(currentStackSessionId ?? "nil") path=\(ids)")
             }
             if navigationPath.isEmpty { CrashBreadcrumbs.setSlot("page", value: "home") }

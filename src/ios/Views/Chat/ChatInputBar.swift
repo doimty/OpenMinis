@@ -71,6 +71,7 @@ struct SwipeToSendHint: View {
 // MARK: - Flow Layout
 
 /// A custom Layout that arranges subviews in a wrapping horizontal flow.
+@available(iOS 16.0, *)
 private struct FlowLayout: Layout {
     var hSpacing: CGFloat = 8
     var vSpacing: CGFloat = 8
@@ -181,26 +182,15 @@ struct InputAttachmentGridView: View {
     @State private var previewTarget: AttachmentPreviewTarget?
 
     var body: some View {
-        FlowLayout(hSpacing: 8, vSpacing: 8) {
-            ForEach(attachments) { attachment in
-                AttachmentChip(attachment: attachment, onRemove: {
-                    onRemove(attachment)
-                }, onPreview: {
-                    previewTarget = AttachmentPreviewTarget(id: attachment.id)
-                })
-                .opacity(draggingID == attachment.id ? 0.4 : 1)
-                .onDrag {
-                    draggingID = attachment.id
-                    return NSItemProvider(object: attachment.id.uuidString as NSString)
+        Group {
+            if #available(iOS 16.0, *) {
+                FlowLayout(hSpacing: 8, vSpacing: 8) {
+                    ForEach(attachments) { attachment in chip(attachment) }
+                    ForEach(0..<loadingVideoCount, id: \.self) { _ in VideoLoadingChip() }
                 }
-                .onDrop(of: [.text], delegate: AttachmentDropDelegate(
-                    targetID: attachment.id,
-                    draggingID: $draggingID,
-                    onMove: onMove
-                ))
-            }
-            ForEach(0..<loadingVideoCount, id: \.self) { _ in
-                VideoLoadingChip()
+            } else {
+                LegacyFlowLayout(items: legacyItems, hSpacing: 8, vSpacing: 8,
+                                 alignment: .leading)
             }
         }
         .padding(.horizontal, 16)
@@ -211,6 +201,36 @@ struct InputAttachmentGridView: View {
                 initialID: target.id,
                 onDone: { previewTarget = nil })
         }
+    }
+
+    private var legacyItems: [LegacyFlowItem] {
+        attachments.map { attachment in
+            LegacyFlowItem(id: attachment.id, expectedSize: CGSize(width: 64, height: 64)) {
+                chip(attachment)
+            }
+        } + (0..<loadingVideoCount).map { index in
+            LegacyFlowItem(id: "loading-video-\(index)", expectedSize: CGSize(width: 64, height: 64)) {
+                VideoLoadingChip()
+            }
+        }
+    }
+
+    private func chip(_ attachment: InputAttachment) -> some View {
+        AttachmentChip(attachment: attachment, onRemove: {
+            onRemove(attachment)
+        }, onPreview: {
+            previewTarget = AttachmentPreviewTarget(id: attachment.id)
+        })
+        .opacity(draggingID == attachment.id ? 0.4 : 1)
+        .onDrag {
+            draggingID = attachment.id
+            return NSItemProvider(object: attachment.id.uuidString as NSString)
+        }
+        .onDrop(of: [.text], delegate: AttachmentDropDelegate(
+            targetID: attachment.id,
+            draggingID: $draggingID,
+            onMove: onMove
+        ))
     }
 }
 
@@ -805,24 +825,45 @@ struct UserAttachmentList: View {
     }
 
     var body: some View {
-        FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
-            ForEach(attachments) { meta in
-                if meta.isImage {
-                    AsyncImageTile(meta: meta, tileSize: tileSize) {
-                        openGallery(startingAt: meta)
-                    }
-                } else if meta.isVideo {
-                    AsyncVideoTile(meta: meta, tileSize: tileSize)
-                } else if meta.pastedId != nil {
-                    pastedTile(meta)
-                } else {
-                    fileTile(meta, searchKey: searchMessageId.flatMap { mid in
-                        attachments.firstIndex(where: { $0.id == meta.id }).map {
-                            ChatSearchUnitKey(messageId: mid, blockId: nil, field: .attachmentName($0))
-                        }
-                    })
+        Group {
+            if #available(iOS 16.0, *) {
+                FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
+                    ForEach(attachments) { meta in tile(meta) }
                 }
+            } else {
+                LegacyFlowLayout(items: legacyItems,
+                                 hSpacing: UserAttachmentTileMetrics.gap,
+                                 vSpacing: UserAttachmentTileMetrics.gap,
+                                 alignment: .trailing)
             }
+        }
+    }
+
+    private var legacyItems: [LegacyFlowItem] {
+        attachments.map { meta in
+            LegacyFlowItem(id: meta.id,
+                           expectedSize: CGSize(width: tileSize, height: tileSize)) {
+                tile(meta)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tile(_ meta: AttachmentMeta) -> some View {
+        if meta.isImage {
+            AsyncImageTile(meta: meta, tileSize: tileSize) {
+                openGallery(startingAt: meta)
+            }
+        } else if meta.isVideo {
+            AsyncVideoTile(meta: meta, tileSize: tileSize)
+        } else if meta.pastedId != nil {
+            pastedTile(meta)
+        } else {
+            fileTile(meta, searchKey: searchMessageId.flatMap { mid in
+                attachments.firstIndex(where: { $0.id == meta.id }).map {
+                    ChatSearchUnitKey(messageId: mid, blockId: nil, field: .attachmentName($0))
+                }
+            })
         }
     }
 
@@ -991,18 +1032,33 @@ struct QueuedAttachmentPreview: View {
     private let tileSize: CGFloat = UserAttachmentTileMetrics.tile
 
     var body: some View {
-        FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
-            ForEach(attachments) { attachment in
-                switch attachment.kind {
-                case .image:
-                    AsyncCacheURLImageTile(cacheURL: attachment.cacheURL, tileSize: tileSize)
-                        .opacity(0.7)
-                case .video:
-                    placeholderTile(icon: "film", fileName: attachment.fileName)
-                case .document:
-                    placeholderTile(icon: "doc.fill", fileName: attachment.fileName)
+        Group {
+            if #available(iOS 16.0, *) {
+                FlowLayout(hSpacing: UserAttachmentTileMetrics.gap, vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing) {
+                    ForEach(attachments) { attachment in tile(attachment) }
                 }
+            } else {
+                LegacyFlowLayout(items: attachments.map { attachment in
+                    LegacyFlowItem(id: attachment.id,
+                                   expectedSize: CGSize(width: tileSize, height: tileSize)) {
+                        tile(attachment)
+                    }
+                }, hSpacing: UserAttachmentTileMetrics.gap,
+                   vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func tile(_ attachment: InputAttachment) -> some View {
+        switch attachment.kind {
+        case .image:
+            AsyncCacheURLImageTile(cacheURL: attachment.cacheURL, tileSize: tileSize)
+                .opacity(0.7)
+        case .video:
+            placeholderTile(icon: "film", fileName: attachment.fileName)
+        case .document:
+            placeholderTile(icon: "doc.fill", fileName: attachment.fileName)
         }
     }
 
@@ -1796,6 +1852,7 @@ struct PastableTextView: UIViewRepresentable {
         return tv
     }
 
+    @available(iOS 16.0, *)
     func sizeThatFits(_ proposal: ProposedViewSize, uiView tv: PastableUITextView, context: Context) -> CGSize? {
         let width = proposal.width ?? UIScreen.main.bounds.width
         // [T-share-url-input-height] UITextView.sizeThatFits returns the

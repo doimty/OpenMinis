@@ -41,9 +41,9 @@ extension ContentView {
     // MARK: - Stack Layout (iPhone / narrow window)
 
     var stackLayout: some View {
-        NavigationStack(path: $navigationPath) {
+        CompatPathNavigationStack(path: $navigationPath) {
             sessionList(useNavigationLinks: true)
-                .navigationDestination(for: String.self) { id in
+        } destination: { id in
                     // `.id(id)` mirrors detailView (iPad): navigationDestination
                     // views are identified by stack depth, not path value, so
                     // replacing the top element in place (menu "New Chat" swaps
@@ -89,7 +89,6 @@ extension ContentView {
                             }
                     }
                 }
-        }
     }
 
     // MARK: - Detail View

@@ -43,11 +43,11 @@ struct SettingsSheet: View {
     @AppStorage("appearanceMode") private var appearanceMode: Int = 0
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
-    @State private var navPath = NavigationPath()
+    @State private var navPath: [SettingsDestination] = []
     @State private var showFeedbackDialog = false
 
     var body: some View {
-        NavigationStack(path: $navPath) {
+        CompatPathNavigationStack(path: $navPath) {
             List {
                 Section {
                     NavigationLink {
@@ -385,64 +385,14 @@ struct SettingsSheet: View {
                     }
                 }
 
+            } destination: { dest in
+                settingsDestination(for: dest)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
-                }
-            }
-            .navigationDestination(for: SettingsDestination.self) { dest in
-                switch dest {
-                case .providers:
-                    ProviderInstancesView()
-                case .providerDetail(let id):
-                    ProviderInstanceDetailView(instanceId: id)
-                case .modelGroups:
-                    ModelGroupsView()
-                case .modelGroupDetail(let id):
-                    ModelGroupDetailView(groupId: id)
-                case .usage:
-                    UsageStatsView()
-                case .skills:
-                    SkillsManagementView()
-                case .soul:
-                    SoulSettingsView()
-                case .tools:
-                    ToolsSettingsView()
-                case .memory:
-                    MemoryManagementView()
-                case .storage:
-                    StorageManagementView()
-                case .mountedFolders:
-                    MountedFoldersSettingsView()
-                case .sharedFolders:
-                    SharedFoldersSettingsView()
-                case .logs:
-                    // Pull a one-shot tab hint from the deep link router
-                    // (e.g. `?tab=config-audit`). LogManagementView clears
-                    // its local state independently; the published value
-                    // here is consumed once and reset to nil.
-                    LogManagementView(initialTab: deepLink.pendingLogsTab ?? "logs")
-                        .onAppear { deepLink.pendingLogsTab = nil }
-                case .appearance:
-                    AppearanceSettingsView()
-                case .background:
-                    EnhancedBackgroundSettingsView()
-                case .about:
-                    AboutView()
-                case .environments:
-                    EnvironmentVariablesView()
-                case .permissions:
-                    OffloadPermissionSettingsView()
-                // [T-mcp-oauth-deeplink] Detail = the list view told to open
-                // the server's edit sheet on appear; a deleted/unknown server
-                // just lands on the list (no crash, sensible fallback).
-                case .mcpIntegrations:
-                    MCPIntegrationsView()
-                case .mcpServerDetail(let serverId):
-                    MCPIntegrationsView(initialEditServerId: serverId)
                 }
             }
             .onAppear {
@@ -481,6 +431,53 @@ struct SettingsSheet: View {
         .appFontScale()
     }
 
+    @ViewBuilder
+    private func settingsDestination(for dest: SettingsDestination) -> some View {
+        switch dest {
+        case .providers:
+            ProviderInstancesView()
+        case .providerDetail(let id):
+            ProviderInstanceDetailView(instanceId: id)
+        case .modelGroups:
+            ModelGroupsView()
+        case .modelGroupDetail(let id):
+            ModelGroupDetailView(groupId: id)
+        case .usage:
+            UsageStatsView()
+        case .skills:
+            SkillsManagementView()
+        case .soul:
+            SoulSettingsView()
+        case .tools:
+            ToolsSettingsView()
+        case .memory:
+            MemoryManagementView()
+        case .storage:
+            StorageManagementView()
+        case .mountedFolders:
+            MountedFoldersSettingsView()
+        case .sharedFolders:
+            SharedFoldersSettingsView()
+        case .logs:
+            LogManagementView(initialTab: deepLink.pendingLogsTab ?? "logs")
+                .onAppear { deepLink.pendingLogsTab = nil }
+        case .appearance:
+            AppearanceSettingsView()
+        case .background:
+            EnhancedBackgroundSettingsView()
+        case .about:
+            AboutView()
+        case .permissions:
+            OffloadPermissionSettingsView()
+        case .environments:
+            EnvironmentVariablesView()
+        case .mcpIntegrations:
+            MCPIntegrationsView()
+        case .mcpServerDetail(let serverId):
+            MCPIntegrationsView(initialEditServerId: serverId)
+        }
+    }
+
     /// Translate `DeepLinkCoordinator.pendingSettingsTarget` into a
     /// NavigationStack push and clear the pending value. Called from
     /// `onAppear` (cold-start deep link) and `onChange` (deep link
@@ -494,7 +491,7 @@ struct SettingsSheet: View {
         // Reset path so deep links are predictable: a deep link always
         // lands on the requested destination as the only stack entry,
         // not on top of whatever the user was browsing earlier.
-        navPath = NavigationPath()
+        navPath = []
         switch target {
         case .home:
             break // already at Settings root

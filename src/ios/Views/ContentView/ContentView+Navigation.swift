@@ -37,25 +37,11 @@ enum NavDiag {
     /// where from.
     private static var lastWrite: (ids: [String], caller: String, at: Date)?
 
-    /// The path's elements, bottom to top (session / draft ids). nil when the
-    /// path is not codable. `NavigationPath.codable` encodes as
-    /// `[type, json-value, type, json-value, ...]`, TOP first.
-    static func ids(_ path: NavigationPath) -> [String]? {
-        guard let codable = path.codable, let data = try? JSONEncoder().encode(codable),
-              let flat = try? JSONDecoder().decode([String].self, from: data) else { return nil }
-        var out: [String] = []
-        var i = 1
-        while i < flat.count {
-            let value = (try? JSONDecoder().decode(String.self, from: Data(flat[i].utf8))) ?? flat[i]
-            out.append(value)
-            i += 2
-        }
-        return out.reversed()
-    }
+    /// The path's elements, bottom to top (session / draft ids).
+    static func ids(_ path: [String]) -> [String] { path }
 
-    static func describe(_ path: NavigationPath) -> String {
-        guard let ids = ids(path) else { return "<\(path.count) non-codable>" }
-        return "[" + ids.joined(separator: ",") + "]"
+    static func describe(_ path: [String]) -> String {
+        "[" + path.joined(separator: ",") + "]"
     }
 
     /// Sessions running an agent loop right now (streaming / reasoning / tools).
@@ -74,9 +60,9 @@ enum NavDiag {
 
     /// A path write by the app. `outcome`: committed / deferred-background /
     /// flushed / discarded.
-    static func write(event: String, target: String?, before: NavigationPath, after: NavigationPath,
+    static func write(event: String, target: String?, before: [String], after: [String],
                       animated: Bool, outcome: String, caller: String) {
-        let afterIds = ids(after) ?? []
+        let afterIds = after
         if outcome != "discarded" { lastWrite = (afterIds, caller, Date()) }
         let stray = strayRunning(afterIds, target: target)
         let line = "[NavDiag] write event=\(event) caller=\(caller) target=\(target?.prefix(8) ?? "-") "
@@ -90,8 +76,8 @@ enum NavDiag {
     }
 
     /// Any change of the compact navigation path, whoever made it.
-    static func observe(_ path: NavigationPath, currentTarget: String?) {
-        let current = ids(path) ?? []
+    static func observe(_ path: [String], currentTarget: String?) {
+        let current = path
         let stray = strayRunning(current, target: currentTarget)
         let lastLabel = lastWrite.map { "\($0.caller)@\(String(format: "%.2f", Date().timeIntervalSince($0.at)))s" } ?? "-"
         let base = "[NavDiag] path-changed depth=\(path.count) path=\(describe(path)) target=\(currentTarget?.prefix(8) ?? "-") "
@@ -200,7 +186,7 @@ extension ContentView {
         if isWideLayout {
             openSession(newId)
         } else {
-            commitNavigationPath(NavigationPath([newId]))
+            commitNavigationPath([newId])
             currentStackSessionId = newId
         }
     }
@@ -234,7 +220,7 @@ extension ContentView {
             if isWideLayout {
                 selectedSessionId = nil
             } else {
-                navigationPath = NavigationPath()
+                navigationPath = []
                 currentStackSessionId = nil
             }
         }
@@ -253,7 +239,7 @@ extension ContentView {
         if isWideLayout {
             openSession(newId)
         } else {
-            commitNavigationPath(NavigationPath([newId]))
+            commitNavigationPath([newId])
             currentStackSessionId = newId
         }
         QuickActionWorkflow.shared.attachTargetSession(newId)
@@ -290,7 +276,7 @@ extension ContentView {
     /// [T-nav-row-push-animation] `animated` lets ONE caller - a list row tap,
     /// see `switchToSession` - keep the system push animation. Everything else
     /// still commits inside a disabled-animation transaction, exactly as before.
-    private func commitNavigationPath(_ newPath: NavigationPath, animated: Bool = false,
+    private func commitNavigationPath(_ newPath: [String], animated: Bool = false,
                                       target: String? = nil,
                                       file: String = #fileID, line: Int = #line) {
         let caller = "\((file as NSString).lastPathComponent):\(line)"
@@ -418,7 +404,7 @@ extension ContentView {
             pathIsEmpty: navigationPath.isEmpty,
             hasPendingBackgroundNavigation: pendingBackgroundNavigation != nil,
             appIsActive: UIApplication.shared.applicationState == .active)
-        commitNavigationPath(NavigationPath([id]), animated: animate, target: id, file: file, line: line)
+        commitNavigationPath([id], animated: animate, target: id, file: file, line: line)
         currentStackSessionId = id
     }
 
