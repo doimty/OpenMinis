@@ -95,8 +95,8 @@ struct NavBarStyleModifier: ViewModifier {
         } else {
             // iOS 16–18: opaque navbar background
             content
-                .toolbarBackground(ChatColors.background, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
+                .compatNavigationBarBackground(ChatColors.background)
+                .compatVisibleNavigationBarBackground()
                 .overlay(alignment: .top) {
                     if measuresSafeArea {
                         // [T-ios-geometry-observer-crash] onGeometryChange

@@ -1712,7 +1712,7 @@ struct ModelEntryDetailSheet: View {
             // views activates constraints across hierarchies. `.immediately`
             // hides the keyboard outright on the first scroll, so it is never
             // left minimized for that path to resurrect.
-            .scrollDismissesKeyboard(.immediately)
+            .compatScrollDismissesKeyboardInteractively()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
