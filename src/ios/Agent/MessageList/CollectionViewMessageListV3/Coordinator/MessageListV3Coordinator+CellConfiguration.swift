@@ -76,7 +76,7 @@ extension CollectionViewMessageListV3.Coordinator {
                 let message = messages[msgIdx]
                 let bridge = getOrCreateBridge(for: message, in: messages)
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedWholeMessageV3(
                         message: message,
                         bridge: bridge,
@@ -104,20 +104,18 @@ extension CollectionViewMessageListV3.Coordinator {
                     // [T-in-chat-search] Same reason: the search highlights
                     // must be handed to every hosted cell explicitly.
                     .environment(\.chatSearchHighlights, vm.chatSearch.highlights)
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
 
             case .assistantHeader(let msgId):
                 guard let msgIdx = messageIndex[msgId], msgIdx < messages.count else { return }
                 let message = messages[msgIdx]
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedAssistantHeaderV3(message: message, maxWidth: width,
                                             onOpenSoulSettings: onOpenSoulSettings)
                         .transaction { $0.disablesAnimations = true }
                         .environmentObject(vm)
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
 
             case .assistantBlock(let msgId, let blockId):
                 guard let msgIdx = messageIndex[msgId], msgIdx < messages.count else {
@@ -131,7 +129,7 @@ extension CollectionViewMessageListV3.Coordinator {
                 }
                 let bridge = getOrCreateBridge(for: message, in: messages)
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedAssistantBlockV3(
                         block: block,
                         message: message,
@@ -141,8 +139,7 @@ extension CollectionViewMessageListV3.Coordinator {
                     .transaction { $0.disablesAnimations = true }
                     .environmentObject(vm)
                     .environment(\.chatSearchHighlights, vm.chatSearch.highlights)
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
 
             case .toolGroup(let msgId, let firstBlockId):
                 guard let msgIdx = messageIndex[msgId], msgIdx < messages.count,
@@ -153,7 +150,7 @@ extension CollectionViewMessageListV3.Coordinator {
                 let message = messages[msgIdx]
                 let expanded = expandedToolGroups.contains(run.key)
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedToolGroupV3(
                         message: message,
                         firstBlockId: firstBlockId,
@@ -163,15 +160,14 @@ extension CollectionViewMessageListV3.Coordinator {
                         maxWidth: width
                     )
                     .transaction { $0.disablesAnimations = true }
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
 
             case .assistantFooter(let msgId):
                 guard let msgIdx = messageIndex[msgId], msgIdx < messages.count else { return }
                 let message = messages[msgIdx]
                 let bridge = getOrCreateBridge(for: message, in: messages)
                 cell.backgroundColor = .clear
-                let config = UIHostingConfiguration {
+                cell.applyHostedContent(parent: viewController) {
                     BridgedAssistantFooterV3(
                         message: message,
                         bridge: bridge,
@@ -181,8 +177,7 @@ extension CollectionViewMessageListV3.Coordinator {
                     .transaction { $0.disablesAnimations = true }
                     .environmentObject(vm)
                     .environment(\.chatSearchHighlights, vm.chatSearch.highlights)
-                }.minSize(width: 0, height: 0).margins(.all, 0)
-                cell.applyContentConfiguration(config)
+                }
             }
 
             // [T-ios-scroll-decel-height-drift] Seed this cell with the real

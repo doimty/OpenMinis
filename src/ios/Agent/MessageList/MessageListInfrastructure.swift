@@ -178,6 +178,38 @@ class SelfSizingCell: UICollectionViewCell {
         seededWidth = nil
     }
 
+    /// Use the native synchronous host on iOS 16+ and the measured legacy host
+    /// on iOS 15. Both paths keep the same configuration generation owner.
+    func applyHostedContent<Content: View>(parent: UIViewController?,
+                                           @ViewBuilder content: () -> Content) {
+        if #available(iOS 16.0, *) {
+            applyContentConfiguration(UIHostingConfiguration(content: content)
+                .minSize(width: 0, height: 0).margins(.all, 0))
+        } else {
+            let generation = configGeneration &+ 1
+            let config = LegacyHostingConfiguration(
+                content: AnyView(content()), parent: WeakHostingParent(parent),
+                onSizeChange: { [weak self] size in
+                    guard let self, self.configGeneration == generation,
+                          self.window != nil else { return }
+                    self.clearCachedHeight()
+                    self.legacyMeasuredSize = size
+                    self.seededHeight = nil
+                    self.seededWidth = nil
+                    var ancestor = self.superview
+                    while let view = ancestor {
+                        if let collection = view as? UICollectionView {
+                            collection.collectionViewLayout.invalidateLayout()
+                            collection.setNeedsLayout()
+                            break
+                        }
+                        ancestor = view.superview
+                    }
+                })
+            applyContentConfiguration(config)
+        }
+    }
+
     private static let sizingLogger = AppLogger(category: "CellSizing")
 
     // [ScrollStall] 1Hz-aggregated cache-hit counters.

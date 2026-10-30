@@ -278,39 +278,95 @@ struct SubAgentStatChips: View {
     let budgetMinutes: Int?
 
     var body: some View {
-        ChipFlow(spacing: 6) {
-            if digest.total > 0 {
+        Group {
+            if #available(iOS 16.0, *) {
+                ChipFlow(spacing: 6) {
+                    if digest.total > 0 {
+                        chip("wrench.and.screwdriver",
+                             String(format: AppLocalized("%lld tool calls"), digest.total))
+                    }
+                    if digest.okCount > 0 {
+                        chip("checkmark.circle.fill", "\(digest.okCount)", tint: .green,
+                             label: String(format: AppLocalized("%lld succeeded"), digest.okCount))
+                    }
+                    if digest.failedCount > 0 {
+                        chip("xmark.circle.fill", "\(digest.failedCount)", tint: .red,
+                             label: String(format: AppLocalized("%lld failed"), digest.failedCount))
+                    }
+                    if digest.turns > 0 {
+                        chip("arrow.triangle.2.circlepath",
+                             String(format: AppLocalized("%lld turns"), digest.turns))
+                    }
+                    if digest.hasTokens {
+                        chip("arrow.up.arrow.down",
+                             "\(SubAgentRunDigest.compact(digest.tokensIn)) / \(SubAgentRunDigest.compact(digest.tokensOut))",
+                             label: String(format: AppLocalized("Tokens: %1$@ in, %2$@ out"),
+                                           SubAgentRunDigest.compact(digest.tokensIn),
+                                           SubAgentRunDigest.compact(digest.tokensOut)))
+                    }
+                    if let remaining, let left = SubAgentTimeBudget.remainingLabel(remaining) {
+                        chip("timer", left.minutes > 0
+                             ? String(format: AppLocalized("%lldm left"), left.minutes)
+                             : String(format: AppLocalized("%llds left"), left.seconds),
+                             tint: remaining < 60 ? .orange : nil)
+                    } else if let budgetMinutes {
+                        chip("timer", String(format: AppLocalized("%lldm budget"), budgetMinutes))
+                    }
+                }
+            } else {
+                LegacyFlowLayout(items: legacyItems, hSpacing: 6, vSpacing: 6)
+            }
+        }
+    }
+
+    private var legacyItems: [LegacyFlowItem] {
+        var items: [LegacyFlowItem] = []
+        if digest.total > 0 {
+            items.append(LegacyFlowItem(id: "calls") {
                 chip("wrench.and.screwdriver",
                      String(format: AppLocalized("%lld tool calls"), digest.total))
-            }
-            if digest.okCount > 0 {
+            })
+        }
+        if digest.okCount > 0 {
+            items.append(LegacyFlowItem(id: "ok") {
                 chip("checkmark.circle.fill", "\(digest.okCount)", tint: .green,
                      label: String(format: AppLocalized("%lld succeeded"), digest.okCount))
-            }
-            if digest.failedCount > 0 {
+            })
+        }
+        if digest.failedCount > 0 {
+            items.append(LegacyFlowItem(id: "failed") {
                 chip("xmark.circle.fill", "\(digest.failedCount)", tint: .red,
                      label: String(format: AppLocalized("%lld failed"), digest.failedCount))
-            }
-            if digest.turns > 0 {
+            })
+        }
+        if digest.turns > 0 {
+            items.append(LegacyFlowItem(id: "turns") {
                 chip("arrow.triangle.2.circlepath",
                      String(format: AppLocalized("%lld turns"), digest.turns))
-            }
-            if digest.hasTokens {
+            })
+        }
+        if digest.hasTokens {
+            items.append(LegacyFlowItem(id: "tokens") {
                 chip("arrow.up.arrow.down",
                      "\(SubAgentRunDigest.compact(digest.tokensIn)) / \(SubAgentRunDigest.compact(digest.tokensOut))",
                      label: String(format: AppLocalized("Tokens: %1$@ in, %2$@ out"),
                                    SubAgentRunDigest.compact(digest.tokensIn),
                                    SubAgentRunDigest.compact(digest.tokensOut)))
-            }
-            if let remaining, let left = SubAgentTimeBudget.remainingLabel(remaining) {
+            })
+        }
+        if let remaining, let left = SubAgentTimeBudget.remainingLabel(remaining) {
+            items.append(LegacyFlowItem(id: "time") {
                 chip("timer", left.minutes > 0
                      ? String(format: AppLocalized("%lldm left"), left.minutes)
                      : String(format: AppLocalized("%llds left"), left.seconds),
                      tint: remaining < 60 ? .orange : nil)
-            } else if let budgetMinutes {
+            })
+        } else if let budgetMinutes {
+            items.append(LegacyFlowItem(id: "budget") {
                 chip("timer", String(format: AppLocalized("%lldm budget"), budgetMinutes))
-            }
+            })
         }
+        return items
     }
 
     private func chip(_ symbol: String, _ text: String, tint: Color? = nil, label: String? = nil) -> some View {
@@ -332,6 +388,8 @@ struct SubAgentStatChips: View {
 }
 
 /// Leading-aligned wrapping row.
+@available(iOS 16.0, *)
+@available(iOS 16.0, *)
 private struct ChipFlow: Layout {
     var spacing: CGFloat = 6
 
@@ -434,18 +492,17 @@ struct SubAgentToolTimelineCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 let split = digest.byTool
                 if split.count > 1 {
-                    ChipFlow(spacing: 6) {
-                        ForEach(Array(split.enumerated()), id: \.offset) { _, entry in
-                            HStack(spacing: 4) {
-                                Image(systemName: CompatSystemSymbol.name(HelperAccent.symbol(forTool: entry.tool)))
-                                    .font(.system(size: 9, weight: .semibold))
-                                Text("\(HelperAccent.displayName(forTool: entry.tool)) ×\(entry.count)")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .lineLimit(1)
+                    Group {
+                        if #available(iOS 16.0, *) {
+                            ChipFlow(spacing: 6) {
+                                ForEach(Array(split.enumerated()), id: \.offset) { _, entry in
+                                    toolSplitChip(entry)
+                                }
                             }
-                            .foregroundStyle(Color(UIColor.secondaryLabel))
-                            .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(Capsule().stroke(Color(UIColor.separator), lineWidth: 0.5))
+                        } else {
+                            LegacyFlowLayout(items: split.map { entry in
+                                LegacyFlowItem(id: entry.tool) { toolSplitChip(entry) }
+                            }, hSpacing: 6, vSpacing: 6)
                         }
                     }
                 }
@@ -456,6 +513,19 @@ struct SubAgentToolTimelineCard: View {
                 }
             }
         }
+    }
+
+    private func toolSplitChip(_ entry: (tool: String, count: Int)) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: CompatSystemSymbol.name(HelperAccent.symbol(forTool: entry.tool)))
+                .font(.system(size: 9, weight: .semibold))
+            Text("\(HelperAccent.displayName(forTool: entry.tool)) ×\(entry.count)")
+                .font(.system(size: 10, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(Color(UIColor.secondaryLabel))
+        .padding(.horizontal, 7).padding(.vertical, 3)
+        .background(Capsule().stroke(Color(UIColor.separator), lineWidth: 0.5))
     }
 
     @ViewBuilder
@@ -531,9 +601,8 @@ struct SubAgentActionsCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 if canSteer {
                     HStack(alignment: .bottom, spacing: 8) {
-                        TextField(AppLocalized("Send a course correction…"), text: $draft, axis: .vertical)
+                        CompatMultilineTextField(AppLocalized("Send a course correction…"), text: $draft, lineLimit: 1...4)
                             .font(.system(size: 13))
-                            .lineLimit(1...4)
                             .focused($focused)
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color(UIColor.tertiarySystemFill)))
