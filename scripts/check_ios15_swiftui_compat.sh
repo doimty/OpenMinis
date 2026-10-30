@@ -45,7 +45,7 @@ cat "$work/native-ios15.log"
 
 failed=0
 for minimum in 15.0 16.0; do
-  if check "$minimum" "${production[@]}" "$fixture/AppLoggerStub.swift" "$fixture/CompatibilityCalls.swift"; then
+  if check "$minimum" "${production[@]}" "$fixture/AppLoggerStub.swift" "$fixture/AppLocalizationStub.swift" "$fixture/CompatibilityCalls.swift"; then
     echo "PASS: all ${#production[@]} production compatibility/support modules type-check at iOS $minimum"
   else
     echo "FAIL: production compatibility type-check at iOS $minimum" >&2
