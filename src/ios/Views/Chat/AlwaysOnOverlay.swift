@@ -163,7 +163,7 @@ struct AlwaysOnOverlayView: View {
             soul = SoulStore.cachedMetadata
         }
         .statusBarHidden(true)
-        .persistentSystemOverlays(.hidden)
+        .compatPersistentSystemOverlays(.hidden)
     }
 
     private var content: some View {
