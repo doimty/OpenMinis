@@ -632,6 +632,7 @@ struct ChatTrailingMenuButton: UIViewRepresentable {
     /// icon-sized footprint and the system wraps it in the same round glass
     /// as a plain toolbar icon (a representable otherwise accepts the full
     /// proposed width -> stretched capsule, the 2026-07-17 regression).
+    @available(iOS 16.0, *)
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIButton, context: Context) -> CGSize? {
         uiView.intrinsicContentSize
     }
@@ -944,6 +945,7 @@ struct ChatNavMenuBarItemInstaller: UIViewRepresentable {
         return view
     }
 
+    @available(iOS 16.0, *)
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: AnchorView, context: Context) -> CGSize? {
         .zero
     }
