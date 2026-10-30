@@ -500,7 +500,7 @@ struct AppearanceSettingsView: View {
                             if appLanguage == lang.id {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.blue)
-                                    .fontWeight(.semibold)
+                                    .font(.body.weight(.semibold))
                             }
                         }
                     }

@@ -416,11 +416,16 @@ final class EnvVarStore: ObservableObject {
 
     // MARK: - Validation
 
-    /// Valid env var name: starts with a letter, contains only letters, digits, and underscores.
-    static let keyRegex = /^[A-Za-z][A-Za-z0-9_]*$/
-
+    /// Valid env var name: starts with an ASCII letter, then ASCII letters, digits, or underscores.
     static func isValidKey(_ key: String) -> Bool {
-        key.wholeMatch(of: keyRegex) != nil
+        let scalars = key.unicodeScalars
+        guard let first = scalars.first,
+              (65...90).contains(first.value) || (97...122).contains(first.value) else { return false }
+        return scalars.dropFirst().allSatisfy { scalar in
+            let value = scalar.value
+            return (65...90).contains(value) || (97...122).contains(value)
+                || (48...57).contains(value) || value == 95
+        }
     }
 
     // MARK: - Value Sanitization

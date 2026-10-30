@@ -60,12 +60,10 @@ struct MemoryManagementView: View {
         .navigationTitle("Memory")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // The iOS 17 check lives in `showsForceSync`, not here: an
-            // `if #available` inside a ToolbarContentBuilder needs
-            // buildLimitedAvailability, which the Xcode 27.1 SDK marks iOS
-            // 17.5+, so it no longer compiles for the 16.0 target.
-            if showsForceSync {
-                ToolbarItem(placement: .topBarTrailing) {
+            // Keep the conditional inside ToolbarItem's ViewBuilder; the outer
+            // ToolbarContentBuilder.buildIf is unavailable at the iOS 15 floor.
+            ToolbarItem(placement: .topBarTrailing) {
+                if showsForceSync {
                     Menu {
                         Button {
                             if #available(iOS 17.0, *) {
