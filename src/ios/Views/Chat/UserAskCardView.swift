@@ -1374,7 +1374,7 @@ private struct UserAskInputSheet: View {
     @State private var savedVoiceExpanded: Bool?
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(alignment: .leading, spacing: 12) {
                 Text(question)
                     .font(.system(size: t.resolvedDetail))

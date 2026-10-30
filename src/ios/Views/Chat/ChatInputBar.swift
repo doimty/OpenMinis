@@ -558,7 +558,7 @@ struct PastedTextChipRow: View {
             .padding(.trailing, 4)
         }
         .sheet(item: $previewEntry) { entry in
-            NavigationStack {
+            CompatNavigationStack {
                 ScrollView {
                     // Read-only by construction: selectable text (copyable),
                     // deliberately NOT a TextEditor.
@@ -609,7 +609,7 @@ struct AttachmentPreviewSheet: View {
     var body: some View {
         let start = Self.previewStartIndex(of: initialID, in: attachments.map(\.id))
         let shown = index ?? start
-        NavigationStack {
+        CompatNavigationStack {
             AttachmentPreviewView(urls: attachments.map(\.cacheURL), initialIndex: start,
                                   onIndexChange: { index = $0 })
                 .navigationTitle(attachments.indices.contains(shown) ? attachments[shown].fileName : "")
@@ -671,6 +671,7 @@ private struct AttachmentPreviewView: UIViewControllerRepresentable {
 
 // MARK: - Video File Transferable (for PhotosPicker video export)
 
+@available(iOS 16.0, *)
 struct VideoFileTransferable: Transferable {
     let url: URL
 
