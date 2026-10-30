@@ -547,7 +547,7 @@ struct SelectableMarkdownView: UIViewRepresentable {
         let imageMatches = MarkdownStripper.imageSyntaxMatches(in: markdown)
         if !imageMatches.isEmpty {
             for match in imageMatches {
-                let matchStr = String(markdown[match])
+                let matchStr = match
                 imgLogger.info("[MinisImage][StreamParse] image markdown found: \(matchStr)")
             }
             let imageBlockCount = content.blocks.flatMap { Self.collectImageNodes(from: $0) }.count

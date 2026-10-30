@@ -402,10 +402,26 @@ extension AIChatViewModel {
         return raw
     }
 
-    /// Persistent storage directory for a specific session's workspace.
-    nonisolated static func minisWorkspacePersistentDir(for sid: String) -> URL {
+    /// Persistent storage directory shared by every conversation's
+    /// `/var/minis/workspace`. It lives below the shared-files root so it
+    /// survives new-session creation and is included in the existing Shared
+    /// Files backup/FileProvider tree.
+    nonisolated static var minisGlobalWorkspacePersistentDir: URL {
+        minisSharedPersistentDir.appendingPathComponent("workspace", isDirectory: true)
+    }
+
+    /// Legacy per-session workspace location. Kept for one-way migration and
+    /// for old on-disk data; new reads/writes use the global workspace.
+    nonisolated static func minisLegacyWorkspacePersistentDir(for sid: String) -> URL {
         minisPersistentBase.appendingPathComponent(sid, isDirectory: true)
             .appendingPathComponent("workspace", isDirectory: true)
+    }
+
+    /// Persistent workspace exposed at `/var/minis/workspace`. The workspace
+    /// is intentionally global: every conversation sees the same files.
+    nonisolated static func minisWorkspacePersistentDir(for sid: String) -> URL {
+        _ = sid
+        return minisGlobalWorkspacePersistentDir
     }
 
     /// Persistent storage directory for a specific session's browser snapshots.
