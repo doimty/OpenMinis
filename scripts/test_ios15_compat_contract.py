@@ -252,6 +252,23 @@ class CompatibilityContractTests(unittest.TestCase):
                 self.assertIn(".compatScrollDismissesKeyboardImmediately()", view)
                 self.assertNotIn(".compatScrollDismissesKeyboardInteractively()", view)
 
+    def test_compat_shims_localize_string_titles(self):
+        """A String-taking shim must not render its title with bare verbatim.
+
+        A string literal binds to the `StringProtocol` overload rather than to
+        the `LocalizedStringKey` one, so `Text(verbatim: String(title))` showed
+        the raw English key in a Chinese UI even though the catalog had the
+        entry (T-compat-verbatim-drops-localization).
+        """
+        compat = COMPAT.read_text(encoding="utf-8")
+        self.assertNotIn("Text(verbatim: String(title))", compat)
+        self.assertIn("AppLocalizedDynamic(String(title))", compat)
+        self.assertEqual(compat.count("AppLocalizedDynamic(String(title))"), 3)
+        localization = (ROOT / "src/ios/Shared/AppLocalization.swift").read_text(encoding="utf-8")
+        helper = localization.split("func AppLocalizedDynamic(", 1)[1].split("\n}", 1)[0]
+        self.assertIn("LocalizedStringCache.lookup", helper)
+        self.assertIn("String(localized: String.LocalizationValue(key)", helper)
+
     def test_chat_toolbar_condition_and_popup_indicators_are_ios15_safe(self):
         host = (ROOT / "src/ios/Views/Chat/AIChatView/Toolbar/ChatToolbarHost.swift").read_text(encoding="utf-8")
         toolbar = host.split("private var toolbarHost: some View {", 1)[1]

@@ -97,6 +97,26 @@ func AppLocalized(_ key: StaticString, comment: StaticString? = nil) -> String {
     return value
 }
 
+/// [T-compat-verbatim-drops-localization] Localize a key that only exists as a
+/// `String` value rather than a literal.
+///
+/// `Text("…")` localizes because the literal binds to `LocalizedStringKey`. A
+/// compat shim that takes `String`/`StringProtocol` and renders
+/// `Text(verbatim:)` bypasses that lookup entirely — so
+/// `CompatLabeledContent("Total Input (incl. Cache)", …)` stayed English in a
+/// Chinese UI even though the catalog had the entry. Such shims must resolve
+/// the string here instead of trusting `verbatim`.
+///
+/// Safe for non-keys: an unknown key resolves to itself, so passing an
+/// already-localized string or a model name is a no-op.
+func AppLocalizedDynamic(_ key: String) -> String {
+    let bundle = AppBundle.current
+    if let hit = LocalizedStringCache.lookup(key, bundle: bundle) { return hit }
+    let value = String(localized: String.LocalizationValue(key), bundle: bundle)
+    LocalizedStringCache.store(value, for: key, bundle: bundle)
+    return value
+}
+
 /// [T-composer-typing-lag] Process-wide memo for `AppLocalized`, keyed by the
 /// localization key and scoped to the bundle it was resolved from, so an
 /// in-app language switch (a different `.lproj` bundle) starts a fresh table.

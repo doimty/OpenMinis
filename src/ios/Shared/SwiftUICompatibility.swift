@@ -58,7 +58,10 @@ extension CompatLabeledContent where Label == Text {
     }
 
     init<S: StringProtocol>(_ title: S, @ViewBuilder content: () -> Content) {
-        self.label = Text(verbatim: String(title))
+        // A string literal binds here rather than to the LocalizedStringKey
+        // overload, so `verbatim` dropped localization entirely
+        // (T-compat-verbatim-drops-localization). Resolve the key at runtime.
+        self.label = Text(verbatim: AppLocalizedDynamic(String(title)))
         self.content = content()
         self.combinesAccessibility = false
     }
@@ -72,7 +75,7 @@ extension CompatLabeledContent where Content == Text, Label == Text {
     }
 
     init<S: StringProtocol>(_ title: S, value: String) {
-        self.label = Text(verbatim: String(title))
+        self.label = Text(verbatim: AppLocalizedDynamic(String(title)))
         self.content = Text(verbatim: value)
         self.combinesAccessibility = true
     }
@@ -113,7 +116,7 @@ struct CompatMultilineTextField: View {
 
     init<S: StringProtocol>(_ title: S, text: Binding<String>, lineLimit: ClosedRange<Int>? = nil) {
         self._text = text
-        self.label = Text(verbatim: String(title))
+        self.label = Text(verbatim: AppLocalizedDynamic(String(title)))
         self.lineLimit = lineLimit
     }
 

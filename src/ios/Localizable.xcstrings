@@ -29748,6 +29748,23 @@
         }
       }
     },
+    "Limited by the current model-group cap" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limited by the current model-group cap"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受当前模型组上限限制"
+          }
+        }
+      }
+    },
     "Load All" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -41949,6 +41966,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "處理時間"
+          }
+        }
+      }
+    },
+    "Resolved from the current model" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resolved from the current model"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按当前模型计算"
           }
         }
       }
