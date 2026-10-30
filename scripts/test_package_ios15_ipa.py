@@ -110,7 +110,8 @@ class ResolveAndValidateTests(unittest.TestCase):
 
 
 class NativeFloorAuditTests(unittest.TestCase):
-    def audit_fixture(self, minimum="15.0", architectures="arm64", platform="2", *, plist_minimum=None):
+    def audit_fixture(self, minimum="15.0", architectures="arm64", platform="2", *,
+                      plist_minimum=None, framework_magic=None, framework_architectures=None):
         with tempfile.TemporaryDirectory() as tmp:
             app = Path(tmp) / "Minis.app"
             write_plist(app / "Info.plist", {"CFBundleExecutable": "Minis", "MinimumOSVersion": "15.0"})
@@ -119,7 +120,7 @@ class NativeFloorAuditTests(unittest.TestCase):
             framework = app / "Frameworks/RealTimeCutVADCXXLibrary.framework"
             framework.mkdir(parents=True)
             binary = framework / "RealTimeCutVADCXXLibrary"
-            binary.write_bytes(header(6))
+            binary.write_bytes(framework_magic + bytes(28) if framework_magic else header(6))
             # SPM object files are not runtime images and must not fail the audit.
             (app / "Metadata.o").write_bytes(header(1))
             if plist_minimum is not None:
@@ -129,6 +130,8 @@ class NativeFloorAuditTests(unittest.TestCase):
 
             def run(command, **kwargs):
                 text = architectures if command[1] == "lipo" else output
+                if command[1] == "lipo" and command[-1] == str(binary) and framework_architectures is not None:
+                    text = framework_architectures
                 return subprocess.CompletedProcess(command, 0, stdout=text, stderr="")
 
             with patch("package_ios15_ipa.sys.platform", "darwin"), \
@@ -153,6 +156,18 @@ class NativeFloorAuditTests(unittest.TestCase):
     def test_fat_or_wrong_arch_is_rejected(self):
         with self.assertRaisesRegex(PackageError, "expected arm64 only"):
             self.audit_fixture(architectures="arm64 x86_64")
+
+    def test_fat64_framework_is_included_when_arm64_is_valid(self):
+        for magic in (b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca"):
+            with self.subTest(magic=magic):
+                result = self.audit_fixture(framework_magic=magic)
+                self.assertEqual(len(result), 2)
+                self.assertTrue(any("RealTimeCutVADCXXLibrary" in item["path"] for item in result))
+
+    def test_fat64_framework_cannot_bypass_architecture_audit(self):
+        for magic in (b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca"):
+            with self.subTest(magic=magic), self.assertRaisesRegex(PackageError, "expected arm64 only"):
+                self.audit_fixture(framework_magic=magic, framework_architectures="arm64 x86_64")
 
     def test_simulator_platform_is_rejected(self):
         with self.assertRaisesRegex(PackageError, "platform"):
