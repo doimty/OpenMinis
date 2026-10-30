@@ -85,6 +85,7 @@ enum ChatPDFExporter {
         case .readImageTool: name = "read_image"
         case .memoryTool(let action): name = action
         case .delegateTool: name = "delegate_task"
+        case .userAskTool: name = UserAskTool.name
         case .text, .thinking, .info: name = "tool"
         }
         let flat = block.content

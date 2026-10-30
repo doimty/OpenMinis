@@ -3716,7 +3716,6 @@
 				15C0CE57332DB7DB4B16F252 /* ISHCommandLifecycle.swift in Sources */,
 				15C02A42052C5974CA210DE6 /* ISHTerminalShellLifecycle.swift in Sources */,
 				15C0809AAE2D3FF85A701CB0 /* ToolGroupObserver.swift in Sources */,
-				15C03CC0ED7FA4C9BEE9BE2B /* ToolGroupProjection.swift in Sources */,
 				15C03162AB036689046CB78D /* BalanceLookup.swift in Sources */,
 				15C0CAAC31A7C6D0A40437FA /* BalanceService.swift in Sources */,
 				15C013E731A0B436E4295D46 /* ResponsesToolArguments.swift in Sources */,

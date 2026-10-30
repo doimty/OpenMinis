@@ -66,22 +66,6 @@ struct CompatPhotoPickerItem: Equatable, @unchecked Sendable {
     }
 }
 
-@available(iOS 16.0, *)
-struct VideoFileTransferable: Transferable, @unchecked Sendable {
-    let url: URL
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(contentType: .movie) { video in
-            SentTransferredFile(video.url)
-        } importing: { received in
-            let owned = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString + "_" + received.file.lastPathComponent)
-            try FileManager.default.copyItem(at: received.file, to: owned)
-            return Self(url: owned)
-        }
-    }
-}
-
 extension View {
     @ViewBuilder
     func compatPhotosPicker(isPresented: Binding<Bool>, selection: Binding<[CompatPhotoPickerItem]>,

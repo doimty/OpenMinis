@@ -43,6 +43,24 @@ enum MessageListItem: Hashable {
     }
 }
 
+// REENTRY-DIAG-BEGIN
+#if DEBUG
+/// Read-only ancestor IDs; never force layout or query intrinsic sizes.
+@MainActor
+func reentryDiagnosticContext(_ view: UIView) -> (cell: SelfSizingCell?, collection: UICollectionView?) {
+    var cell: SelfSizingCell?
+    var cursor: UIView? = view
+    for _ in 0..<64 {
+        guard let current = cursor else { break }
+        if let match = current as? SelfSizingCell { cell = match }
+        if let collection = current as? UICollectionView { return (cell, collection) }
+        cursor = current.superview
+    }
+    return (cell, nil)
+}
+#endif
+// REENTRY-DIAG-END
+
 
 // MARK: - Self-Sizing Cell
 
