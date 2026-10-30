@@ -160,6 +160,30 @@ class NativeFloorAuditTests(unittest.TestCase):
 
 
 class PackageTests(unittest.TestCase):
+    def test_signed_package_fails_before_codesign_when_native_floor_is_high(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source")
+            with patch("package_ios15_ipa.audit_staged_native_floor", side_effect=PackageError("VAD minimum 15.6")), \
+                 patch("package_ios15_ipa.adhoc_sign") as signer:
+                with self.assertRaisesRegex(PackageError, "VAD minimum 15.6"):
+                    package_app(app, root / "out")
+                signer.assert_not_called()
+            self.assertFalse(list((root / "out").glob("*.ipa")))
+
+    def test_signed_package_records_native_floor_before_codesign(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source")
+            evidence = [{"path": "Minis", "arch": "arm64", "minimum_os": "15.0"}]
+            with patch("package_ios15_ipa.audit_staged_native_floor", return_value=evidence) as auditor, \
+                 patch("package_ios15_ipa.adhoc_sign") as signer:
+                manifest = package_app(app, root / "out")
+            self.assertEqual(manifest["native_floor_audit"], evidence)
+            self.assertTrue(manifest["signed"])
+            auditor.assert_called_once()
+            signer.assert_called_once()
+
     def test_missing_app_directory_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(PackageError):
