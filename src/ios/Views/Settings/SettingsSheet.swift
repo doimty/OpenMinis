@@ -48,387 +48,414 @@ struct SettingsSheet: View {
 
     var body: some View {
         CompatPathNavigationStack(path: $navPath) {
-            List {
-                Section {
-                    NavigationLink {
-                        ProviderInstancesView()
-                    } label: {
-                        if #available(iOS 26, *) {
-                            Label("Manage Providers", systemImage: CompatSystemSymbol.name("key.circle.fill"))
-                        } else {
-                            Label("Manage Providers", systemImage: "lock.circle.fill")
-                        }
-                    }
-
-                    NavigationLink {
-                        ModelGroupsView()
-                    } label: {
-                        Label("Model Groups", systemImage: "gearshape.circle.fill")
-                    }
-
-                    NavigationLink {
-                        UsageStatsView()
-                    } label: {
-                        Label("Token Usage", systemImage: "chart.line.uptrend.xyaxis.circle.fill")
-                    }
-                } header: {
-                    Text("LLM Providers")
-                } footer: {
-                    Text("Configure which models the agent uses, manage API keys & OAuth for each provider, and create model groups for fallback or load balancing.")
-                }
-
-                Section("Appearance") {
-                    NavigationLink {
-                        AppearanceSettingsView()
-                    } label: {
-                        Label {
-                            Text("Appearance")
-                        } icon: {
-                            Image(systemName: "paintbrush.fill")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.indigo, in: Circle())
-                        }
-                    }
-                }
-
-                Section("Agent Runtime") {
-                    NavigationLink {
-                        AutoCompactionSettingsView()
-                    } label: {
-                        Label {
-                            Text(AppLocalized("Auto Compaction"))
-                        } icon: {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                        }
-                    }
-                    // [T-tools-granular-switches] First row: per-tool switches.
-                    NavigationLink {
-                        ToolsSettingsView()
-                    } label: {
-                        Label {
-                            Text(AppLocalized("Agent Tools"))
-                        } icon: {
-                            Image(systemName: "wrench.and.screwdriver.fill")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.indigo, in: Circle())
-                        }
-                    }
-                    // [T-sub-agents-v1] Directly under Agent Tools: the two pages
-                    // are the tool surface (which tools exist) and the delegation
-                    // surface (who runs a delegated task), so they read as a pair.
-                    NavigationLink {
-                        HelperSettingsView()
-                    } label: {
-                        Label {
-                            Text(AppLocalized("Sub Agents"))
-                        } icon: {
-                            // [T-agent-icon] Same violet and glyph the agent block
-                            // and tool sheet use in chat, so the settings row reads
-                            // as the same feature. `glyph` is the bare figure pair
-                            // meant for a caller that already draws the disc — the
-                            // wider person.2.wave.2 reached the edge of the 21pt
-                            // circle at this section's icon size.
-                            Image(systemName: CompatSystemSymbol.name(HelperAccent.glyph))
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(HelperAccent.color, in: Circle())
-                        }
-                    }
-                    NavigationLink {
-                        SkillsManagementView()
-                    } label: {
-                        Label {
-                            Text("Skills")
-                        } icon: {
-                            Image(systemName: "puzzlepiece.extension")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.blue, in: Circle())
-                        }
-                    }
-                    NavigationLink {
-                        SoulSettingsView()
-                    } label: {
-                        Label {
-                            Text("Soul")
-                        } icon: {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.pink, in: Circle())
-                        }
-                    }
-                    NavigationLink {
-                        MemoryManagementView()
-                    } label: {
-                        Label {
-                            Text("Memory")
-                        } icon: {
-                            Image(systemName: "brain.head.profile")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.purple, in: Circle())
-                        }
-                    }
-                    NavigationLink {
-                        MCPIntegrationsView()
-                    } label: {
-                        Label {
-                            Text("MCP Integrations")
-                        } icon: {
-                            Image(systemName: "square.stack.3d.up")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.teal, in: Circle())
-                        }
-                    }
-                    NavigationLink {
-                        EnvironmentVariablesView()
-                    } label: {
-                        Label {
-                            Text("Environment Variables")
-                        } icon: {
-                            Image(systemName: "terminal")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.green, in: Circle())
-                        }
-                    }
-                }
-
-                Section("Storage") {
-                    NavigationLink {
-                        StorageManagementView()
-                    } label: {
-                        Label {
-                            Text("Storage")
-                        } icon: {
-                            Image(systemName: "archivebox")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.blue, in: Circle())
-                        }
-                    }
-                    NavigationLink {
-                        SharedFoldersSettingsView()
-                    } label: {
-                        Label {
-                            Text("Shared Folders")
-                        } icon: {
-                            Image(systemName: "folder.fill.badge.person.crop")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.green, in: Circle())
-                        }
-                    }
-                    NavigationLink {
-                        MountedFoldersSettingsView()
-                    } label: {
-                        Label {
-                            Text("Mount External Folders")
-                        } icon: {
-                            Image(systemName: "externaldrive.badge.plus")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.orange, in: Circle())
-                        }
-                    }
-                    if #available(iOS 17.0, *) {
-                        NavigationLink {
-                            // v2 is the default sync engine; legacy v1
-                            // settings page is unreachable from here.
-                            CloudSyncSettingsV2View()
-                        } label: {
-                            Label {
-                                Text("iCloud Sync")
-                            } icon: {
-                                Image(systemName: "icloud")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 21, height: 21)
-                                    .background(.cyan, in: Circle())
-                            }
-                        }
-                    }
-                    NavigationLink {
-                        BackupAndRestoreView()
-                    } label: {
-                        Label {
-                            // Not just "Backup": this screen is both halves of
-                            // the feature, and on a new device restore is the
-                            // only one the user is looking for.
-                            Text("Backup & Restore")
-                        } icon: {
-                            // arrow.triangle.2.circlepath reads as a round trip
-                            // rather than a one-way export.
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.indigo, in: Circle())
-                        }
-                    }
-                }
-
-                Section("Permissions") {
-                    NavigationLink {
-                        OffloadPermissionSettingsView()
-                    } label: {
-                        Label {
-                            Text("Permissions")
-                        } icon: {
-                            Image(systemName: "lock.shield")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.red, in: Circle())
-                        }
-                    }
-                    if BiometricAuth.isAvailable {
-                        NavigationLink {
-                            FaceIDProtectionSettingsView()
-                        } label: {
-                            Label {
-                                Text("\(BiometricAuth.biometryDisplayName) Protection")
-                            } icon: {
-                                // Match SF Symbol to the device's actual sensor — Touch ID
-                                // devices showed a Face ID glyph here before.
-                                Image(systemName: CompatSystemSymbol.name(BiometricAuth.biometryIconName))
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 21, height: 21)
-                                    .background(.teal, in: Circle())
-                            }
-                        }
-                    }
-                }
-
-                Section("Logs") {
-                    NavigationLink {
-                        LogManagementView()
-                    } label: {
-                        Label {
-                            Text("Logs")
-                        } icon: {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.gray, in: Circle())
-                        }
-                    }
-                }
-
-                Section("About") {
-                    NavigationLink {
-                        AboutView()
-                    } label: {
-                        Label {
-                            Text("About Minis")
-                        } icon: {
-                            Image(systemName: "info")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.indigo, in: Circle())
-                        }
-                    }
-                    Link(destination: URL(string: "https://openminis.github.io/privacy-policy.html")!) {
-                        Label {
-                            Text("Privacy Policy")
-                        } icon: {
-                            Image(systemName: "hand.raised")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.teal, in: Circle())
-                        }
-                    }
-                    Button {
-                        showFeedbackDialog = true
-                    } label: {
-                        Label {
-                            Text("Feedback")
-                        } icon: {
-                            Image(systemName: "bubble.left.and.bubble.right.fill")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white)
-                                .frame(width: 21, height: 21)
-                                .background(.indigo, in: Circle())
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                    .confirmationDialog("Feedback", isPresented: $showFeedbackDialog, titleVisibility: .visible) {
-                        Button("Report a Bug (GitHub)") {
-                            if let url = Self.makeBugReportURL() { UIApplication.shared.open(url) }
-                        }
-                        Button("Feedback (Telegram)") {
-                            if let url = URL(string: "https://t.me/+2NzhOJuzRyI1YmM1") { UIApplication.shared.open(url) }
-                        }
-                        Button("Feedback (Email)") {
-                            if let url = Self.makeFeedbackEmailURL() { UIApplication.shared.open(url) }
-                        }
-                        Button("Cancel", role: .cancel) {}
-                    }
-                }
-
-            } destination: { dest in
-                settingsDestination(for: dest)
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            .onAppear {
-                applyPendingDeepLink()
-                // Legacy flags — kept so older call sites keep working.
-                if deepLink.showEnvironmentVariables {
-                    navPath.append(SettingsDestination.environments)
-                    deepLink.showEnvironmentVariables = false
-                }
-                if deepLink.showPermissions {
-                    navPath.append(SettingsDestination.permissions)
-                    deepLink.showPermissions = false
-                }
-                // Restore the user's location after a language-change rebuild.
-                // AppearanceSettingsView's language picker writes this flag
-                // right before flipping `appLanguage`, knowing the root
-                // `.id(appLanguage)` will tear the whole tree down. ContentView
-                // re-opens the sheet on re-mount; here we push back to the
-                // destination so the user lands where they were, now rendered
-                // in the new language.
-                if let dest = UserDefaults.standard.string(forKey: "pendingSettingsReopen") {
-                    UserDefaults.standard.removeObject(forKey: "pendingSettingsReopen")
-                    switch dest {
-                    case "appearance":
-                        navPath.append(SettingsDestination.appearance)
-                    default:
-                        break
-                    }
-                }
-            }
-            .onChange(of: deepLink.pendingSettingsTarget) { _ in
-                applyPendingDeepLink()
-            }
+            settingsRoot
+        } destination: { dest in
+            settingsDestination(for: dest)
         }
         .preferredColorScheme(appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : nil)
         .appFontScale()
+    }
+
+    private var settingsRoot: some View {
+        List {
+            providerSection
+            appearanceSection
+            agentRuntimeSection
+            storageSection
+            permissionsSection
+            logsSection
+            aboutSection
+        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") { dismiss() }
+            }
+        }
+        .onAppear { handleSettingsAppearance() }
+        .onChange(of: deepLink.pendingSettingsTarget) { _ in
+            applyPendingDeepLink()
+        }
+    }
+
+    private var providerSection: some View {
+        Section {
+            NavigationLink {
+                ProviderInstancesView()
+            } label: {
+                if #available(iOS 26, *) {
+                    Label("Manage Providers", systemImage: CompatSystemSymbol.name("key.circle.fill"))
+                } else {
+                    Label("Manage Providers", systemImage: "lock.circle.fill")
+                }
+            }
+
+            NavigationLink {
+                ModelGroupsView()
+            } label: {
+                Label("Model Groups", systemImage: "gearshape.circle.fill")
+            }
+
+            NavigationLink {
+                UsageStatsView()
+            } label: {
+                Label("Token Usage", systemImage: "chart.line.uptrend.xyaxis.circle.fill")
+            }
+        } header: {
+            Text("LLM Providers")
+        } footer: {
+            Text("Configure which models the agent uses, manage API keys & OAuth for each provider, and create model groups for fallback or load balancing.")
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section("Appearance") {
+            NavigationLink {
+                AppearanceSettingsView()
+            } label: {
+                Label {
+                    Text("Appearance")
+                } icon: {
+                    Image(systemName: "paintbrush.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.indigo, in: Circle())
+                }
+            }
+        }
+    }
+
+    private var agentRuntimeSection: some View {
+        Section("Agent Runtime") {
+            NavigationLink {
+                AutoCompactionSettingsView()
+            } label: {
+                Label {
+                    Text(AppLocalized("Auto Compaction"))
+                } icon: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+            }
+            // [T-tools-granular-switches] First row: per-tool switches.
+            NavigationLink {
+                ToolsSettingsView()
+            } label: {
+                Label {
+                    Text(AppLocalized("Agent Tools"))
+                } icon: {
+                    Image(systemName: "wrench.and.screwdriver.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.indigo, in: Circle())
+                }
+            }
+            // [T-sub-agents-v1] Directly under Agent Tools: the two pages
+            // are the tool surface (which tools exist) and the delegation
+            // surface (who runs a delegated task), so they read as a pair.
+            NavigationLink {
+                HelperSettingsView()
+            } label: {
+                Label {
+                    Text(AppLocalized("Sub Agents"))
+                } icon: {
+                    // [T-agent-icon] Same violet and glyph the agent block
+                    // and tool sheet use in chat, so the settings row reads
+                    // as the same feature. `glyph` is the bare figure pair
+                    // meant for a caller that already draws the disc — the
+                    // wider person.2.wave.2 reached the edge of the 21pt
+                    // circle at this section's icon size.
+                    Image(systemName: CompatSystemSymbol.name(HelperAccent.glyph))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(HelperAccent.color, in: Circle())
+                }
+            }
+            NavigationLink {
+                SkillsManagementView()
+            } label: {
+                Label {
+                    Text("Skills")
+                } icon: {
+                    Image(systemName: "puzzlepiece.extension")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.blue, in: Circle())
+                }
+            }
+            NavigationLink {
+                SoulSettingsView()
+            } label: {
+                Label {
+                    Text("Soul")
+                } icon: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.pink, in: Circle())
+                }
+            }
+            NavigationLink {
+                MemoryManagementView()
+            } label: {
+                Label {
+                    Text("Memory")
+                } icon: {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.purple, in: Circle())
+                }
+            }
+            NavigationLink {
+                MCPIntegrationsView()
+            } label: {
+                Label {
+                    Text("MCP Integrations")
+                } icon: {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.teal, in: Circle())
+                }
+            }
+            NavigationLink {
+                EnvironmentVariablesView()
+            } label: {
+                Label {
+                    Text("Environment Variables")
+                } icon: {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.green, in: Circle())
+                }
+            }
+        }
+    }
+
+    private var storageSection: some View {
+        Section("Storage") {
+            NavigationLink {
+                StorageManagementView()
+            } label: {
+                Label {
+                    Text("Storage")
+                } icon: {
+                    Image(systemName: "archivebox")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.blue, in: Circle())
+                }
+            }
+            NavigationLink {
+                SharedFoldersSettingsView()
+            } label: {
+                Label {
+                    Text("Shared Folders")
+                } icon: {
+                    Image(systemName: "folder.fill.badge.person.crop")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.green, in: Circle())
+                }
+            }
+            NavigationLink {
+                MountedFoldersSettingsView()
+            } label: {
+                Label {
+                    Text("Mount External Folders")
+                } icon: {
+                    Image(systemName: "externaldrive.badge.plus")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.orange, in: Circle())
+                }
+            }
+            if #available(iOS 17.0, *) {
+                NavigationLink {
+                    // v2 is the default sync engine; legacy v1
+                    // settings page is unreachable from here.
+                    CloudSyncSettingsV2View()
+                } label: {
+                    Label {
+                        Text("iCloud Sync")
+                    } icon: {
+                        Image(systemName: "icloud")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.white)
+                            .frame(width: 21, height: 21)
+                            .background(.cyan, in: Circle())
+                    }
+                }
+            }
+            NavigationLink {
+                BackupAndRestoreView()
+            } label: {
+                Label {
+                    // Not just "Backup": this screen is both halves of
+                    // the feature, and on a new device restore is the
+                    // only one the user is looking for.
+                    Text("Backup & Restore")
+                } icon: {
+                    // arrow.triangle.2.circlepath reads as a round trip
+                    // rather than a one-way export.
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.indigo, in: Circle())
+                }
+            }
+        }
+    }
+
+    private var permissionsSection: some View {
+        Section("Permissions") {
+            NavigationLink {
+                OffloadPermissionSettingsView()
+            } label: {
+                Label {
+                    Text("Permissions")
+                } icon: {
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.red, in: Circle())
+                }
+            }
+            if BiometricAuth.isAvailable {
+                NavigationLink {
+                    FaceIDProtectionSettingsView()
+                } label: {
+                    Label {
+                        Text("\(BiometricAuth.biometryDisplayName) Protection")
+                    } icon: {
+                        // Match SF Symbol to the device's actual sensor — Touch ID
+                        // devices showed a Face ID glyph here before.
+                        Image(systemName: CompatSystemSymbol.name(BiometricAuth.biometryIconName))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white)
+                            .frame(width: 21, height: 21)
+                            .background(.teal, in: Circle())
+                    }
+                }
+            }
+        }
+    }
+
+    private var logsSection: some View {
+        Section("Logs") {
+            NavigationLink {
+                LogManagementView()
+            } label: {
+                Label {
+                    Text("Logs")
+                } icon: {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.gray, in: Circle())
+                }
+            }
+        }
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            NavigationLink {
+                AboutView()
+            } label: {
+                Label {
+                    Text("About Minis")
+                } icon: {
+                    Image(systemName: "info")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.indigo, in: Circle())
+                }
+            }
+            Link(destination: URL(string: "https://openminis.github.io/privacy-policy.html")!) {
+                Label {
+                    Text("Privacy Policy")
+                } icon: {
+                    Image(systemName: "hand.raised")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.teal, in: Circle())
+                }
+            }
+            Button {
+                showFeedbackDialog = true
+            } label: {
+                Label {
+                    Text("Feedback")
+                } icon: {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.indigo, in: Circle())
+                }
+            }
+            .foregroundStyle(.primary)
+            .confirmationDialog("Feedback", isPresented: $showFeedbackDialog, titleVisibility: .visible) {
+                Button("Report a Bug (GitHub)") {
+                    if let url = Self.makeBugReportURL() { UIApplication.shared.open(url) }
+                }
+                Button("Feedback (Telegram)") {
+                    if let url = URL(string: "https://t.me/+2NzhOJuzRyI1YmM1") { UIApplication.shared.open(url) }
+                }
+                Button("Feedback (Email)") {
+                    if let url = Self.makeFeedbackEmailURL() { UIApplication.shared.open(url) }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        }
+    }
+
+    private func handleSettingsAppearance() {
+        applyPendingDeepLink()
+        // Legacy flags — kept so older call sites keep working.
+        if deepLink.showEnvironmentVariables {
+            navPath.append(SettingsDestination.environments)
+            deepLink.showEnvironmentVariables = false
+        }
+        if deepLink.showPermissions {
+            navPath.append(SettingsDestination.permissions)
+            deepLink.showPermissions = false
+        }
+        // Restore the user's location after a language-change rebuild.
+        // AppearanceSettingsView's language picker writes this flag
+        // right before flipping `appLanguage`, knowing the root
+        // `.id(appLanguage)` will tear the whole tree down. ContentView
+        // re-opens the sheet on re-mount; here we push back to the
+        // destination so the user lands where they were, now rendered
+        // in the new language.
+        if let dest = UserDefaults.standard.string(forKey: "pendingSettingsReopen") {
+            UserDefaults.standard.removeObject(forKey: "pendingSettingsReopen")
+            switch dest {
+            case "appearance":
+                navPath.append(SettingsDestination.appearance)
+            default:
+                break
+            }
+        }
     }
 
     @ViewBuilder

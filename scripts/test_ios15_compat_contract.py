@@ -229,6 +229,30 @@ class CompatibilityContractTests(unittest.TestCase):
         self.assertIn("bounds.width.isFinite", source)
         self.assertIn("sizeThatFits(CGSize(width: bounds.width", source)
 
+    def test_settings_navigation_uses_compat_stack_and_sectioned_root(self):
+        source = (ROOT / "src/ios/Views/Settings/SettingsSheet.swift").read_text(encoding="utf-8")
+        self.assertRegex(
+            source,
+            r"CompatPathNavigationStack\(path: \$navPath\)\s*\{\s*settingsRoot\s*\}"
+            r"\s*destination:\s*\{\s*dest in\s*settingsDestination\(for: dest\)\s*\}",
+            "the destination belongs to the navigation stack, not its List",
+        )
+        self.assertIn("@State private var navPath: [SettingsDestination] = []", source)
+        root = source.split("private var settingsRoot: some View {", 1)[1]
+        root = root.split("private var providerSection: some View {", 1)[0]
+        sections = ("providerSection", "appearanceSection", "agentRuntimeSection",
+                    "storageSection", "permissionsSection", "logsSection", "aboutSection")
+        positions = [root.index(section) for section in sections]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn('.navigationTitle("Settings")', root)
+        self.assertIn(".onAppear { handleSettingsAppearance() }", root)
+        self.assertIn(".onChange(of: deepLink.pendingSettingsTarget)", root)
+        appearance = source.split("private func handleSettingsAppearance() {", 1)[1]
+        appearance = appearance.split("private func settingsDestination", 1)[0]
+        for value in ("applyPendingDeepLink()", "deepLink.showEnvironmentVariables",
+                      "deepLink.showPermissions", '"pendingSettingsReopen"'):
+            self.assertIn(value, appearance)
+
     def test_ios15_chat_geometry_detector_red_and_green(self):
         detector = ROOT / "scripts/check_ios15_chat_geometry.py"
         self.assertTrue(detector.exists(), "geometry replay detector must exist")
