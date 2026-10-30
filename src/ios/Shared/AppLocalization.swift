@@ -140,3 +140,17 @@ func AppLocalized(resource: LocalizedStringResource) -> String {
     // pretending the override applies.
     String(localized: resource)
 }
+
+extension Locale {
+    /// iOS 16 moved the language code onto `language.languageCode`; keep the
+    /// 15-compatible spelling for the speech/voice catalogs.
+    var compatLanguageCode: String? {
+        if #available(iOS 16.0, *) { return language.languageCode?.identifier }
+        return languageCode
+    }
+
+    var compatRegionCode: String? {
+        if #available(iOS 16.0, *) { return region?.identifier }
+        return regionCode
+    }
+}
