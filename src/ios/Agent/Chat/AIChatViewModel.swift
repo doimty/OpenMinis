@@ -1315,6 +1315,10 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     var skipCompactCheck = false
     /// When false, memory_write tool calls are skipped (returns "Memory disabled") in this session.
     @Published var memoryEnabled = true
+    /// When false, the recent daily-log fragment is omitted from the system
+    /// prompt. Global memory (GLOBAL.md) still injects while memoryEnabled.
+    /// [GH#357] Keeps the prompt prefix byte-stable for prompt caching.
+    @Published var memoryDailyInjectionEnabled = true
 
     // MARK: - Session Stats
     /// Accumulated streaming duration (seconds) for output token speed calculation.

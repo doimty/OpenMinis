@@ -255,7 +255,7 @@ extension AIChatViewModel {
             if let memoryFragment = Self.loadGlobalMemoryFragment() {
                 userSystemPrompt += "\n\n" + memoryFragment
             }
-            if let dailyFragment = Self.loadRecentDailyMemoryFragment() {
+            if memoryDailyInjectionEnabled, let dailyFragment = Self.loadRecentDailyMemoryFragment() {
                 userSystemPrompt += "\n\n" + dailyFragment
             }
         }
@@ -1095,7 +1095,7 @@ extension AIChatViewModel {
                     if let memoryFragment = Self.loadGlobalMemoryFragment() {
                         userSystemPrompt += "\n\n" + memoryFragment
                     }
-                    if let dailyFragment = Self.loadRecentDailyMemoryFragment() {
+                    if memoryDailyInjectionEnabled, let dailyFragment = Self.loadRecentDailyMemoryFragment() {
                         userSystemPrompt += "\n\n" + dailyFragment
                     }
                 }
