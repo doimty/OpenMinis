@@ -131,10 +131,9 @@ struct BrowserManagementView: View {
                     }
                 }
             }
-            TextField("Enter custom user agent...", text: $customUA, axis: .vertical)
+            CompatMultilineTextField("Enter custom user agent...", text: $customUA, lineLimit: 2...4)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .lineLimit(2...4)
                 .onSubmit {
                     pool.customUserAgentString = customUA
                     pool.setUserAgentProfile(.custom)
