@@ -83,7 +83,7 @@ struct BridgedAssistantBlockV3: View {
         // (same pattern as BridgedAssistantFooterV3).
         .overlay {
             Color.clear.frame(width: 0, height: 0)
-                .contextMenu {
+                .compatContextMenu {
                     Button {
                         let text = message.blocks
                             .filter { if case .text = $0.kind { return true }; return false }
