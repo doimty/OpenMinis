@@ -436,4 +436,20 @@ extension View {
             self
         }
     }
+
+    /// `accessibilityActions` is iOS 16; the legacy platform expresses the same
+    /// conditional action with `accessibilityAction(named:)`.
+    @ViewBuilder
+    func compatAccessibilityAction(offered: Bool, named title: Text,
+                                   perform action: @escaping () -> Void) -> some View {
+        if #available(iOS 16.0, *) {
+            self.accessibilityActions {
+                if offered { Button(action: action) { title } }
+            }
+        } else if offered {
+            self.accessibilityAction(named: title, action)
+        } else {
+            self
+        }
+    }
 }

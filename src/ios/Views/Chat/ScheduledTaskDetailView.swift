@@ -1255,10 +1255,10 @@ struct ScheduledTaskBanner: View {
         .accessibilityAction(named: Text(AppLocalized("Cancel All Scheduled Tasks"))) { confirmCancelAll = true }
         // [T-sched-run-now] Offered only while counting down; the action
         // re-checks at activation like the menu item.
-        .accessibilityActions {
-            if runNowOffered(jobId: state.job.id, phase: state.phase) {
-                Button(AppLocalized("Run Now")) { runNow(state.job.id, run: state.job.runsDone) }
-            }
+        .compatAccessibilityAction(
+            offered: runNowOffered(jobId: state.job.id, phase: state.phase),
+            named: Text(AppLocalized("Run Now"))) {
+            runNow(state.job.id, run: state.job.runsDone)
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .padding(.horizontal, 12)

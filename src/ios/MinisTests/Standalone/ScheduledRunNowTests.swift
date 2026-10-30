@@ -303,7 +303,7 @@ check("menu order: Run Now, Hide, Skip, Cancel all",
           let order = ["\"Run Now\"", "\"Hide This Countdown\"", "\"Skip Next Run\"", "\"Cancel All Scheduled Tasks\""].compactMap { m.range(of: $0)?.lowerBound }
           return order.count == 4 && order == order.sorted()
       }())
-check("VoiceOver action only while offered", pill.contains(".accessibilityActions {\n            if runNowOffered(jobId: state.job.id, phase: state.phase) {"))
+check("VoiceOver action only while offered", pill.contains(".compatAccessibilityAction(\n            offered: runNowOffered(jobId: state.job.id, phase: state.phase),"))
 
 print("[4] Localization")
 let catalogURL = iosRoot.appendingPathComponent("Localizable.xcstrings")
