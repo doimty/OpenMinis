@@ -135,7 +135,13 @@ struct SettingsSheet: View {
                 Label {
                     Text(AppLocalized("Auto Compaction"))
                 } icon: {
+                    // Same 21pt white-on-color disc as every other row in this
+                    // section; a bare glyph looked like a stray outline here.
                     Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .frame(width: 21, height: 21)
+                        .background(.orange, in: Circle())
                 }
             }
             // [T-tools-granular-switches] First row: per-tool switches.
