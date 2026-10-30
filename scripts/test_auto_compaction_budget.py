@@ -582,11 +582,31 @@ def check_catalog(ss, rep):
             unit = ((locs.get(lang) or {}).get("stringUnit") or {}).get("value", "")
             if not unit:
                 bad.append("%s missing %s" % (key[:60], lang))
+    # Every key the page actually calls must be in the catalog: a missing key
+    # does not fail at build time, it silently falls back to the English
+    # literal at runtime (T-auto-compact-unlocalized).
+    view_rel = VIEWS_REL + "/Settings/AutoCompactionSettingsView.swift"
+    view = ss.root / view_rel
+    view_keys = []
+    if view.exists():
+        for match in re.finditer(r'AppLocalized\("((?:[^"\\]|\\.)*)"', view.read_text(encoding="utf-8")):
+            if match.group(1) not in view_keys:
+                view_keys.append(match.group(1))
+    for key in view_keys:
+        entry = strings.get(key)
+        if entry is None:
+            bad.append("page key missing from catalog: %r" % key[:60])
+            continue
+        for lang in ("en", "zh-Hans", "zh-Hant"):
+            unit = (((entry.get("localizations") or {}).get(lang) or {}).get("stringUnit") or {}).get("value", "")
+            if not unit:
+                bad.append("page key %r missing %s" % (key[:50], lang))
     if bad:
         rep.add("catalog", "catalog.auto_compact_keys", "FAIL", "; ".join(bad))
     else:
         rep.add("catalog", "catalog.auto_compact_keys", "PASS",
-                "%d key(s) with en+zh-Hans values" % len(hits))
+                "%d auto-compaction key(s); all %d page keys have en+zh-Hans+zh-Hant"
+                % (len(hits), len(view_keys)))
 
 
 def check_new_view_contract(ss, rep):

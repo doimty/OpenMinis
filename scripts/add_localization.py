@@ -159,13 +159,13 @@ def main() -> int:
     for off, chunk in sorted(inserts, key=lambda t: -t[0]):   # back-to-front
         text = text[:off] + chunk + text[off:]
 
-    catalog.write_text(text)
+    catalog.write_text(text, encoding="utf-8")
 
     # ---- verify, and roll back on any surprise -------------------------------
     try:
         after = json.loads(catalog.read_text(encoding="utf-8"))["strings"]
     except Exception as e:
-        catalog.write_text(original)
+        catalog.write_text(original, encoding="utf-8")
         sys.exit(f"FAILED: result is not valid JSON ({e}). Original restored.")
 
     lost = sorted(set(before) - set(after))
@@ -184,7 +184,7 @@ def main() -> int:
         problems.append(f"expected {len(new)} additions, found {len(added)}")
 
     if problems:
-        catalog.write_text(original)
+        catalog.write_text(original, encoding="utf-8")
         print("\nFAILED — original restored:", file=sys.stderr)
         for p in problems:
             print("  ✗ " + p, file=sys.stderr)
