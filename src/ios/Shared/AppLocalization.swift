@@ -134,6 +134,7 @@ enum LocalizedStringCache {
 /// still showed AppLocalized at 18% of the main thread while merely typing)
 /// and the in-app language bundle alike. With the label, literals can only
 /// reach the StaticString (plain) or LocalizationValue (interpolated) forms.
+@available(iOS 16.0, *)
 func AppLocalized(resource: LocalizedStringResource) -> String {
     // A LocalizedStringResource carries its own bundle reference, so it cannot
     // be re-pointed the way a literal key can. Resolve it as-is rather than
