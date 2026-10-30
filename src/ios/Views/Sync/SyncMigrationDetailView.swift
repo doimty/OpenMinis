@@ -1127,7 +1127,7 @@ private struct PauseSyncSheet: View {
     private let hoursOptions = [1, 3, 6, 12, 24]
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 Section {
                     ForEach(hoursOptions, id: \.self) { hours in
@@ -1158,7 +1158,7 @@ private struct PauseSyncSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
+        .compatPresentationDetents([.medium])
+        .compatPresentationDragIndicator(.visible)
     }
 }

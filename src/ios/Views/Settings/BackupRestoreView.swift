@@ -1015,7 +1015,7 @@ struct ServerRestorePickerSheet: View {
     @State private var showAddServer = false
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 if !remotes.isEmpty {
                     Section {
@@ -1491,7 +1491,7 @@ struct ServerPackageListView: View {
             .disabled(cancelFlag.value)
         }
         .padding(24)
-        .presentationDetents([.height(240)])
+        .compatPresentationDetents([.height(240)])
         // No swipe-to-dismiss: leaving the sheet would hide a transfer that is
         // still running, which is how the concurrency problem started.
         .interactiveDismissDisabled(true)

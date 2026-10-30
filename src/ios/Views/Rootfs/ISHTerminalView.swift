@@ -148,12 +148,12 @@ struct ISHTerminalView: View {
             }
         }
         .sheet(isPresented: $showFileBrowser) {
-            NavigationStack {
+            CompatNavigationStack {
                 FileBrowserView()
             }
         }
         .sheet(isPresented: $showRootfsManagement) {
-            NavigationStack {
+            CompatNavigationStack {
                 RootfsManagementView()
             }
         }
@@ -502,7 +502,7 @@ struct QuickCommandButton: View {
 }
 
 #Preview {
-    NavigationStack {
+    CompatNavigationStack {
         ISHTerminalView()
     }
 }

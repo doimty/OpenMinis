@@ -271,7 +271,7 @@ private struct ImportSkillSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 Picker("Import Method", selection: $importMode) {
                     ForEach(ImportMode.allCases, id: \.self) { mode in
@@ -970,7 +970,7 @@ struct MinisSkillsBrowserView: View {
     @StateObject private var coordinator = SkillBrowserCoordinator()
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             ZStack {
                 SkillBrowserWebView(coordinator: coordinator)
                     .ignoresSafeArea(edges: .bottom)

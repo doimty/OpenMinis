@@ -94,7 +94,7 @@ struct MCPFormSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 Section {
                     TextField(AppLocalized("Server name"), text: $name)

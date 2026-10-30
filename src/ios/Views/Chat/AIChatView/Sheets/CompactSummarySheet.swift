@@ -34,7 +34,7 @@ struct CompactSummarySheet: View {
     @State private var showRevertConfirm = false
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(spacing: 0) {
                 SelectableTextView(text: summary)
                     .padding(.horizontal, 16)
@@ -87,7 +87,7 @@ struct CompactSummarySheet: View {
                 Text("The summary will be discarded and the messages it covered will become active again. This may push the conversation past the model's context window — if that happens, long-press a message to re-compact from that point.")
             }
         }
-        .presentationDetents([.large])
+        .compatPresentationDetents([.large])
     }
 }
 

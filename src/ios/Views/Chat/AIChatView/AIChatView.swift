@@ -778,7 +778,7 @@ struct AIChatView: View {
         // view, so this body re-renders only when its height changes.
         .safeAreaInset(edge: .top, spacing: 0) {
             topBanners
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                .compatOnGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                     if abs(height - topBannersHeight) > 0.5 { topBannersHeight = height }
                 }
         }
@@ -863,13 +863,13 @@ struct AIChatView: View {
             }
         }
         .sheet(item: $browseMinisFolder) { target in
-            NavigationStack {
+            CompatNavigationStack {
                 FileBrowserView(rootPath: target.root, initialPath: target.folder, rootLabel: target.label)
             }
         }
         .sheet(item: $locateDownloadTarget) { target in
             if let sid = vm.sessionId {
-                NavigationStack {
+                CompatNavigationStack {
                     FileBrowserView(
                         rootPath: AIChatViewModel.minisWorkspacePersistentDir(for: sid),
                         rootLabel: "/var/minis/workspace",
@@ -1012,8 +1012,8 @@ struct AIChatView: View {
         }
         .sheet(item: $previewAudioFile) { fileURL in
             MinisAudioPreviewView(fileURL: fileURL)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.hidden)
+                .compatPresentationDetents([.large])
+                .compatPresentationDragIndicator(.hidden)
         }
         .sheet(item: $previewTextFile) { fileURL in
             MinisTextPreviewView(fileURL: fileURL)
@@ -1097,7 +1097,7 @@ struct AIChatView: View {
             })
         }
         .sheet(isPresented: $showFileBrowser) {
-            NavigationStack {
+            CompatNavigationStack {
                 let base = RootfsManager.shared.dataPath
                 FileBrowserView(rootPath: base, initialPath: base.appendingPathComponent("var/minis"), rootLabel: "/")
             }
@@ -1108,16 +1108,16 @@ struct AIChatView: View {
             })
         }
         .sheet(isPresented: $showModelPicker) {
-            NavigationStack {
+            CompatNavigationStack {
                 SessionModelPicker(sessionId: vm.sessionId) {
                     await vm.ensureSessionReturningId()
                 }
             }
-            .presentationDetents([.large])
+            .compatPresentationDetents([.large])
         }
         .sheet(isPresented: $showTokenUsage) {
             TokenUsageSheet(vm: cached.vm)
-                .presentationDetents([.fraction(0.8), .large])
+                .compatPresentationDetents([.fraction(0.8), .large])
         }
         .sheet(item: $shareRequest) { request in
             ChatShareSelectionView(request: request)
@@ -1211,7 +1211,7 @@ struct AIChatView: View {
         .fullScreenCover(isPresented: $showTerminal) {
             terminalInitCommand = nil
         } content: {
-            NavigationStack {
+            CompatNavigationStack {
                 ISHTerminalView(sessionId: vm.sessionId, showCloseButton: true, initCommand: terminalInitCommand)
                     .onAppear {
                         if let sid = vm.sessionId {

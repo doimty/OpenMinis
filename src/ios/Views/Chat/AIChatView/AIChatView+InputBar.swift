@@ -124,7 +124,7 @@ extension AIChatView {
                     // [T-ios-geometry-observer-crash] traced an async-renderer
                     // SIGTRAP to that scaffold, and this file already
                     // standardised on the observer for exactly that reason.
-                    .onGeometryChange(for: CGFloat.self) { proxy in
+                    .compatOnGeometryChange(for: CGFloat.self) { proxy in
                         proxy.size.width
                     } action: { w in
                         guard w > 0, abs(w - inputBottomRowWidth) > 0.5 else { return }
@@ -185,7 +185,7 @@ extension AIChatView {
             // floating-bar site). Fires with the initial value too, so the
             // old onAppear seeding AND its diagnostic log are preserved as
             // a single unified line.
-            .onGeometryChange(for: CGRect.self) { proxy in
+            .compatOnGeometryChange(for: CGRect.self) { proxy in
                 proxy.frame(in: .global)
             } action: { frame in
                 let newH = frame.size.height

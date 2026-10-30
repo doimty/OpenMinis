@@ -76,7 +76,7 @@ extension AIChatView {
     }
 
     /// [T-ipad-inputbar-height-zero] Bounds of the window hosting the chat, in
-    /// the same GLOBAL space `onGeometryChange(.global)` reports.
+    /// the same GLOBAL space `compatOnGeometryChange(.global)` reports.
     ///
     /// `UIScreen.main.bounds` is NOT a valid stand-in: under Mac Catalyst and in
     /// iPad multitasking the app's window is a sub-rect of the screen, and the

@@ -124,12 +124,12 @@ extension ContentView {
         .frame(maxHeight: .infinity)
         .padding(.horizontal, 32)
         .sheet(isPresented: $showAddProvider) {
-            NavigationStack {
+            CompatNavigationStack {
                 AddProviderView()
             }
         }
         .sheet(isPresented: $showSelectModels) {
-            NavigationStack {
+            CompatNavigationStack {
                 OnboardingModelSelectionView()
             }
         }
@@ -138,7 +138,7 @@ extension ContentView {
             // the Restore tab. Not auto-dismissed on success — the result
             // report is worth reading; the steps above refresh on their own
             // (restore reloads ProviderConfigStore and the session list).
-            NavigationStack {
+            CompatNavigationStack {
                 BackupAndRestoreView(initialTab: .restore)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {

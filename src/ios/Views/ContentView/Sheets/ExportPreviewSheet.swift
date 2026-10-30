@@ -49,7 +49,7 @@ struct ExportPreviewSheet: View {
     private let previewLimit = 10000
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(spacing: 0) {
                 // Preview — summary for multi-select, full content for single.
                 if let summary {

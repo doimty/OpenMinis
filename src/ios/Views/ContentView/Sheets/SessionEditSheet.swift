@@ -41,7 +41,7 @@ struct SessionEditSheet: View {
     ]
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 Section("Title") {
                     TextField("Session title", text: $editTitle)

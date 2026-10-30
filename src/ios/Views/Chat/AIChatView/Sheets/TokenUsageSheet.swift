@@ -26,7 +26,7 @@ struct TokenUsageSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 let s = vm.sessionTokenStats
 

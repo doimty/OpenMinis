@@ -19,7 +19,7 @@ struct DeleteConfirmSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(spacing: 0) {
                 if isLoading || info == nil {
                     Spacer()

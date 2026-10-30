@@ -87,7 +87,7 @@ struct FolderPickerSheet: View {
     private var sessionCount: Int { sessionIds.count }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 Section {
                     HStack {

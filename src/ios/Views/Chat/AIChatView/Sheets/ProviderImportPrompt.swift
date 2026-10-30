@@ -133,8 +133,8 @@ private struct ProviderImportSheet: View {
             }
         }
         .padding(24)
-        .presentationDetents([.height(360), .medium])
-        .presentationDragIndicator(.visible)
+        .compatPresentationDetents([.height(360), .medium])
+        .compatPresentationDragIndicator(.visible)
         // Swipe-to-dismiss without tapping a button still needs cleanup.
         .onDisappear { if !chose { onCancel() } }
     }

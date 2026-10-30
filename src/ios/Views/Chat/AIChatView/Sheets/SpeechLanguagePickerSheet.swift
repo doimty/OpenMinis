@@ -43,7 +43,7 @@ private struct SpeechLanguagePickerSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 let preferred = filteredLocales.filter { preferredCodes.contains($0.language.languageCode?.identifier ?? "") }
                 let others = filteredLocales.filter { !preferredCodes.contains($0.language.languageCode?.identifier ?? "") }
@@ -75,7 +75,7 @@ private struct SpeechLanguagePickerSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .compatPresentationDetents([.medium, .large])
     }
 
     private func languageRow(_ loc: Locale) -> some View {

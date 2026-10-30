@@ -360,14 +360,14 @@ struct ModelGroupDetailView: View {
         .scrollDismissesKeyboard(.immediately)
         .environment(\.editMode, $editMode)
         .sheet(isPresented: $showAddModels) {
-            NavigationStack {
+            CompatNavigationStack {
                 UnifiedModelPicker(config: addModelsConfig())
             }
         }
         .sheet(item: $quotaDetailProviderId) { target in
             QuotaDetailSheet(instanceId: target.id)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .compatPresentationDetents([.medium, .large])
+                .compatPresentationDragIndicator(.visible)
         }
     }
 

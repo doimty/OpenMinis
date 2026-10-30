@@ -72,7 +72,7 @@ struct MoveToSessionSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 if !isSearching {
                     Button {

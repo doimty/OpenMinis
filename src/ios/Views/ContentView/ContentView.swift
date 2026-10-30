@@ -771,7 +771,7 @@ struct ContentView: View {
             }
         }
         .fullScreenCover(isPresented: $showTerminal) {
-            NavigationStack {
+            CompatNavigationStack {
                 ISHTerminalView(showCloseButton: true)
             }
         }
@@ -793,7 +793,7 @@ struct ContentView: View {
             case .settings:
                 SettingsSheet(showTerminal: $showTerminal)
             case .rootfsManagement:
-                NavigationStack {
+                CompatNavigationStack {
                     RootfsManagementView()
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
@@ -804,11 +804,11 @@ struct ContentView: View {
             case .browser:
                 BrowserSheetView(pool: browserPool)
             case .browserManagement:
-                NavigationStack {
+                CompatNavigationStack {
                     BrowserManagementView(pool: browserPool)
                 }
             case .syncMigrationDetail:
-                NavigationStack {
+                CompatNavigationStack {
                     SyncMigrationDetailView()
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
@@ -837,7 +837,7 @@ struct ContentView: View {
             .onAppear {
                 print("[DELETE] Sheet appeared. singleDeleteInfo is \(singleDeleteInfo == nil ? "nil" : "non-nil, sessionCount=\(singleDeleteInfo!.sessionCount)")")
             }
-            .presentationDetents([.medium])
+            .compatPresentationDetents([.medium])
         }
         .sheet(item: $sessionToEdit) { session in
             SessionEditSheet(session: session) { newTitle, newCategory in
@@ -849,7 +849,7 @@ struct ContentView: View {
                 }
                 sessionToEdit = nil
             }
-            .presentationDetents([.medium])
+            .compatPresentationDetents([.medium])
         }
         .sheet(isPresented: $showDeleteConfirm, onDismiss: {
             if deleteInfo == nil {
@@ -866,7 +866,7 @@ struct ContentView: View {
                 deleteSelectedSessions()
                 showDeleteConfirm = false
             }
-            .presentationDetents([.medium])
+            .compatPresentationDetents([.medium])
         }
         .sheet(isPresented: $showExportPreview) {
             ExportPreviewSheet(fileURL: exportFileURL, previewURL: exportPreviewURL, summary: exportSummary)
@@ -901,7 +901,7 @@ struct ContentView: View {
                 if req.fromMultiSelect { folderMoveApplied = true }
                 folderPickerRequest = nil
             }
-            .presentationDetents([.medium, .large])
+            .compatPresentationDetents([.medium, .large])
         }
         .modifier(FolderAlertsModifier(
             folderToRename: $folderToRename,

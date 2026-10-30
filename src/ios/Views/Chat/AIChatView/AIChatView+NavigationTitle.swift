@@ -537,7 +537,7 @@ extension AIChatView {
                     showThinkingLevelSheet = false
                 }
             )
-            .presentationDetents([.medium])
+            .compatPresentationDetents([.medium])
         }
     }
 
