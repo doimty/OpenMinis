@@ -606,6 +606,13 @@ struct SubAgentActionsCard: View {
                             .focused($focused)
                             .padding(.horizontal, 10).padding(.vertical, 7)
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color(UIColor.tertiarySystemFill)))
+                            // iOS 15 falls back to TextEditor, which is greedy in
+                            // BOTH axes: without an explicit flexible frame it
+                            // claims its ideal width and pushes the send button
+                            // past the card's trailing edge (T-subagent-composer-
+                            // overflow). Claim only the space the button leaves.
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .layoutPriority(1)
                         Button {
                             if SubAgentUserSteer.send(draft, childSessionId: childSessionId) {
                                 draft = ""
@@ -618,6 +625,8 @@ struct SubAgentActionsCard: View {
                                 .foregroundStyle(isBlank ? Color(UIColor.tertiaryLabel) : HelperAccent.color)
                         }
                         .buttonStyle(.plain)
+                        // Never let the label compress the control that sends.
+                        .fixedSize()
                         .disabled(isBlank)
                         .accessibilityLabel(AppLocalized("Send"))
                     }

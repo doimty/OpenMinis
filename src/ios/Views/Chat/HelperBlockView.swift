@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // [T-p2-helper-block-render] Dedicated rendering for a `delegate_task` block.
 // The generic tool capsule / thumbnail / live sheet all print `block.content`,
@@ -788,6 +789,13 @@ struct HelperDetailCard: View {
     @State private var digest: SubAgentRunDigest?
     @State private var clock = SubAgentRunClock()
     @State private var now = Date()
+    /// [T-subagent-composer-overflow] How much of the sheet the keyboard
+    /// covers. The sub-agent steer field sits at the very END of this scroll
+    /// view: when the content is shorter than the viewport there is nothing
+    /// left to scroll, so focusing it put the field behind the keyboard on
+    /// iOS 15 (the sheet resizes, the content does not). Reserve the overlap as
+    /// scrollable slack so the field can always be brought above the keyboard.
+    @State private var keyboardOverlap: CGFloat = 0
 
     private var childId: String? {
         block.helperChildSessionId
@@ -916,6 +924,11 @@ struct HelperDetailCard: View {
                 // [T-agent-detail-buttons] The live conversation is reached
                 // from the sheet's top-right chat-bubble button; no second
                 // entry at the bottom.
+                //
+                // Scrollable slack for the keyboard (see keyboardOverlap).
+                Color.clear
+                    .frame(height: keyboardOverlap)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 12)
             .padding(.top, 12)
@@ -944,6 +957,23 @@ struct HelperDetailCard: View {
         // final figures once more so the chips and the timeline are complete.
         .onChange(of: info.isRunning) { running in
             if !running { Task { await loadChildFacts() } }
+        }
+        // [T-subagent-composer-overflow] Track how much the keyboard covers.
+        // The sheet itself resizes, but a scroll view whose content is shorter
+        // than the viewport has no slack to lift the focused field, so reserve
+        // exactly the overlap (see the Color.clear spacer above).
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            // Keyboard frames are in screen coordinates (same source of truth as
+            // AIChatView's dock detection), so compare against the screen.
+            let screen = (note.object as? UIScreen)
+                ?? UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.screen }.first
+            guard let bounds = screen?.bounds else { return }
+            let overlap = max(0, bounds.maxY - frame.minY)
+            if abs(overlap - keyboardOverlap) > 0.5 { keyboardOverlap = overlap }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            if keyboardOverlap != 0 { keyboardOverlap = 0 }
         }
     }
 
