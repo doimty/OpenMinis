@@ -1288,5 +1288,3 @@ struct MinisApp: App {
         }
     }
 }
-  }
-}
