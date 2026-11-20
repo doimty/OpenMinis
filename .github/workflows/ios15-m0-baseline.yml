@@ -250,6 +250,45 @@ jobs:
           # this step proves the binary builds for the device and prints its floor.
           echo "helper built, NOT signed, NOT installed"
 
+      # Both read-only A/B apps must come from the same opt-in build so each
+      # contains the same manually invoked positive-control and fixed-sample UI.
+      # Packaging keeps their identities and entitlement profiles isolated.
+      - name: Package host file probe A/B IPAs
+        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+        run: |
+          set -euo pipefail
+          python3 scripts/package_ios15_ipa.py \
+            --derived-data "$RUNNER_TEMP/probe-dd" \
+            --configuration Debug \
+            --output-dir "$RUNNER_TEMP/probe-ipa-standard" \
+            --entitlements scripts/ios15-trollstore.entitlements
+          python3 scripts/package_ios15_ipa.py \
+            --derived-data "$RUNNER_TEMP/probe-dd" \
+            --configuration Debug \
+            --output-dir "$RUNNER_TEMP/probe-ipa-broad-files" \
+            --file-access-profile broad-files
+          python3 - "$RUNNER_TEMP" <<'PY'
+          import json, sys
+          from pathlib import Path
+          root = Path(sys.argv[1])
+          expected = {
+              "probe-ipa-standard": ("com.openminis.app", "standard"),
+              "probe-ipa-broad-files": ("com.openminis.app.broadfiles", "broad-files"),
+          }
+          manifests = []
+          for directory, (bundle_id, profile) in expected.items():
+              manifest = json.loads((root / directory / "manifest.json").read_text())
+              assert manifest["bundle_id"] == bundle_id, manifest
+              assert manifest["minimum_os"] == "15.0", manifest
+              assert manifest["file_access_profile"] == profile, manifest
+              assert manifest["runtime_file_access_verified"] is False, manifest
+              assert manifest["root_helper_included"] is False, manifest
+              assert manifest["signed"] is True, manifest
+              manifests.append(manifest)
+          assert manifests[0]["source_app"] == manifests[1]["source_app"]
+          print(json.dumps(manifests, indent=2))
+          PY
+
       - name: Upload host file probe artifacts
         if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -260,6 +299,28 @@ jobs:
             ${{ runner.temp }}/probe-build/**
             ${{ runner.temp }}/probe-dd/Build/Products/Debug-iphoneos/Minis.app/**
             ${{ runner.temp }}/minis-rootprobe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload standard host file probe IPA
+        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: minis-host-file-probe-standard-ipa
+          path: |
+            ${{ runner.temp }}/probe-ipa-standard/*.ipa
+            ${{ runner.temp }}/probe-ipa-standard/manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload broad-files host file probe IPA
+        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: minis-host-file-probe-broad-files-ipa
+          path: |
+            ${{ runner.temp }}/probe-ipa-broad-files/*.ipa
+            ${{ runner.temp }}/probe-ipa-broad-files/manifest.json
           if-no-files-found: error
           retention-days: 14
 

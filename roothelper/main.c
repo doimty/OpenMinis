@@ -7,6 +7,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// Keep the fixed-path no-symlink policy available when Darwin strict POSIX
+// feature visibility hides this fcntl extension.
+#if defined(__APPLE__) && !defined(O_NOFOLLOW)
+#define O_NOFOLLOW 0x00000100
+#endif
+
 #define PROBE_DIRECTORY "OpenMinisRootProbe"
 #define PROBE_FILENAME "sample-v1.txt"
 #define PROBE_ID "fb81bca8-f8c0-4f2e-9ff2-fbfaf351aa87"

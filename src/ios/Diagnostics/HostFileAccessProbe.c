@@ -10,6 +10,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// Darwin hides O_NOFOLLOW together with other non-POSIX fcntl extensions
+// when strict POSIX feature visibility is requested. Its ABI value is stable;
+// retain the no-symlink open guarantee in that build mode as well.
+#if defined(__APPLE__) && !defined(O_NOFOLLOW)
+#define O_NOFOLLOW 0x00000100
+#endif
+
 #define PROBE_DIRECTORY "OpenMinisPermissionProbe"
 #define PROBE_FILENAME "sample-v1.txt"
 #define PROBE_SAMPLE_ID "20820eed-3d91-46bb-be1d-2d1b9058b29b"
