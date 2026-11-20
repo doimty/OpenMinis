@@ -64,5 +64,11 @@
 
 #endif /* MinisApp_Bridging_Header_h */
 
+#if defined(MINIS_HOST_FILE_PROBE) && MINIS_HOST_FILE_PROBE
+// [T-host-file-probe] Fixed-path diagnostic only; no path, bytes or handle
+// crosses into Swift, and ordinary builds do not see these declarations.
+#import "HostFileAccessProbe.h"
+#endif
+
 // rclone static library (deps/frameworks/Rclone.xcframework) — see RcloneBridge.swift
 #import "librclone.h"

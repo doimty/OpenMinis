@@ -111,6 +111,30 @@ struct AboutView: View {
 
             // MARK: - Links
             Section("Links") {
+#if DEBUG && MINIS_HOST_FILE_PROBE && os(iOS)
+                // [T-host-file-probe] Hidden from ordinary builds: the page and
+                // this row exist only when a build opts in. A plain tap starts
+                // one read; nothing in the app, no tool and no background task
+                // can reach it.
+                if !ProcessInfo.processInfo.isiOSAppOnMac {
+                    NavigationLink {
+                        HostFileAccessProbeView()
+                    } label: {
+                        Label {
+                            HStack {
+                                Text("Host File Access")
+                                    .foregroundStyle(Color(UIColor.label))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "folder.badge.questionmark")
+                        }
+                    }
+                }
+#endif
                 Link(destination: URL(string: "https://github.com/OpenMinis")!) {
                     Label {
                         HStack {

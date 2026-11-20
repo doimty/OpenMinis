@@ -58,6 +58,8 @@
 		A11Y0001 /* ChatAccessibilityAnnouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11Y0002 /* ChatAccessibilityAnnouncer.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* SystemVoiceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* SystemVoiceCatalog.swift */; };
 		AA0838A02F3B941A00049557 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838A12F3B941A00049557 /* AboutView.swift */; };
+		A1H0ST0001 /* HostFileAccessProbeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1H0ST0011 /* HostFileAccessProbeView.swift */; };
+		A1H0ST0002 /* HostFileAccessProbe.c in Sources */ = {isa = PBXBuildFile; fileRef = A1H0ST0012 /* HostFileAccessProbe.c */; };
 		AA0838C02F3B941A00049557 /* RootfsResetButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */; };
 		AA0838C32F3B941A00049557 /* RootfsManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */; };
 		AA0838CC2F3B941A00049557 /* StorageManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838CD2F3B941A00049557 /* StorageManagementView.swift */; };
@@ -797,6 +799,9 @@
 		A11Y0002 /* ChatAccessibilityAnnouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAccessibilityAnnouncer.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* SystemVoiceCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SystemVoiceCatalog.swift; sourceTree = "<group>"; };
 		AA0838A12F3B941A00049557 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		A1H0ST0011 /* HostFileAccessProbeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostFileAccessProbeView.swift; sourceTree = "<group>"; };
+		A1H0ST0012 /* HostFileAccessProbe.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = HostFileAccessProbe.c; sourceTree = "<group>"; };
+		A1H0ST0013 /* HostFileAccessProbe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HostFileAccessProbe.h; sourceTree = "<group>"; };
 		AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsManagementView.swift; sourceTree = "<group>"; };
 		AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsResetButton.swift; sourceTree = "<group>"; };
 		AA0838CD2F3B941A00049557 /* StorageManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageManagementView.swift; sourceTree = "<group>"; };
@@ -2050,6 +2055,8 @@
 				E5CBR0011 /* CrashBreadcrumbs.m */,
 				E5CBR0012 /* ResourceSampler.swift */,
 				E5CDX0011 /* CrashDiagnosticsExport.swift */,
+				A1H0ST0012 /* HostFileAccessProbe.c */,
+				A1H0ST0013 /* HostFileAccessProbe.h */,
 			);
 			path = Diagnostics;
 			sourceTree = "<group>";
@@ -2649,6 +2656,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0838A12F3B941A00049557 /* AboutView.swift */,
+				A1H0ST0011 /* HostFileAccessProbeView.swift */,
 				E5S000014 /* CloudSyncSettingsView.swift */,
 				E5G000013 /* EnhancedBackgroundSettingsView.swift */,
 				E5P000012 /* EnvironmentVariablesView.swift */,
@@ -3181,6 +3189,8 @@
 				E54000AC1 /* DebugSkillGenerated.swift in Sources */,
 				E5FP00100 /* AppGroupChangeWatcher.swift in Sources */,
 				AA0838A02F3B941A00049557 /* AboutView.swift in Sources */,
+				A1H0ST0001 /* HostFileAccessProbeView.swift in Sources */,
+				A1H0ST0002 /* HostFileAccessProbe.c in Sources */,
 				BB1000100F700000000000AA /* ContextPolicy.swift in Sources */,
 				AADDA9E12F6ECCF400B66649 /* ThumbnailCache.swift in Sources */,
 				E5SRS0001 /* SessionRefreshScheduler.swift in Sources */,
