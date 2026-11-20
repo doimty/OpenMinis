@@ -4,6 +4,29 @@
 // checks are NOT Swift execution. Missing swiftc is SKIP / exit 77, never PASS.
 import Foundation
 
+// Host-only glue, not behavior under test. UI localization is deterministic;
+// Anthropic dependency calls trap if a GPT-6.2 fixture unexpectedly reaches
+// them. No Anthropic/UI correctness is claimed by this isolated smoke.
+func AppLocalized(_ key: String) -> String { key }
+enum AnthropicProvider {
+    enum OffPolicy { case omit, disabled }
+    static func modelUsesAdaptiveThinking(_ id: String) -> Bool {
+        fatalError("out-of-scope Anthropic path reached")
+    }
+    static func offThinking(for id: String) -> OffPolicy {
+        fatalError("out-of-scope Anthropic path reached")
+    }
+}
+enum AnthropicAgentProvider {
+    static func thinkingEffort(for level: ThinkingLevel) -> String {
+        fatalError("out-of-scope Anthropic path reached")
+    }
+    static func thinkingBudget(for model: LLMModel, maxTokens: Int,
+                               level: ThinkingLevel = .medium) -> Int {
+        fatalError("out-of-scope Anthropic path reached")
+    }
+}
+
 @main
 struct GPT62ReasoningTests {
     static func main() throws {

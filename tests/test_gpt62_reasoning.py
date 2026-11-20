@@ -202,6 +202,7 @@ def extracted_swift():
     pure_types += "\n" + declaration(types, "extension LLMModel {")
     pure_types += "\n" + read("ThinkingLevelCatalog.swift") + "\n" + read("ModelEntry.swift")
     pure_types += "\n" + read("Thinking/ThinkingWireFormat.swift") + "\n" + read("Thinking/ThinkingRule.swift")
+    pure_types += "\n" + declaration(read("Thinking/ThinkingRuleCoding.swift"), "extension ThinkingRule.Scope {")
     resolver = read("Thinking/ThinkingRuleResolver.swift")
     # Only the UI/store display method is outside the pure rule engine slice.
     pure_types += "\n" + resolver.rsplit("    @MainActor", 1)[0] + "\n}\n"
