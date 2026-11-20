@@ -36,6 +36,9 @@ def main():
         print("SKIP root helper contract test: needs root to build/run the setuid surface")
         return
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="openminis-root-probe-"))
+    # The negative test drops to uid 501 before exec. Keep the temporary parent
+    # traversable so that case reaches the helper's non-root guard on macOS.
+    tmp.chmod(0o755)
     binary = tmp / "rootprobe"
     try:
         subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2",
