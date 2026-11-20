@@ -2,6 +2,7 @@
 """Native host-side adversarial tests for the fixed-path iOS C probe."""
 from __future__ import annotations
 import os
+import errno
 import pathlib
 import shutil
 import subprocess
@@ -66,7 +67,7 @@ def main():
         assert_case(binary, root, MATCH, stage="sample.compare", sample_id=SAMPLE_ID)
 
         root = temp / "missing"; make_tree(root)
-        assert_case(binary, root, ERROR, stage="sample.stat", err=2)
+        assert_case(binary, root, ERROR, stage="sample.stat", err=errno.ENOENT)
 
         root = temp / "symlink"; d = make_tree(root); outside = root / "outside"
         outside.write_bytes(PAYLOAD); (d / "sample-v1.txt").symlink_to(outside)
@@ -96,14 +97,14 @@ def main():
         target = root / "outside-media"; target.mkdir()
         (base / "Media").symlink_to(target, target_is_directory=True)
         out = target / "OpenMinisPermissionProbe"; out.mkdir(); (out / "sample-v1.txt").write_bytes(PAYLOAD)
-        assert_case(binary, root, ERROR, stage="Media", err=40)  # ELOOP
+        assert_case(binary, root, ERROR, stage="Media", err=errno.ELOOP)
 
         if os.geteuid() == 0:
             root = temp / "denied"; d = make_tree(root); (d / "sample-v1.txt").write_bytes(PAYLOAD)
             media = str(root / "private/var/mobile/Media")
             for p in [root, root / "private", root / "private/var", root / "private/var/mobile"]: p.chmod(0o755)
             os.chown(media, 0, 0); os.chmod(media, 0o700)
-            assert_case(binary, root, ERROR, stage="Media", err=13, drop=True)  # EACCES as nobody
+            assert_case(binary, root, ERROR, stage="Media", err=errno.EACCES, drop=True)
         else:
             print("SKIP permission-denied case: runner is not root")
 
