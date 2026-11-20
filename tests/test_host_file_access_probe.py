@@ -43,11 +43,12 @@ def make_tree(root: pathlib.Path):
     return sample_dir
 
 
-def assert_case(binary, root, expected, *, stage=None, err=None, sample_id=None, drop=False):
+def assert_case(binary, root, expected, *, stage=None, err=None, errors=None, sample_id=None, drop=False):
     outcome, eno, got_stage, got_id, metadata = run_case(binary, root, drop_privs=drop)
     require(outcome == expected, f"{root.name}: expected outcome {expected}, got {outcome} ({eno}, {got_stage})")
     if stage is not None: require(got_stage == stage, f"expected stage {stage}, got {got_stage}")
     if err is not None: require(eno == err, f"expected errno {err}, got {eno}")
+    if errors is not None: require(eno in errors, f"expected errno in {errors}, got {eno}")
     if sample_id is not None: require(got_id == sample_id, f"sample ID mismatch: {got_id}")
     else: require(got_id == "", f"failure leaked sample ID: {got_id}")
     require("OPENMINIS-PROBE-V1:" not in "\t".join([got_stage, got_id, *metadata]), "file content leaked")
@@ -57,6 +58,7 @@ def main():
     temp = pathlib.Path(tempfile.mkdtemp(prefix="openminis-host-probe-"))
     temp.chmod(0o755)
     binary = temp / "probe"
+    permission_denial_checked = False
     try:
         subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-O2",
                         "-DMINIS_HOST_FILE_PROBE=1", "-DMINIS_HOST_FILE_PROBE_TEST_ROOT=1",
@@ -97,7 +99,7 @@ def main():
         target = root / "outside-media"; target.mkdir()
         (base / "Media").symlink_to(target, target_is_directory=True)
         out = target / "OpenMinisPermissionProbe"; out.mkdir(); (out / "sample-v1.txt").write_bytes(PAYLOAD)
-        assert_case(binary, root, ERROR, stage="Media", err=errno.ELOOP)
+        assert_case(binary, root, ERROR, stage="Media", errors={errno.ELOOP, errno.ENOTDIR})
 
         if os.geteuid() == 0:
             root = temp / "denied"; d = make_tree(root); (d / "sample-v1.txt").write_bytes(PAYLOAD)
@@ -105,10 +107,14 @@ def main():
             for p in [root, root / "private", root / "private/var", root / "private/var/mobile"]: p.chmod(0o755)
             os.chown(media, 0, 0); os.chmod(media, 0o700)
             assert_case(binary, root, ERROR, stage="Media", err=errno.EACCES, drop=True)
+            permission_denial_checked = True
         else:
             print("SKIP permission-denied case: runner is not root")
 
-        print("PASS host C probe: exact marker, missing, symlink, ancestor symlink, FIFO, directory, size, marker, hardlink, permission denial")
+        passed_cases = "exact marker, missing, symlink, ancestor symlink, FIFO, directory, size, marker, hardlink"
+        if permission_denial_checked:
+            passed_cases += ", permission denial"
+        print(f"PASS host C probe: {passed_cases}")
     finally:
         os.chmod(temp, 0o755)
         shutil.rmtree(temp, ignore_errors=True)

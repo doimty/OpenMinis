@@ -28,12 +28,23 @@ const char *OMHostFileProbeSamplePath(void) {
 #endif
 }
 
-#ifdef __APPLE__
-#define PROBE_MTIME(st) ((st)->st_mtimespec)
-#define PROBE_CTIME(st) ((st)->st_ctimespec)
+#if defined(__APPLE__) && defined(_POSIX_C_SOURCE) && !defined(_DARWIN_C_SOURCE)
+// Darwin hides the BSD timespec members when strict POSIX feature visibility
+// is requested, while retaining the seconds and nanoseconds as separate fields.
+#define PROBE_MTIME_SECONDS(st) ((st)->st_mtime)
+#define PROBE_MTIME_NANOSECONDS(st) ((st)->st_mtimensec)
+#define PROBE_CTIME_SECONDS(st) ((st)->st_ctime)
+#define PROBE_CTIME_NANOSECONDS(st) ((st)->st_ctimensec)
+#elif defined(__APPLE__)
+#define PROBE_MTIME_SECONDS(st) ((st)->st_mtimespec.tv_sec)
+#define PROBE_MTIME_NANOSECONDS(st) ((st)->st_mtimespec.tv_nsec)
+#define PROBE_CTIME_SECONDS(st) ((st)->st_ctimespec.tv_sec)
+#define PROBE_CTIME_NANOSECONDS(st) ((st)->st_ctimespec.tv_nsec)
 #else
-#define PROBE_MTIME(st) ((st)->st_mtim)
-#define PROBE_CTIME(st) ((st)->st_ctim)
+#define PROBE_MTIME_SECONDS(st) ((st)->st_mtim.tv_sec)
+#define PROBE_MTIME_NANOSECONDS(st) ((st)->st_mtim.tv_nsec)
+#define PROBE_CTIME_SECONDS(st) ((st)->st_ctim.tv_sec)
+#define PROBE_CTIME_NANOSECONDS(st) ((st)->st_ctim.tv_nsec)
 #endif
 
 static OMHostFileProbeResult report(int outcome, const char *stage, int error_number) {
@@ -43,10 +54,10 @@ static OMHostFileProbeResult report(int outcome, const char *stage, int error_nu
 static int same_snapshot(const struct stat *a, const struct stat *b) {
     return a->st_dev == b->st_dev && a->st_ino == b->st_ino &&
            a->st_mode == b->st_mode && a->st_nlink == b->st_nlink && a->st_size == b->st_size &&
-           PROBE_MTIME(a).tv_sec == PROBE_MTIME(b).tv_sec &&
-           PROBE_MTIME(a).tv_nsec == PROBE_MTIME(b).tv_nsec &&
-           PROBE_CTIME(a).tv_sec == PROBE_CTIME(b).tv_sec &&
-           PROBE_CTIME(a).tv_nsec == PROBE_CTIME(b).tv_nsec;
+           PROBE_MTIME_SECONDS(a) == PROBE_MTIME_SECONDS(b) &&
+           PROBE_MTIME_NANOSECONDS(a) == PROBE_MTIME_NANOSECONDS(b) &&
+           PROBE_CTIME_SECONDS(a) == PROBE_CTIME_SECONDS(b) &&
+           PROBE_CTIME_NANOSECONDS(a) == PROBE_CTIME_NANOSECONDS(b);
 }
 
 static OMHostFileProbeResult compare_sample(int directory, int file, const struct stat *expected) {
@@ -94,8 +105,8 @@ static OMHostFileProbeResult compare_sample(int directory, int file, const struc
     result.device = (uint64_t)after.st_dev;
     result.inode = (uint64_t)after.st_ino;
     result.size = (uint64_t)after.st_size;
-    result.mtime_seconds = PROBE_MTIME(&after).tv_sec;
-    result.mtime_nanoseconds = PROBE_MTIME(&after).tv_nsec;
+    result.mtime_seconds = PROBE_MTIME_SECONDS(&after);
+    result.mtime_nanoseconds = PROBE_MTIME_NANOSECONDS(&after);
     return result;
 }
 

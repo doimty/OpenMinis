@@ -38,6 +38,20 @@ env:
   APM_SHA256: 3ee3d36e9207a09fa3133c405f08a49a0d023f173ee5b4a47c047362aba56856
 
 jobs:
+  host-file-probe-linux:
+    name: Host file probe Linux gates
+    if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Native host probe adversarial tests
+        run: sudo env "PATH=$PATH" python3 tests/test_host_file_access_probe.py
+
   baseline:
     name: Native deps + iOS 15 compile probe
     runs-on: macos-26
@@ -77,9 +91,18 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
         run: |
           set -euo pipefail
-          python3 tests/test_host_file_access_probe.py
+          sudo env "PATH=$PATH" python3 tests/test_host_file_access_probe.py
           sudo env "PATH=$PATH" python3 tests/test_root_probe_helper.py
           clang -std=c11 -Wall -Wextra -Werror -c src/ios/Diagnostics/HostFileAccessProbe.c -o "$RUNNER_TEMP/probe-off.o"
+          sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun --sdk iphoneos swiftc \
+            -typecheck -parse-as-library -swift-version 5 \
+            -target arm64-apple-ios15.0 -sdk "$sdk" \
+            -module-cache-path "$RUNNER_TEMP/probe-module-cache" \
+            -D DEBUG -D MINIS_HOST_FILE_PROBE \
+            -Xcc -DMINIS_HOST_FILE_PROBE=1 \
+            -import-objc-header src/ios/Diagnostics/HostFileAccessProbe.h \
+            src/ios/Views/Settings/HostFileAccessProbeView.swift
 
       - name: SF Symbols compatibility gates
         run: |
@@ -99,53 +122,6 @@ jobs:
           sha="$(git -C deps/ish rev-parse HEAD)"
           printf 'deps/ish %s\n' "$sha"
           test "$sha" = "$EXPECTED_ISH"
-
-      - name: Build host file probe app
-        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
-        run: |
-          set -euo pipefail
-          xcodebuild \
-            -project src/ios/Minis.xcodeproj \
-            -scheme Minis \
-            -configuration Debug \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$RUNNER_TEMP/probe-dd" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY=- \
-            CODE_SIGNING_REQUIRED=NO \
-            OTHER_CFLAGS="-DMINIS_HOST_FILE_PROBE=1" \
-            OTHER_SWIFT_FLAGS="-DMINIS_HOST_FILE_PROBE" \
-            build \
-            > "$RUNNER_TEMP/probe-build.log" 2>&1
-          python3 scripts/ios15_build_log.py "$RUNNER_TEMP/probe-build.log" --output-dir "$RUNNER_TEMP/probe-build" || true
-          grep -q 'MINIS_HOST_FILE_PROBE' "$RUNNER_TEMP/probe-build.log" || true
-
-      - name: Build iOS 15 root helper
-        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
-        run: |
-          set -euo pipefail
-          sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
-          xcrun --sdk iphoneos clang -arch arm64e -arch arm64 \
-            -isysroot "$sdk" -miphoneos-version-min=15.0 \
-            -O2 -Wall -Wextra -Werror \
-            roothelper/main.c -o "$RUNNER_TEMP/minis-rootprobe"
-          xcrun --sdk iphoneos lipo -info "$RUNNER_TEMP/minis-rootprobe"
-          xcrun --sdk iphoneos otool -l "$RUNNER_TEMP/minis-rootprobe" | grep -A3 LC_BUILD_VERSION
-          # Signature is applied only at package time by the installing user;
-          # this step proves the binary builds for the device and prints its floor.
-          echo "helper built, NOT signed, NOT installed"
-
-      - name: Upload host file probe artifacts
-        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: minis-host-file-probe
-          path: |
-            ${{ runner.temp }}/probe-build.log
-            ${{ runner.temp }}/probe-build/**
-            ${{ runner.temp }}/minis-rootprobe
-          if-no-files-found: warn
-          retention-days: 14
 
       - name: Input prompt compatibility gates
         run: |
@@ -226,6 +202,66 @@ jobs:
             ./deps/build_vad_framework.sh
           fi
           test -f "$binary"
+
+      # [T-host-file-probe] Build only after the pinned iSH submodule and all
+      # native frameworks are ready. The opt-in target remains unsigned and
+      # separate from the ordinary m1 build used for release packaging.
+      - name: Build host file probe app
+        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project src/ios/Minis.xcodeproj \
+            -scheme Minis \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/probe-dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=NO \
+            OTHER_CFLAGS="-DMINIS_HOST_FILE_PROBE=1" \
+            OTHER_SWIFT_FLAGS="-DMINIS_HOST_FILE_PROBE" \
+            build \
+            > "$RUNNER_TEMP/probe-build.log" 2>&1
+          python3 scripts/ios15_build_log.py "$RUNNER_TEMP/probe-build.log" --output-dir "$RUNNER_TEMP/probe-build"
+          app="$RUNNER_TEMP/probe-dd/Build/Products/Debug-iphoneos/Minis.app"
+          test -d "$app"
+          python3 - "$app/Info.plist" <<'PY'
+          import plistlib, sys
+          from pathlib import Path
+          info = plistlib.loads(Path(sys.argv[1]).read_bytes())
+          assert info.get("CFBundleIdentifier") == "com.openminis.app", info.get("CFBundleIdentifier")
+          assert info.get("MinimumOSVersion") == "15.0", info.get("MinimumOSVersion")
+          print(f"probe app: {info['CFBundleIdentifier']} iOS {info['MinimumOSVersion']}")
+          PY
+
+      - name: Build iOS 15 root helper
+        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+        run: |
+          set -euo pipefail
+          sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun --sdk iphoneos clang -arch arm64e -arch arm64 \
+            -isysroot "$sdk" -miphoneos-version-min=15.0 \
+            -O2 -Wall -Wextra -Werror \
+            roothelper/main.c -o "$RUNNER_TEMP/minis-rootprobe"
+          xcrun --sdk iphoneos lipo -info "$RUNNER_TEMP/minis-rootprobe"
+          xcrun --sdk iphoneos otool -l "$RUNNER_TEMP/minis-rootprobe" | grep -A3 LC_BUILD_VERSION
+          # Signature is applied only at package time by the installing user;
+          # this step proves the binary builds for the device and prints its floor.
+          echo "helper built, NOT signed, NOT installed"
+
+      - name: Upload host file probe artifacts
+        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: minis-host-file-probe
+          path: |
+            ${{ runner.temp }}/probe-build.log
+            ${{ runner.temp }}/probe-build/**
+            ${{ runner.temp }}/probe-dd/Build/Products/Debug-iphoneos/Minis.app/**
+            ${{ runner.temp }}/minis-rootprobe
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Save native iOS deps cache
         if: steps.native-cache.outputs.cache-hit != 'true'

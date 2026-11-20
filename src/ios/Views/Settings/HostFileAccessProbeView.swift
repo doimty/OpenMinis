@@ -23,6 +23,7 @@ import Darwin
 struct HostFileAccessProbeView: View {
     private struct Report: Equatable {
         var controlOK = false
+        var sampleRan = false
         var outcome = -1
         var errorNumber = 0
         var stage = ""
@@ -101,18 +102,22 @@ struct HostFileAccessProbeView: View {
                 }
 
                 Section("Result") {
-                    row("Outcome", Self.outcomeNames[report.outcome] ?? "code \(report.outcome)", mono: false)
-                    row("Stage", report.stage, mono: true)
-                    if report.errorNumber != 0 {
-                        row("Errno", "\(report.errorNumber) (\(Self.errnoName(report.errorNumber)))", mono: true)
-                        Text(Self.errnoHint(report.errorNumber))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
-                    if !report.sampleId.isEmpty {
-                        row("Sample id", report.sampleId, mono: true)
-                        row("Device · inode", "\(report.device) · \(report.inode)", mono: true)
-                        row("Size", "\(report.size) bytes", mono: true)
+                    if report.sampleRan {
+                        row("Outcome", Self.outcomeNames[report.outcome] ?? "code \(report.outcome)", mono: false)
+                        row("Stage", report.stage, mono: true)
+                        if report.errorNumber != 0 {
+                            row("Errno", "\(report.errorNumber) (\(Self.errnoName(report.errorNumber)))", mono: true)
+                            Text(Self.errnoHint(report.errorNumber))
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        if !report.sampleId.isEmpty {
+                            row("Sample id", report.sampleId, mono: true)
+                            row("Device · inode", "\(report.device) · \(report.inode)", mono: true)
+                            row("Size", "\(report.size) bytes", mono: true)
+                        }
+                    } else {
+                        row("Sample probe", "not run", mono: false)
                     }
                 }
 
@@ -176,8 +181,10 @@ struct HostFileAccessProbeView: View {
         out.controlOK = control.0
         out.controlStage = control.1
         out.controlErrno = control.2
+        guard control.0 else { return out }
 
         let result = OMHostFileProbeReadSample()
+        out.sampleRan = true
         out.outcome = Int(result.outcome)
         out.errorNumber = Int(result.error_number)
         out.stage = result.stage.map { String(cString: $0) } ?? ""
@@ -191,14 +198,14 @@ struct HostFileAccessProbeView: View {
     /// Bounded, read-only, no bytes kept: proves the reader path itself works.
     private static func readOwnInfoPlist() -> (Bool, String, Int) {
         guard let url = Bundle.main.url(forResource: "Info", withExtension: "plist") else {
-            return (false, "bundle.locate", ENOENT)
+            return (false, "bundle.locate", Int(ENOENT))
         }
         let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
-        if fd < 0 { return (false, "bundle.open", errno) }
+        if fd < 0 { return (false, "bundle.open", Int(errno)) }
         defer { close(fd) }
         var buffer = [UInt8](repeating: 0, count: 64)
         let count = read(fd, &buffer, buffer.count)
-        if count < 0 { return (false, "bundle.read", errno) }
+        if count < 0 { return (false, "bundle.read", Int(errno)) }
         return count > 0 ? (true, "bundle.read", 0) : (false, "bundle.empty", 0)
     }
 }
