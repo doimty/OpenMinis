@@ -142,6 +142,9 @@ struct ChatToolbarKey: Equatable {
     let keepAwakeEnabled: Bool
     /// [T-always-on-now] Checkmark of the "Use Screen Saver" row.
     let screenSaverNowEnabled: Bool
+    /// [T-ios15-auto-compaction-menu] Freeze the global opt-in in the
+    /// equatable display snapshot without changing the caller's initializer.
+    let autoCompactionEnabled: Bool = AutoCompactionPreferences.enabled
 }
 
 /// [T-ios-navbar-toolbar-host] Zero-footprint host that owns the navigation
@@ -200,6 +203,7 @@ struct ChatToolbarHost<Title: View, Trailing: View>: View, Equatable {
             if lhs.key.showUltrafast != rhs.key.showUltrafast { diffs.append("showUltrafast") }
             if lhs.key.keepAwakeEnabled != rhs.key.keepAwakeEnabled { diffs.append("keepAwakeEnabled") }
             if lhs.key.screenSaverNowEnabled != rhs.key.screenSaverNowEnabled { diffs.append("screenSaverNowEnabled") }
+            if lhs.key.autoCompactionEnabled != rhs.key.autoCompactionEnabled { diffs.append("autoCompactionEnabled") }
             NavbarEvalStats.logger.info("[NavbarEval] host == FALSE diffs=[\(diffs.joined(separator: ","))]")
         }
         #endif
@@ -580,6 +584,7 @@ struct ChatTrailingMenuButton: UIViewRepresentable {
         let showUltrafast: Bool
         let keepAwakeEnabled: Bool
         let screenSaverNowEnabled: Bool
+        let autoCompactionEnabled: Bool
     }
 
     fileprivate var key: Key {
@@ -592,13 +597,43 @@ struct ChatTrailingMenuButton: UIViewRepresentable {
             speedTier: speedTier,
             showUltrafast: showUltrafast,
             keepAwakeEnabled: keepAwakeEnabled,
-            screenSaverNowEnabled: screenSaverNowEnabled)
+            screenSaverNowEnabled: screenSaverNowEnabled,
+            autoCompactionEnabled: AutoCompactionPreferences.enabled)
     }
 
     final class Coordinator {
         var lastKey: Key?
         var parent: ChatTrailingMenuButton
-        init(parent: ChatTrailingMenuButton) { self.parent = parent }
+        weak var button: UIButton?
+        weak var barItem: UIBarButtonItem?
+        private var defaultsObserver: AnyCancellable?
+
+        init(parent: ChatTrailingMenuButton) {
+            self.parent = parent
+            // Settings may change the global opt-in without a parent redraw.
+            // Other defaults writes remain no-ops behind the display-key gate.
+            defaultsObserver = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.refreshMenuIfNeeded() }
+        }
+
+        func toggleAutoCompaction() {
+            // Read at invocation, not from the key captured by an older menu.
+            let enabled = !parent.key.autoCompactionEnabled
+            UserDefaults.standard.set(enabled, forKey: AutoCompactionPreferences.enabledKey)
+            // Publish fresh actions instead of mutating an installed UIAction;
+            // do not wait for a SwiftUI/defaults notification to update UIKit.
+            refreshMenuIfNeeded()
+        }
+
+        func refreshMenuIfNeeded() {
+            let key = parent.key
+            guard lastKey != key else { return }
+            lastKey = key
+            let menu = ChatTrailingMenuButton.buildMenu(key: key, coordinator: self)
+            button?.menu = menu
+            barItem?.menu = menu
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
@@ -635,6 +670,7 @@ struct ChatTrailingMenuButton: UIViewRepresentable {
         button.tintColor = UIColor(ChatColors.primaryText)
         button.showsMenuAsPrimaryAction = true
         button.accessibilityLabel = AppLocalized("More options")
+        context.coordinator.button = button
         button.menu = Self.buildMenu(key: key, coordinator: context.coordinator)
         context.coordinator.lastKey = key
         return button
@@ -685,6 +721,13 @@ struct ChatTrailingMenuButton: UIViewRepresentable {
             UIAction(title: AppLocalized("Compact Messages"),
                      image: UIImage(systemName: "arrow.down.right.and.arrow.up.left"),
                      attributes: key.messagesEmpty ? [.disabled] : []) { _ in coordinator.parent.onCompact() },
+            // [T-ios15-auto-compaction-menu] Direct global toggle, also on an
+            // empty chat; independent of the manual compaction availability.
+            UIAction(title: AppLocalized("Auto Compaction"),
+                     image: UIImage(systemName: "arrow.triangle.2.circlepath"),
+                     state: key.autoCompactionEnabled ? .on : .off) { _ in
+                coordinator.toggleAutoCompaction()
+            },
             UIAction(title: AppLocalized("Clear Chat"),
                      image: UIImage(systemName: "trash"),
                      attributes: key.messagesEmpty ? [.destructive, .disabled] : [.destructive]) { _ in coordinator.parent.onClearChat() },
@@ -885,6 +928,7 @@ struct ChatNavMenuBarItemInstaller: UIViewRepresentable {
             // the app tint; iOS 26's glass hides that, iOS 16-18 would show it.
             item.tintColor = UIColor(ChatColors.primaryText)
             item.accessibilityLabel = AppLocalized("More options")
+            inner.barItem = item
             item.menu = ChatTrailingMenuButton.buildMenu(key: menu.key, coordinator: inner)
             inner.lastKey = menu.key
         }

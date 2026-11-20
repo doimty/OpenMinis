@@ -91,8 +91,9 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
     var declaresNoEffortTiers: Bool?
 
     /// [T-thinking-off-custom-provider] True when `reasoningEffortValues` was read from a
-    /// catalog entry belonging to this model's OWN provider, rather than from the
-    /// cross-provider fallback scan.
+    /// catalog entry belonging to this model's OWN provider, or the endpoint's
+    /// own model metadata, rather than from the cross-provider fallback scan.
+    /// GPT-6.2 name fallback never sets this flag.
     ///
     /// The fallback scan matches a bare model id under any publisher and majority-votes
     /// the effort sets, which is what every user-defined OpenAI-compatible relay resolves
@@ -368,6 +369,31 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
         supportsReasoning: true
     )
 
+    /// [T-gpt62-metadata-first] Codex OAuth entries from CLIProxyAPI's pinned
+    /// compatibility registry (not an official-account availability promise):
+    /// https://github.com/router-for-me/CLIProxyAPI/blob/6faa8d20b2673404cff70a2f2d9537ae0d0e684d/internal/registry/models/models.json
+    /// Both declare low / medium / high / xhigh / max. No release date,
+    /// account tier or required client version is inferred from this evidence.
+    static let gpt62Astra = LLMModel(
+        id: "gpt-6.2-astra",
+        displayName: "GPT-6.2 Astra",
+        provider: "OpenAI",
+        contextWindow: 272_000,
+        maxOutputTokens: 128_000,
+        supportsReasoning: true,
+        reasoningEffortValues: ThinkingLevelCatalog.gpt62EffortValues
+    )
+
+    static let gpt62Sol = LLMModel(
+        id: "gpt-6.2-sol",
+        displayName: "GPT-6.2 Sol",
+        provider: "OpenAI",
+        contextWindow: 500_000,
+        maxOutputTokens: 128_000,
+        supportsReasoning: true,
+        reasoningEffortValues: ThinkingLevelCatalog.gpt62EffortValues
+    )
+
     /// [T-gpt6-sol-luna] Same explicit `supportsReasoning: true` as Astra above,
     /// and for the same reason — a brand-new id is not in models-dev-api.json,
     /// so `enrichModels()` leaves the flag nil and every thinking level collapses
@@ -625,6 +651,7 @@ struct LLMModel: Equatable, Hashable, Identifiable, Sendable, Codable {
     /// the tier-gated symptom above.
     static let allOpenAICodexOAuth: [LLMModel] = [
         .gpt6Astra, .gpt61Sol, .gpt6Sol, .gpt6Luna,
+        .gpt62Astra, .gpt62Sol,
         .gpt56Sol, .gpt56Terra, .gpt56Luna,
         .gpt55, .gpt54, .gpt54Mini,
         // gptImage2 is kept: it is an image endpoint, not a Codex chat model,
@@ -1161,6 +1188,23 @@ enum ThinkingLevel: String, Codable, Hashable, CaseIterable, Comparable {
 }
 
 extension LLMModel {
+    /// [T-gpt62-metadata-first] Read-only policy, also used after synthesized
+    /// Codable decodes an old model without visiting the memberwise init.
+    /// Explicit model/user/endpoint answers win; never persist the fallback.
+    var effectiveSupportsReasoning: Bool? {
+        supportsReasoning ?? (ThinkingLevelCatalog.isGPT62Family(id) ? true : nil)
+    }
+
+    var effectiveReasoningEffortValues: [String]? {
+        guard ThinkingLevelCatalog.isGPT62Family(id) else { return reasoningEffortValues }
+        guard supportsReasoning != false, declaresNoEffortTiers != true else { return [] }
+        guard let declared = reasoningEffortValues else { return ThinkingLevelCatalog.gpt62EffortValues }
+        // Unknown-only/empty declarations are NOT permission to use a fallback.
+        // none/minimal are honored only when explicitly declared, not invented.
+        let safe = ["none", "minimal"] + ThinkingLevelCatalog.gpt62EffortValues
+        return declared.map { $0.lowercased() }.filter { safe.contains($0) }
+    }
+
     var catalogMaxThinkingLevel: ThinkingLevel {
         // A model that can't reason has max level .off regardless of any
         // catalog family rule — family rules match by id substring, so a
@@ -1168,6 +1212,12 @@ extension LLMModel {
         // ceiling of that family's non-reasoning members (mimo-v2.5-tts/-asr).
         // [T-fallback-thinking-preclamp]
         if supportsReasoning == false { return .off }
+        // GPT-6.2's family rule is a fallback, never a raise over a narrower
+        // declaration (including no usable effort tiers). Other families keep
+        // their historical ceiling rules unchanged.
+        if ThinkingLevelCatalog.isGPT62Family(id) {
+            return selectableThinkingLevels.last ?? .off
+        }
         // [T-thinking-levels-data-driven] A declared effort set is a stronger
         // statement than any id-substring rule: it names the exact tiers the
         // backend accepts. Take its top tier as the ceiling so a model whose
@@ -1215,7 +1265,7 @@ extension LLMModel {
     /// `.off` is never included — it is a separate toggle, not an effort tier,
     /// and the OFF wire value is chosen by `explicitOffEffort`, not here.
     var selectableThinkingLevels: [ThinkingLevel] {
-        guard let declared = reasoningEffortValues, !declared.isEmpty else { return [] }
+        guard let declared = effectiveReasoningEffortValues, !declared.isEmpty else { return [] }
         // Map each declared wire tier to the UI level that emits it. "none" and
         // "minimal" are OFF-ish tiers handled by the toggle, not the ladder.
         let mapping: [(wire: String, level: ThinkingLevel)] = [

@@ -426,7 +426,10 @@ struct ChatMessageRow: View {
     }
 
     private var userRow: some View {
-        HStack {
+        // Match the attachment estimator's cellWidth - 32 - 60 contract.
+        // A prioritized content column receives the width after the spacer's
+        // minimum; no implicit HStack gap can change a boundary row count.
+        HStack(spacing: 0) {
             Spacer(minLength: 60)
 
             VStack(alignment: .trailing, spacing: 6) {
@@ -462,6 +465,7 @@ struct ChatMessageRow: View {
                 }
             }
             .modifier(MinisOpenURLHandler())
+            .layoutPriority(1)
             .contentShape(Rectangle())
             // [T-ios-usermsg-contextmenu-preview-shape] The hit-test shape above
             // stays a full Rectangle (so the whole row is long-pressable), but

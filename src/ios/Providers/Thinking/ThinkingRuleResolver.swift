@@ -556,14 +556,31 @@ enum ThinkingRuleResolver {
             }
         }
 
+        let isGPT62 = ThinkingLevelCatalog.isGPT62Family(ctx.modelId)
+        if isGPT62, ctx.supportsReasoning == false || ctx.declaresNoEffortTiers || ctx.declaredEffortValues?.isEmpty == true {
+            // Scope the metadata veto to effort emitters only. Rule selection,
+            // including custom boolean/path formats, retains its priority.
+            switch format {
+            case .reasoningEffort, .reasoningEffortNested:
+                gateEvents.append(ThinkingGateEvent(
+                    id: "gpt62-effort-disabled",
+                    evidence: ctx.effortDeclarationIsAuthoritative ? .catalogAuthoritative : .catalogHeuristic,
+                    verdict: "emitNothing"))
+                return (nil, nil)
+            default: break
+            }
+        }
+
         switch format {
         case .omitEverything:
             return (nil, nil)
 
         case .reasoningEffortNested:
-            // OpenRouter: omit entirely when off.
+            // OpenRouter: omit entirely when off. GPT-6.2 declarations also
+            // constrain this envelope, without changing other vendors' rules.
             guard ctx.level.isEnabled else { return (nil, nil) }
-            let effort = OpenAIAgentProvider.wireEffort(for: ctx.level)
+            let requested = OpenAIAgentProvider.wireEffort(for: ctx.level)
+            let effort = isGPT62 ? OpenAIAgentProvider.clampEffort(requested, to: ctx.declaredEffortValues) : requested
             body["reasoning"] = ["effort": effort]
             return (effort, effort)
 

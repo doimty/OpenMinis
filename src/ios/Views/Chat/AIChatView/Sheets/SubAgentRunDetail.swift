@@ -596,6 +596,10 @@ struct SubAgentActionsCard: View {
     @State private var confirmStop = false
     @FocusState private var focused: Bool
 
+    private var editorShape: RoundedRectangle {
+        ComposerSurface.roundedShape()
+    }
+
     var body: some View {
         AgentDetailCard(title: AppLocalized("Actions"), icon: "slider.horizontal.3") {
             VStack(alignment: .leading, spacing: 10) {
@@ -604,8 +608,11 @@ struct SubAgentActionsCard: View {
                         CompatMultilineTextField(AppLocalized("Send a course correction…"), text: $draft, lineLimit: 1...4)
                             .font(.system(size: 13))
                             .focused($focused)
+                            // Clip the iOS 15 TextEditor's own white surface BEFORE padding.
+                            .clipShape(editorShape)
                             .padding(.horizontal, 10).padding(.vertical, 7)
-                            .background(RoundedRectangle(cornerRadius: 8).fill(Color(UIColor.tertiarySystemFill)))
+                            .background(editorShape.fill(Color(UIColor.tertiarySystemFill)))
+                            .clipShape(editorShape)
                             // iOS 15 falls back to TextEditor, which is greedy in
                             // BOTH axes: without an explicit flexible frame it
                             // claims its ideal width and pushes the send button

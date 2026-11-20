@@ -236,8 +236,13 @@ struct ModelEntry: Identifiable, Codable, Hashable {
             contextWindow: overrides.contextWindow ?? baseModel.contextWindow,
             maxOutputTokens: overrides.maxOutputTokens ?? baseModel.maxOutputTokens,
             supportsReasoning: overrides.supportsReasoning ?? baseModel.supportsReasoning,
-            interleavedReasoningField: baseModel.interleavedReasoningField
+            interleavedReasoningField: baseModel.interleavedReasoningField,
+            reasoningEffortValues: baseModel.reasoningEffortValues,
+            declaresNoEffortTiers: baseModel.declaresNoEffortTiers
         )
+        // An unrelated name/modality override must not discard endpoint tier
+        // restrictions or turn their authority into a heuristic.
+        rebuilt.effortDeclarationIsAuthoritative = baseModel.effortDeclarationIsAuthoritative
         // Not an init parameter, so the rebuild would drop it and a renamed or
         // re-moded OpenRouter entry would fall back to the audio-bit rule.
         // [T-openrouter-voice-catalog]

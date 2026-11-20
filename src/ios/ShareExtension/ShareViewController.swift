@@ -100,7 +100,7 @@ class ShareViewController: UIViewController {
     /// chain. `done` runs on the main thread once the open reported back, or
     /// at once when it could not be attempted.
     private func openHostApp(_ done: @escaping () -> Void) {
-        guard let url = URL(string: "minis://share") else {
+        guard let url = URL(string: "\(SharedContainerStore.deepLinkScheme)://share") else {
             NSLog("[ShareExt] ERROR: Failed to create minis://share URL")
             done()
             return

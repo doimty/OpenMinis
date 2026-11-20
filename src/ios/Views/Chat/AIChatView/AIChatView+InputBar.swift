@@ -110,8 +110,11 @@ extension AIChatView {
                                 Color.clear.preference(key: AttachmentGridHeightKey.self, value: geo.size.height)
                             })
                     }
-                    .frame(height: min(attachmentGridHeight, 160))
-                    .onPreferenceChange(AttachmentGridHeightKey.self) { attachmentGridHeight = $0 }
+                    .frame(height: min(max(attachmentGridHeight, InputAttachmentGridView.minimumHeight), 160))
+                    .onPreferenceChange(AttachmentGridHeightKey.self) { height in
+                        guard height.isFinite, height >= InputAttachmentGridView.minimumHeight else { return }
+                        attachmentGridHeight = height
+                    }
                     .padding(.top, 8)
                 }
 

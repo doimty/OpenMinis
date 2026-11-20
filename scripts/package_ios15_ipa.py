@@ -30,6 +30,25 @@ APP_NAME = "Minis.app"
 APP_EXECUTABLE = "Minis"
 PRODUCT_FLOOR = (15, 0, 0)
 DEFAULT_ENTITLEMENTS = Path(__file__).resolve().parent / "ios15-trollstore.entitlements"
+BROAD_FILES_ENTITLEMENTS = Path(__file__).resolve().parent / "ios15-broadfiles.entitlements"
+BROAD_SHARE_ENTITLEMENTS = Path(__file__).resolve().parent / "ios15-broadfiles-share.entitlements"
+NORMAL_BUNDLE_ID = "com.openminis.app"
+BROAD_BUNDLE_ID = "com.openminis.app.broadfiles"
+BROAD_APP_GROUP = "group.com.openminis.app.broadfiles"
+FILE_ACCESS_PROFILES = ("standard", "broad-files")
+BROAD_FILE_KEYS = {
+    "com.apple.security.exception.files.absolute-path.read-write",
+    "com.apple.private.security.storage.AppDataContainers",
+    "com.apple.private.security.storage.AppBundles",
+}
+FORBIDDEN_PRIVILEGE_KEYS = {
+    "platform-application", "com.apple.private.security.no-sandbox",
+    "com.apple.private.security.no-container", "com.apple.private.tcc.allow",
+    "com.apple.private.tcc.manager", "task_for_pid-allow", "get-task-allow-root",
+    "com.apple.system-task-ports", "run-unsigned-code", "com.apple.private.persona-mgmt",
+    "com.apple.private.cs.debugger", "dynamic-codesigning",
+    "com.apple.private.skip-library-validation",
+}
 SHARE_ENTITLEMENTS = (
     Path(__file__).resolve().parent.parent
     / "src/ios/ShareExtension/ShareExtension.entitlements"
@@ -76,6 +95,98 @@ def load_plist(path: Path) -> dict:
     if not isinstance(data, dict):
         raise PackageError(f"Info.plist is not a dictionary: {path}")
     return data
+
+
+def entitlement_values_equal(actual: object, expected: object) -> bool:
+    # bool is a subclass of int in Python, but integer 1 is not a valid
+    # replacement for a Boolean entitlement. Match plist types as well.
+    if type(actual) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return actual.keys() == expected.keys() and all(
+            entitlement_values_equal(actual[key], value) for key, value in expected.items())
+    if isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            entitlement_values_equal(a, b) for a, b in zip(actual, expected))
+    return actual == expected
+
+
+def expected_broad_entitlements(*, share: bool = False) -> dict:
+    values = {
+        "application-identifier": BROAD_BUNDLE_ID + (".ShareExtension" if share else ""),
+        "com.apple.security.application-groups": [BROAD_APP_GROUP],
+        "keychain-access-groups": [BROAD_BUNDLE_ID],
+        "get-task-allow": False,
+    }
+    if not share:
+        values.update({
+            "com.apple.private.security.no-sandbox": True,
+            "platform-application": True,
+            "com.apple.private.security.storage.AppDataContainers": True,
+        })
+    return values
+
+
+def validate_file_access_profile(profile: str, entitlements: Path | None) -> tuple[Path, dict]:
+    if profile not in FILE_ACCESS_PROFILES:
+        raise PackageError(f"unknown file access profile: {profile}")
+    path = entitlements or (BROAD_FILES_ENTITLEMENTS if profile == "broad-files" else DEFAULT_ENTITLEMENTS)
+    values = load_plist(path)
+    if profile == "broad-files":
+        # An exact opt-in allowlist: native unsandboxing, no TCC, process
+        # inspection, persona-mgmt or root helper.
+        if not entitlement_values_equal(values, expected_broad_entitlements()):
+            raise PackageError("broad-files entitlements must match the minimal file-only profile")
+        if not entitlement_values_equal(load_plist(BROAD_SHARE_ENTITLEMENTS), expected_broad_entitlements(share=True)):
+            raise PackageError("broad-files share entitlements must remain sandboxed and independently identified")
+    elif any(key in values for key in BROAD_FILE_KEYS | FORBIDDEN_PRIVILEGE_KEYS) \
+            or values.get("com.apple.private.security.container-required") is False:
+        raise PackageError("ordinary IPA cannot receive broad or elevated entitlements; select broad-files explicitly")
+    return path, values
+
+
+def write_bundle_info(bundle: Path, info: dict) -> None:
+    path = bundle / "Info.plist"
+    fmt = plistlib.FMT_BINARY if path.read_bytes().startswith(b"bplist") else plistlib.FMT_XML
+    path.write_bytes(plistlib.dumps(info, fmt=fmt))
+
+
+def prepare_file_access_identity(app: Path, profile: str) -> dict:
+    info = load_plist(app / "Info.plist")
+    identifier = str(info.get("CFBundleIdentifier") or "")
+    if profile == "standard":
+        if identifier == BROAD_BUNDLE_ID or identifier.startswith(BROAD_BUNDLE_ID + ".") \
+                or info.get("MinisFileAccessProfile") == "broad-files":
+            raise PackageError("broad-files source cannot be silently relabelled as an ordinary IPA")
+        return info
+    if identifier not in {NORMAL_BUNDLE_ID, BROAD_BUNDLE_ID}:
+        raise PackageError("broad-files repack requires the known OpenMinis app identity")
+    info = dict(info)
+    info.update({
+        "CFBundleIdentifier": BROAD_BUNDLE_ID,
+        "CFBundleName": "Minis Files",
+        "CFBundleDisplayName": "Minis Files",
+        "MinisFileAccessProfile": "broad-files",
+    })
+    # Preserve registered OAuth callbacks; the isolated share handoff uses
+    # minis-broadfiles. Co-installed OAuth callbacks still need device testing.
+    info["CFBundleURLTypes"] = [dict(entry) for entry in info.get("CFBundleURLTypes", [])]
+    info["CFBundleURLTypes"].append({
+        "CFBundleURLName": "Minis Files",
+        "CFBundleURLSchemes": ["minis-broadfiles"],
+    })
+    write_bundle_info(app, info)
+    for plugin in plugin_bundles(app):
+        if plugin.name != "MinisShare.appex":
+            raise PackageError(f"broad-files only supports the compatible share extension, not {plugin.name}")
+        plugin_info = load_plist(plugin / "Info.plist")
+        old_id = str(plugin_info.get("CFBundleIdentifier") or "")
+        if not (old_id.startswith(NORMAL_BUNDLE_ID + ".") or old_id.startswith(BROAD_BUNDLE_ID + ".")):
+            raise PackageError("unrecognized share extension identity")
+        plugin_info.update({"CFBundleIdentifier": BROAD_BUNDLE_ID + ".ShareExtension",
+                            "MinisFileAccessProfile": "broad-files"})
+        write_bundle_info(plugin, plugin_info)
+    return info
 
 
 def bundle_minimum_os(info: dict) -> str | None:
@@ -184,7 +295,8 @@ def chmod_executable(path: Path) -> None:
     path.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
-def adhoc_sign(app: Path, entitlements: Path | None) -> None:
+def adhoc_sign(app: Path, entitlements: Path | None, *, share_entitlements: Path | None = None) -> None:
+    share_entitlements = share_entitlements or SHARE_ENTITLEMENTS
     if os.uname().sysname != "Darwin":
         raise PackageError("ad-hoc codesign requires Darwin; pass --skip-sign")
     codesign = shutil.which("codesign")
@@ -207,15 +319,15 @@ def adhoc_sign(app: Path, entitlements: Path | None) -> None:
     for binary in binaries:
         chmod_executable(binary)
         extra: list[str] = []
-        if binary.parent.suffix == ".appex" and SHARE_ENTITLEMENTS.is_file():
-            extra = ["--entitlements", str(SHARE_ENTITLEMENTS)]
+        if binary.parent.suffix == ".appex" and share_entitlements.is_file():
+            extra = ["--entitlements", str(share_entitlements)]
         run_codesign(codesign, binary, extra)
     for bundle in bundles:
         extra = []
         if bundle == app and entitlements is not None:
             extra = ["--entitlements", str(entitlements)]
-        elif bundle.suffix == ".appex" and SHARE_ENTITLEMENTS.is_file():
-            extra = ["--entitlements", str(SHARE_ENTITLEMENTS)]
+        elif bundle.suffix == ".appex" and share_entitlements.is_file():
+            extra = ["--entitlements", str(share_entitlements)]
         run_codesign(codesign, bundle, extra)
 
 
@@ -226,6 +338,44 @@ def run_codesign(codesign: str, target: Path, extra: list[str]) -> None:
         raise PackageError(
             f"codesign failed for {target}: {completed.stderr.strip() or completed.stdout.strip()}"
         )
+
+
+def signed_entitlements(codesign: str, bundle: Path) -> dict:
+    completed = subprocess.run([codesign, "--display", "--entitlements", ":-", str(bundle)],
+                               capture_output=True)
+    if completed.returncode != 0:
+        raise PackageError(f"cannot read signed entitlements for {bundle}")
+    output = completed.stdout + completed.stderr
+    start, end = output.find(b"<plist"), output.find(b"</plist>")
+    if start < 0 or end < start:
+        raise PackageError(f"codesign returned no plist entitlements for {bundle}")
+    try:
+        values = plistlib.loads(output[start:end + len(b"</plist>")])
+    except Exception as exc:
+        raise PackageError(f"invalid signed entitlement plist for {bundle}") from exc
+    if not isinstance(values, dict):
+        raise PackageError(f"signed entitlements are not a dictionary for {bundle}")
+    return values
+
+
+def verify_broad_files_signatures(app: Path) -> dict:
+    codesign = shutil.which("codesign")
+    if not codesign:
+        raise PackageError("codesign not found for signature verification")
+    completed = subprocess.run([codesign, "--verify", "--deep", "--strict", str(app)],
+                               capture_output=True, text=True)
+    if completed.returncode != 0:
+        raise PackageError(f"broad-files bundle signature verification failed: {completed.stderr.strip()}")
+    main = signed_entitlements(codesign, app)
+    if not entitlement_values_equal(main, expected_broad_entitlements()):
+        raise PackageError("signed broad-files main entitlements differ from the approved profile")
+    extensions = {}
+    for plugin in plugin_bundles(app):
+        values = signed_entitlements(codesign, plugin)
+        if not entitlement_values_equal(values, expected_broad_entitlements(share=True)):
+            raise PackageError(f"signed share entitlements differ from the isolated profile: {plugin.name}")
+        extensions[plugin.name] = values
+    return {"app": main, "extensions": extensions}
 
 
 def zip_payload(stage: Path, ipa: Path) -> None:
@@ -298,12 +448,24 @@ def package_app(
     skip_sign: bool = False,
     keep_incompatible_plugins: bool = False,
     entitlements: Path | None = None,
+    file_access_profile: str = "standard",
     ipa_name: str | None = None,
     diagnostic_commit: str | None = None,
 ) -> dict:
     if diagnostic_commit is not None and not re.fullmatch(r"[0-9a-f]{40}", diagnostic_commit):
         raise PackageError("diagnostic commit must be a full lowercase Git SHA")
     info = validate_app(source_app)
+    entitlement_path, requested_entitlements = validate_file_access_profile(file_access_profile, entitlements)
+    if file_access_profile == "broad-files" and (keep_incompatible_plugins or diagnostic_commit is not None):
+        raise PackageError("broad-files cannot keep incompatible extensions or activate diagnostic probes")
+    existing_manifest = output_dir / "manifest.json"
+    if existing_manifest.is_file():
+        try:
+            previous = json.loads(existing_manifest.read_text())
+        except (OSError, ValueError) as exc:
+            raise PackageError("unreadable existing output manifest") from exc
+        if previous.get("file_access_profile", "standard") != file_access_profile:
+            raise PackageError("use a separate output directory for each file access profile")
     output_dir.mkdir(parents=True, exist_ok=True)
     stage = output_dir / "stage"
     if stage.exists():
@@ -328,20 +490,27 @@ def package_app(
         stripped: list[dict] = []
     else:
         kept, stripped = strip_incompatible_plugins(staged_app)
+    info = prepare_file_access_identity(staged_app, file_access_profile)
     validate_app(staged_app)
     native_floor = None if skip_sign else audit_staged_native_floor(staged_app)
     signed = False
+    signature_entitlements = None
     if not skip_sign:
-        entitlement_path = entitlements or DEFAULT_ENTITLEMENTS
-        if not entitlement_path.is_file():
-            raise PackageError(f"entitlements file not found: {entitlement_path}")
-        adhoc_sign(staged_app, entitlement_path)
+        if file_access_profile == "broad-files":
+            adhoc_sign(staged_app, entitlement_path, share_entitlements=BROAD_SHARE_ENTITLEMENTS)
+            signature_entitlements = verify_broad_files_signatures(staged_app)
+        else:
+            adhoc_sign(staged_app, entitlement_path)
         signed = True
     diagnostic_name = (
         f"Minis-{info.get('CFBundleShortVersionString', 'unknown')}-ios15-reentry-diagnostic-{diagnostic_commit[:8]}.ipa"
         if diagnostic_commit is not None else None
     )
-    name = ipa_name or diagnostic_name or default_ipa_name(info)
+    profile_name = (
+        f"Minis-{info.get('CFBundleShortVersionString', 'unknown')}-ios15-trollstore-broadfiles.ipa"
+        if file_access_profile == "broad-files" else None
+    )
+    name = ipa_name or diagnostic_name or profile_name or default_ipa_name(info)
     ipa = output_dir / name
     zip_payload(stage, ipa)
     if ipa.stat().st_size <= 0:
@@ -365,6 +534,13 @@ def package_app(
         "ipa_bytes": ipa.stat().st_size,
         "ipa_sha256": sha256_file(ipa),
         "signed": signed,
+        "file_access_profile": file_access_profile,
+        "requested_entitlements": requested_entitlements,
+        "entitlements_sha256": sha256_file(entitlement_path),
+        "signature_entitlements_verified": signature_entitlements is not None,
+        "signature_entitlements": signature_entitlements,
+        "runtime_file_access_verified": False,
+        "root_helper_included": False,
         "plugins_kept": kept,
         "plugins_stripped": stripped,
         "native_floor_audit": native_floor,
@@ -388,6 +564,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-sign", action="store_true")
     parser.add_argument("--keep-incompatible-plugins", action="store_true")
     parser.add_argument("--entitlements", type=Path)
+    parser.add_argument("--file-access-profile", choices=FILE_ACCESS_PROFILES, default="standard",
+                        help="Opt-in isolated native file-access build; does not grant Linux/root execution")
     parser.add_argument("--ipa-name")
     parser.add_argument("--diagnostic-commit", help="Opt staged Debug IPA into scalar re-entry diagnostics for this Git SHA")
     return parser
@@ -403,6 +581,7 @@ def main(argv: list[str] | None = None) -> int:
             skip_sign=args.skip_sign,
             keep_incompatible_plugins=args.keep_incompatible_plugins,
             entitlements=args.entitlements,
+            file_access_profile=args.file_access_profile,
             ipa_name=args.ipa_name,
             diagnostic_commit=args.diagnostic_commit,
         )

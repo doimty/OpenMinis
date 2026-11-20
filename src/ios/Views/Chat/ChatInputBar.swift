@@ -157,6 +157,52 @@ private struct FlowLayout: Layout {
 
 // MARK: - Input Attachment Grid
 
+/// Fixed-size attachment tiles only. The adaptive grid supplies a natural
+/// row height from the parent's proposal; its overlay uses that SAME live
+/// width to place the real, UUID-keyed tiles (including a trailing last row).
+/// No width/height preference feeds back into a self-sized frame, unlike the
+/// legacy flow's initial 64pt width. Non-attachment LegacyFlowLayout users
+/// retain their existing measurement and unknown-size behavior.
+private struct AttachmentTileGrid: View {
+    let items: [LegacyFlowItem]
+    let tileSize: CGFloat
+    let gap: CGFloat
+    var alignment: HorizontalAlignment = .leading
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: tileSize, maximum: tileSize), spacing: gap)],
+                  alignment: alignment, spacing: gap) {
+            ForEach(items) { _ in
+                Color.clear
+                    .frame(width: tileSize, height: tileSize)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .top))
+        .overlay(
+            GeometryReader { proxy in
+                let arrangement = LegacyFlowArrangement.pack(
+                    sizes: Array(repeating: CGSize(width: tileSize, height: tileSize), count: items.count),
+                    width: max(proxy.size.width, tileSize), hSpacing: gap,
+                    vSpacing: gap, trailing: alignment == .trailing)
+                ZStack(alignment: .topLeading) {
+                    Color.clear
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        item.view
+                            .frame(width: tileSize, height: tileSize)
+                            .fixedSize()
+                            .offset(x: arrangement.positions[index].x, y: arrangement.positions[index].y)
+                    }
+                }
+            }
+        )
+    }
+}
+
 struct AttachmentGridHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
@@ -168,6 +214,10 @@ struct TranscriptHeightKey: PreferenceKey {
 }
 
 struct InputAttachmentGridView: View {
+    private static let tileSize: CGFloat = 64
+    private static let topInset: CGFloat = 6
+    static let minimumHeight: CGFloat = tileSize + topInset
+
     let attachments: [InputAttachment]
     var loadingVideoCount: Int = 0
     let onRemove: (InputAttachment) -> Void
@@ -189,12 +239,11 @@ struct InputAttachmentGridView: View {
                     ForEach(0..<loadingVideoCount, id: \.self) { _ in VideoLoadingChip() }
                 }
             } else {
-                LegacyFlowLayout(items: legacyItems, hSpacing: 8, vSpacing: 8,
-                                 alignment: .leading)
+                AttachmentTileGrid(items: legacyItems, tileSize: Self.tileSize, gap: 8)
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 6)  // room for × button overhang (offset y: -4)
+        .padding(.top, Self.topInset)  // room for × button overhang (offset y: -4)
         .sheet(item: $previewTarget) { target in
             AttachmentPreviewSheet(
                 attachments: attachments.filter { $0.loadState == .ready },
@@ -831,10 +880,8 @@ struct UserAttachmentList: View {
                     ForEach(attachments) { meta in tile(meta) }
                 }
             } else {
-                LegacyFlowLayout(items: legacyItems,
-                                 hSpacing: UserAttachmentTileMetrics.gap,
-                                 vSpacing: UserAttachmentTileMetrics.gap,
-                                 alignment: .trailing)
+                AttachmentTileGrid(items: legacyItems, tileSize: tileSize,
+                                   gap: UserAttachmentTileMetrics.gap, alignment: .trailing)
             }
         }
     }
@@ -1038,13 +1085,13 @@ struct QueuedAttachmentPreview: View {
                     ForEach(attachments) { attachment in tile(attachment) }
                 }
             } else {
-                LegacyFlowLayout(items: attachments.map { attachment in
+                AttachmentTileGrid(items: attachments.map { attachment in
                     LegacyFlowItem(id: attachment.id,
                                    expectedSize: CGSize(width: tileSize, height: tileSize)) {
                         tile(attachment)
                     }
-                }, hSpacing: UserAttachmentTileMetrics.gap,
-                   vSpacing: UserAttachmentTileMetrics.gap, alignment: .trailing)
+                }, tileSize: tileSize,
+                   gap: UserAttachmentTileMetrics.gap, alignment: .trailing)
             }
         }
     }

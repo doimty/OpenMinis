@@ -791,8 +791,8 @@ struct MinisApp: App {
         guard previous != current else { return }
         UserDefaults.standard.set(current, forKey: key)
 
-        guard let container = fm.containerURL(forSecurityApplicationGroupIdentifier: "group.com.openminis.app") else { return }
-        let dir = container.appendingPathComponent("MinisConfig", isDirectory: true)
+        let dir = SharedContainerStore.storageContainerURL
+            .appendingPathComponent("MinisConfig", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = dir.appendingPathComponent("fp-sync-trace.log")
         let fmt = DateFormatter()
@@ -1194,7 +1194,7 @@ struct MinisApp: App {
     private static func migrateSharedDirToAppGroup() {
         let fm = FileManager.default
         let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!
-        let container = fm.containerURL(forSecurityApplicationGroupIdentifier: "group.com.openminis.app")!
+        let container = SharedContainerStore.storageContainerURL
 
         let migrations: [(source: URL, dest: URL, label: String)] = [
             // Legacy Library/MinisChat/shared → new shared
@@ -1235,7 +1235,7 @@ struct MinisApp: App {
     /// targets logged during MOUNT setup.
     private static func logFPSyncTracePaths() {
         let fm = FileManager.default
-        let groupID = "group.com.openminis.app"
+        let groupID = SharedContainerStore.appGroupID
         let containerURL = fm.containerURL(forSecurityApplicationGroupIdentifier: groupID)
         let containerPath = containerURL?.path ?? "<nil>"
         let resolvedContainer = containerURL?.resolvingSymlinksInPath().path ?? "<nil>"
@@ -1287,4 +1287,6 @@ struct MinisApp: App {
             lifecycleLog.error("[WebApp] deeplink resolve failed scope=\(shortcut.pathScope.rawValue) htmlPath=\(shortcut.htmlPath) error=\(error)")
         }
     }
+}
+  }
 }

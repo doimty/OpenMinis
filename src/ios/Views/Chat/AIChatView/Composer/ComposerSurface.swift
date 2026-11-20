@@ -99,8 +99,13 @@ struct FloatingCircleButtonSurface: ViewModifier {
 /// fill and BOTH shadows byte-for-byte, including the dark-mode-only top shadow
 /// that lifts the bar off the message list.
 struct ComposerSurface: ViewModifier {
+    /// Shared continuous boundary; smaller editors keep their existing radius.
+    static func roundedShape(cornerRadius: CGFloat = 20) -> RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
+        Self.roundedShape()
     }
 
     func body(content: Content) -> some View {

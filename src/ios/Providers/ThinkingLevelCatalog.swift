@@ -1,7 +1,21 @@
 import Foundation
 
 enum ThinkingLevelCatalog {
+    // [T-gpt62-metadata-first] CLIProxyAPI registry 6faa8d20 declares this
+    // ladder for gpt-6.2-astra / gpt-6.2-sol. Relay compatibility evidence,
+    // not proof that an official account serves either model. Never send ultra.
+    static let gpt62EffortValues = ["low", "medium", "high", "xhigh", "max"]
+
+    static func isGPT62Family(_ modelId: String) -> Bool {
+        // Only the final model component, with a version-token boundary.
+        // Covers vendor/model and vendor:model relays, case and snapshots,
+        // without accepting gpt-6.20, gpt-6.2.1 or not-gpt-6.2 substrings.
+        let bare = modelId.lowercased().components(separatedBy: CharacterSet(charactersIn: "/:")).last ?? ""
+        return ["gpt-6.2", "gpt-6-2"].contains { bare == $0 || bare.hasPrefix($0 + "-") }
+    }
+
     private static let rules: [(match: (String) -> Bool, max: ThinkingLevel)] = [
+        ({ Self.isGPT62Family($0) }, .max),
         // GPT-5.6 sol/terra/luna all reach .max. (.ultra is a client-side
         // "Max + orchestration" concept — the wire effort tops out at "max",
         // reasoningEffort(for:level:) maps both .max and .ultra to "max".)

@@ -153,9 +153,13 @@ enum OpenAIModelsAPI {
             if authoritative.contextWindow != nil { merged.contextWindow = authoritative.contextWindow }
             if authoritative.maxOutputTokens != nil { merged.maxOutputTokens = authoritative.maxOutputTokens }
             if authoritative.supportsReasoning != nil { merged.supportsReasoning = authoritative.supportsReasoning }
+            if authoritative.reasoningEffortValues != nil { merged.reasoningEffortValues = authoritative.reasoningEffortValues }
+            if authoritative.declaresNoEffortTiers != nil { merged.declaresNoEffortTiers = authoritative.declaresNoEffortTiers }
+            if authoritative.effortDeclarationIsAuthoritative != nil { merged.effortDeclarationIsAuthoritative = authoritative.effortDeclarationIsAuthoritative }
             if authoritative.modalityOverride != nil { merged.modalityOverride = authoritative.modalityOverride }
             // Mutate in place rather than rebuilding: `LLMModel` also carries
-            // effort-tier fields that only models.dev knows about, and a
+            // effort-tier fields; endpoint declarations win when present, and
+            // enrichment only supplies those the endpoint left unknown.
             // re-`init` with the arguments we happen to remember would silently
             // drop them. `displayName` needs no handling — `enrichModels` never
             // replaces it, so `merged` already carries the endpoint's own name.
@@ -280,10 +284,43 @@ enum OpenAIModelsAPI {
     /// `supported_reasoning_levels` (a non-empty list for reasoning models), not
     /// `supports_reasoning`. nil when the entry says nothing either way.
     static func codexCatalogSupportsReasoning(_ item: [String: Any]) -> Bool? {
+        // An explicit endpoint answer outranks a contradictory tier list.
+        if let explicit = (item["supports_reasoning"] as? Bool)
+            ?? (item["supportsReasoning"] as? Bool) ?? (item["reasoning"] as? Bool) { return explicit }
         if let levels = item["supported_reasoning_levels"] as? [Any] { return !levels.isEmpty }
-        return (item["supports_reasoning"] as? Bool) ?? (item["reasoning"] as? Bool)
+        return nil
     }
     // END codexCatalogVisibility
+
+    /// [T-gpt62-metadata-first] Read endpoint declarations, never write a name
+    /// fallback into the model. Scope relay parsing to GPT-6.2 only.
+    static func applyGPT62ReasoningMetadata(_ item: [String: Any], to model: inout LLMModel) {
+        guard ThinkingLevelCatalog.isGPT62Family(model.id) else { return }
+        if let support = (item["supports_reasoning"] as? Bool)
+            ?? (item["supportsReasoning"] as? Bool) ?? (item["reasoning"] as? Bool) {
+            model.supportsReasoning = support
+            model.effortDeclarationIsAuthoritative = true
+        }
+        let declared = (item["reasoning_effort_values"] as? [Any])
+            ?? (item["reasoningEffortValues"] as? [Any])
+            ?? (item["supported_reasoning_levels"] as? [Any])
+            ?? ((item["thinking"] as? [String: Any])?["levels"] as? [Any])
+        if let declared {
+            model.reasoningEffortValues = declared.compactMap { value in
+                if let tier = value as? String { return tier.lowercased() }
+                let object = value as? [String: Any]
+                return ((object?["effort"] as? String) ?? (object?["level"] as? String)
+                    ?? (object?["value"] as? String))?.lowercased()
+            }
+            model.declaresNoEffortTiers = declared.isEmpty
+            model.effortDeclarationIsAuthoritative = true
+        }
+        if let noTiers = (item["declares_no_effort_tiers"] as? Bool)
+            ?? (item["declaresNoEffortTiers"] as? Bool) {
+            model.declaresNoEffortTiers = noTiers
+            model.effortDeclarationIsAuthoritative = true
+        }
+    }
 
     /// Map the Codex catalogue onto `LLMModel`.
     ///
@@ -339,6 +376,7 @@ enum OpenAIModelsAPI {
             if let reasoning = codexCatalogSupportsReasoning(item) {
                 model.supportsReasoning = reasoning
             }
+            applyGPT62ReasoningMetadata(item, to: &model)
             return model
         }
     }
@@ -378,10 +416,11 @@ enum OpenAIModelsAPI {
             guard let (id, item) = ModelListParsing.entry(raw) else { return nil }
 
             if filterOpenAIOnly {
-                let isChatModel = chatPrefixes.contains { id.hasPrefix($0) }
+                let isChatModel = chatPrefixes.contains { id.hasPrefix($0) } || ThinkingLevelCatalog.isGPT62Family(id)
                 guard isChatModel else { return nil }
 
-                let isExcluded = excludeSuffixes.contains { id.hasSuffix($0) }
+                let filterId = ThinkingLevelCatalog.isGPT62Family(id) ? id.lowercased() : id
+                let isExcluded = excludeSuffixes.contains { filterId.hasSuffix($0) }
                 guard !isExcluded else { return nil }
 
                 // Skip fine-tuned models
@@ -442,6 +481,7 @@ enum OpenAIModelsAPI {
             // models still get `.imageInput` from the architecture block
             // above (or from models.dev / pattern inference downstream).
             var model = LLMModel(id: id, displayName: displayName, provider: "OpenAI", modalityOverride: modality)
+            applyGPT62ReasoningMetadata(item, to: &model)
             // [OpenMinis#438] A gateway that reports its own limits is the
             // authority on them; `enrichModels` below and every later
             // re-enrichment only fill what it left out (see applyDevData).

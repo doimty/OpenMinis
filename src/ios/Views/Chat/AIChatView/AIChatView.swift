@@ -414,7 +414,7 @@ struct AIChatView: View {
     /// [T-multi-select-share] The open share picker (long-press "Share…" or "…" → Share…).
     @State var shareRequest: ChatShareRequest?
     @State private var selectedPhotoItems: [CompatPhotoPickerItem] = []
-    @State var attachmentGridHeight: CGFloat = 0
+    @State var attachmentGridHeight: CGFloat = InputAttachmentGridView.minimumHeight
     @State var transcriptHeight: CGFloat = 0
     /// Tracks how much of recognizedText has already been appended to inputText.
     @State var lastRecognizedLength: Int = 0

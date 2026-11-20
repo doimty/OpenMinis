@@ -631,58 +631,14 @@ final class OpenAIAgentProvider: AgentProvider {
         if Self.shouldSendPromptCacheKey(for: provider) {
             body["prompt_cache_key"] = Self.derivePromptCacheKey(from: messages)
         }
-        // Thinking level → Responses API `reasoning.effort`.
-        // Applies to every Responses flavor (Codex OAuth + forceResponsesAPI +
-        // custom-base). Previously only Codex honored the user's level, so
-        // Responses-API provider types silently ignored thinking settings.
-        var reasoningRequested = false
-        // [T-ios-mistral-reasoning-422] Mistral rejects the reasoning request
-        // parameter outright (`422 extra_forbidden body.reasoning`, OpenMinis#87),
-        // and its ChatCompletionRequest-era guard only ever covered the Chat
-        // Completions path (the `if !provider.isMistral` around
-        // injectThinkingParams). This builder is a SECOND, independent injection
-        // site: a Mistral instance with useResponsesAPI enabled reached it
-        // ungated and put `reasoning` back on the wire. Suppress the whole block
-        // — for Mistral the answer to "should any thinking field be sent" is
-        // NEVER, on every request path.
-        if provider.isMistral {
-            // No reasoning key, and reasoningRequested stays false so the
-            // encrypted-reasoning include below is skipped too.
-        } else if thinkingLevel.isEnabled, let effort = Self.reasoningEffort(for: model, level: thinkingLevel) {
-            // `summary: "auto"` opts in to streaming the human-readable
-            // reasoning summary (delivered as `response.reasoning_summary_text.delta`
-            // SSE events). Without it the Responses API only returns
-            // `encrypted_content`, so the UI has nothing to show except a
-            // token count. Safe to send to every Responses-flavor endpoint:
-            // OpenAI ignores unknown variants and falls back to "auto"-equiv.
-            body["reasoning"] = ["effort": effort, "summary": "auto"]
-            reasoningRequested = true
-        } else if isCodexOAuth {
-            // Codex requires a `reasoning` object on every request — fall back
-            // to "low" when the user has thinking off.
-            body["reasoning"] = ["effort": "low", "summary": "auto"]
-            reasoningRequested = true
-        } else if model.supportsReasoning ?? false,
-                  let offEffort = Self.explicitOffEffort(for: provider, model: model, level: thinkingLevel) {
-            // [T-thinking-off-explicit] Thinking OFF on a reasoning-capable
-            // model: send the explicit off tier instead of omitting the
-            // `reasoning` key — omission lets the vendor default kick in.
-            // Same ALLOWLIST as the Chat path (official OpenAI → "none",
-            // Volcano Ark → "minimal"); vendors with undocumented off
-            // semantics keep the historical omission. No summary/include:
-            // nothing should stream back.
-            body["reasoning"] = ["effort": offEffort]
-        }
-        // Request the encrypted reasoning payload whenever reasoning is
-        // requested. The `encrypted_content` is opaque + model-specific; we
-        // capture it on each turn and echo back to the SAME model id on
-        // subsequent requests (see ReasoningEcho + convertMessagesResponsesAPI
-        // for the model-id-gated round-trip). Applies to every Responses-API
-        // model that supports reasoning — Codex OAuth, gpt-5.x, o-series,
-        // and any future model the server recognizes. Not model-name-gated.
-        if reasoningRequested {
-            body["include"] = ["reasoning.encrypted_content"]
-        }
+        // Thinking level → Responses reasoning.effort (all Responses flavors).
+        // The pure injector preserves Mistral's total prohibition, Codex's low
+        // off fallback and encrypted-reasoning inclusion/recovery semantics.
+        Self.injectResponsesThinkingParams(
+            into: &body, model: model, level: thinkingLevel,
+            isCodexOAuth: isCodexOAuth, isMistral: provider.isMistral,
+            offEffort: Self.explicitOffEffort(for: provider, model: model, level: thinkingLevel)
+        )
         // [T-responses-max-output-tokens] The function always RECEIVED
         // maxTokens (dynamicMaxTokens result: model override + context-window
         // aware) but never wrote it into the body — so Responses-API vendors
@@ -1228,8 +1184,10 @@ final class OpenAIAgentProvider: AgentProvider {
     /// low/medium/high for reasoning_effort and reject "xhigh" outright
     /// (MiMo-2.5/Pro → 400 literal_error; Agnes → 422 unknown variant).
     static func reasoningEffort(for model: LLMModel, level: ThinkingLevel = .medium) -> String? {
-        guard model.supportsReasoning ?? false else { return nil }
-        return switch level {
+        guard model.effectiveSupportsReasoning ?? false else { return nil }
+        let isGPT62 = ThinkingLevelCatalog.isGPT62Family(model.id)
+        if isGPT62, model.effectiveReasoningEffortValues?.isEmpty == true { return nil }
+        let effort: String? = switch level {
         case .off: nil
         case .low: "low"
         case .medium: "medium"
@@ -1245,6 +1203,43 @@ final class OpenAIAgentProvider: AgentProvider {
         // ultra → "max" here. If/when we implement the orchestration layer it
         // stays a local behavior; the effort string never becomes "ultra".
         case .max, .ultra: "max"
+        }
+        guard let effort else { return nil }
+        return isGPT62 ? Self.clampEffort(effort, to: model.effectiveReasoningEffortValues) : effort
+    }
+
+    /// Pure Responses injection, shared with the Foundation-only smoke. Keep
+    /// endpoint/Mistral and off semantics separate from the enabled tier clamp.
+    static func injectResponsesThinkingParams(
+        into body: inout [String: Any], model: LLMModel, level: ThinkingLevel,
+        isCodexOAuth: Bool, isMistral: Bool = false, offEffort: String? = nil
+    ) {
+        guard !isMistral else { return }
+        let isGPT62 = ThinkingLevelCatalog.isGPT62Family(model.id)
+        // Explicit false/no-tiers/empty declarations outrank Codex's fallback.
+        if isGPT62, model.effectiveReasoningEffortValues?.isEmpty == true { return }
+        var reasoningRequested = false
+        if level.isEnabled, let effort = Self.reasoningEffort(for: model, level: level) {
+            // summary enables the human-readable Responses reasoning stream.
+            body["reasoning"] = ["effort": effort, "summary": "auto"]
+            reasoningRequested = true
+        } else if isCodexOAuth {
+            // Preserve the necessary low fallback when off; never clamp it UP
+            // and silently enable stronger thinking. Explicit tiers still win.
+            if isGPT62, let tiers = model.effectiveReasoningEffortValues, !tiers.contains("low") { return }
+            body["reasoning"] = ["effort": "low", "summary": "auto"]
+            reasoningRequested = true
+        } else if !level.isEnabled, model.effectiveSupportsReasoning ?? false, let offEffort {
+            // An inferred ladder cannot suppress documented off. Only an
+            // explicit GPT-6.2 declaration may reject that allowlisted value.
+            if isGPT62, let tiers = model.reasoningEffortValues,
+               !tiers.map({ $0.lowercased() }).contains(offEffort) { return }
+            body["reasoning"] = ["effort": offEffort]
+        }
+        if reasoningRequested {
+            // Opaque reasoning is echoed only to the SAME model id by the
+            // existing Responses conversion/recovery path, unchanged here.
+            body["include"] = ["reasoning.encrypted_content"]
         }
     }
 
@@ -1289,8 +1284,10 @@ final class OpenAIAgentProvider: AgentProvider {
         let userRules = providerInstanceId.map { ThinkingRuleCache.shared.rules(for: $0) } ?? []
         let ctx = ThinkingResolveContext(
             modelId: model.id,
-            supportsReasoning: model.supportsReasoning,
-            declaredEffortValues: model.reasoningEffortValues,
+            supportsReasoning: model.effectiveSupportsReasoning,
+            // Family fallback is only for enabled tiers. It is not endpoint
+            // authority and must not suppress the user's documented off value.
+            declaredEffortValues: level.isEnabled ? model.effectiveReasoningEffortValues : model.reasoningEffortValues,
             declaresNoEffortTiers: model.declaresNoEffortTiers ?? false,
             effortDeclarationIsAuthoritative: model.effortDeclarationIsAuthoritative ?? false,
             isXAI: isXAI,

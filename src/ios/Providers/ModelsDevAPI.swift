@@ -536,8 +536,14 @@ enum ModelsDevAPI {
             result.maxOutputTokens = out
         }
 
+        // [T-gpt62-metadata-first] Unlike the legacy family heuristics, GPT-6.2
+        // fallback may only fill unknown reasoning fields. An endpoint/user's
+        // explicit false, empty/no-tier or narrower answer must survive every
+        // enrichment pass (including persisted ModelEntry reconstruction).
+        let keepReasoningDeclarations = ThinkingLevelCatalog.isGPT62Family(model.id)
         // Reasoning capability
-        if let reasoning = devModel.reasoning {
+        if let reasoning = devModel.reasoning,
+           !(keepReasoningDeclarations && model.supportsReasoning != nil) {
             result.supportsReasoning = reasoning
         }
 
@@ -548,17 +554,21 @@ enum ModelsDevAPI {
 
         // [T-reasoning-effort-data-driven] Declared effort tiers — drives both
         // "is this model effort-controlled?" and the allowed-tier clamp.
-        if let efforts = devModel.effortValues {
+        if let efforts = devModel.effortValues,
+           !(keepReasoningDeclarations && (model.reasoningEffortValues != nil || model.declaresNoEffortTiers == true)) {
             result.reasoningEffortValues = efforts
             // [T-thinking-off-custom-provider] Record whether this came from the model's
             // OWN provider. Only that may suppress an explicit "thinking off".
-            result.effortDeclarationIsAuthoritative = authoritative
+            if !keepReasoningDeclarations || model.effortDeclarationIsAuthoritative == nil {
+                result.effortDeclarationIsAuthoritative = authoritative
+            }
         }
         // [OpenMinis#163] Carry the affirmative "no effort tiers" answer too.
         // Only set when the catalog actually says so, so enriching a model the
         // catalog is silent about cannot overwrite a prior real answer with a
         // meaningless `false`.
-        if devModel.declaresNoEffortTiers {
+        if devModel.declaresNoEffortTiers,
+           !(keepReasoningDeclarations && (model.declaresNoEffortTiers != nil || model.reasoningEffortValues != nil)) {
             result.declaresNoEffortTiers = true
         }
 
