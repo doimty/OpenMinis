@@ -54,7 +54,7 @@ jobs:
 
   baseline:
     name: Native deps + iOS 15 compile probe
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 180
     steps:
       - name: Checkout
@@ -160,10 +160,10 @@ jobs:
         run: |
           set -euo pipefail
           brew install llvm lld libarchive pkg-config meson
-          export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
+          export PATH="$(brew --prefix llvm)/bin:$(brew --prefix lld)/bin:$PATH"
           command -v meson
           command -v ninja
-          test -x /opt/homebrew/opt/llvm/bin/clang
+          test -x "$(brew --prefix llvm)/bin/clang"
           command -v ld.lld
           ld.lld --version | sed -n '1p'
 
@@ -184,7 +184,7 @@ jobs:
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
+          export PATH="$(brew --prefix llvm)/bin:$(brew --prefix lld)/bin:$PATH"
           command -v ld.lld
           ./deps/build_lame.sh
           ./deps/build_ffmpeg.sh
