@@ -8,6 +8,8 @@ only and must never be reported as a compilation/run pass.
 """
 import argparse
 import json
+import platform
+import sys
 from pathlib import Path
 import re
 import shutil
@@ -241,9 +243,17 @@ def main():
             source = temp / "Production.swift"
             source.write_text(extracted_swift())
             binary = temp / "gpt62-smoke"
-            build = subprocess.run([compiler, "-parse-as-library", str(source),
-                                    str(ROOT / "tests/Standalone/GPT62ReasoningTests.swift"),
-                                    "-o", str(binary)], timeout=120)
+            command = [compiler]
+            if sys.platform == "darwin":
+                sdk = subprocess.check_output(
+                    ["xcrun", "--sdk", "macosx", "--show-sdk-path"],
+                    text=True, timeout=30).strip()
+                command += ["-sdk", sdk, "-target",
+                            f"{platform.machine()}-apple-macosx15.0"]
+            command += ["-parse-as-library", str(source),
+                        str(ROOT / "tests/Standalone/GPT62ReasoningTests.swift"),
+                        "-o", str(binary)]
+            build = subprocess.run(command, timeout=120)
             if build.returncode:
                 return build.returncode
             return subprocess.run([str(binary)], timeout=30).returncode
