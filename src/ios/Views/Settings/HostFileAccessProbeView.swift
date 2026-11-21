@@ -18,6 +18,7 @@
 
 #if DEBUG && MINIS_HOST_FILE_PROBE && os(iOS)
 import SwiftUI
+import UIKit
 import Darwin
 
 struct HostFileAccessProbeView: View {
@@ -35,10 +36,28 @@ struct HostFileAccessProbeView: View {
         var controlErrno = 0
         var uid: UInt32 = 0
         var euid: UInt32 = 0
+        var observedAt = Date()
+    }
+
+    private struct BuildIdentity {
+        let commit: String
+        let runID: String
+
+        static var packaged: BuildIdentity? {
+            guard let values = Bundle.main.object(forInfoDictionaryKey: "MinisHostFileProbeBuild") as? [String: Any],
+                  let schema = values["schema"] as? Int, schema == 1,
+                  let commit = values["source_commit"] as? String,
+                  commit.count == 40, commit.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
+                  let runID = values["actions_run_id"] as? String,
+                  let first = runID.utf8.first, (49...57).contains(first),
+                  runID.utf8.allSatisfy({ (48...57).contains($0) }) else { return nil }
+            return BuildIdentity(commit: commit, runID: runID)
+        }
     }
 
     @State private var report: Report?
     @State private var running = false
+    @State private var reportCopied = false
 
     private static let outcomeNames: [Int: String] = [
         Int(OMHostProbeMatch): "Read returned the expected sample",
@@ -67,9 +86,26 @@ struct HostFileAccessProbeView: View {
             }
 
             Section {
+                if let build = BuildIdentity.packaged {
+                    row("Source commit", build.commit, mono: true)
+                    row("Actions run", build.runID, mono: true)
+                } else {
+                    Text("Build identity is missing or invalid. This report cannot validate a specific diagnostic IPA.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                }
+                row("iOS version / build", ProcessInfo.processInfo.operatingSystemVersionString, mono: true)
+            } header: {
+                Text("Diagnostic build")
+            } footer: {
+                Text("Match the full commit and run ID against the downloaded IPA manifest before comparing results.")
+            }
+
+            Section {
                 Button {
                     guard !running else { return }
                     running = true
+                    reportCopied = false
                     Task.detached(priority: .userInitiated) {
                         let result = Self.measure()
                         await MainActor.run {
@@ -122,6 +158,12 @@ struct HostFileAccessProbeView: View {
                 }
 
                 Section {
+                    Button(reportCopied ? "Scalar report copied" : "Copy scalar JSON report") {
+                        guard let text = Self.jsonReport(report) else { return }
+                        UIPasteboard.general.string = text
+                        reportCopied = true
+                    }
+                    .disabled(running)
                     Text("A match means this fixed sample was readable. It does not mean arbitrary paths, other apps' data, protected files or root are reachable — each of those is a separate capability with its own check.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -130,6 +172,37 @@ struct HostFileAccessProbeView: View {
         }
         .navigationTitle("Host File Access")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// Only canned identifiers, build/environment identity and scalar
+    /// syscall results are exported. No file bytes or arbitrary paths.
+    private static func jsonReport(_ report: Report) -> String? {
+        let build = BuildIdentity.packaged
+        let values: [String: Any] = [
+            "report_schema": 1,
+            "build_identity_recorded": build != nil,
+            "source_commit": build?.commit ?? "",
+            "actions_run_id": build?.runID ?? "",
+            "bundle_identifier": Bundle.main.bundleIdentifier ?? "unknown",
+            "os_version_build": ProcessInfo.processInfo.operatingSystemVersionString,
+            "observed_at_utc": ISO8601DateFormatter().string(from: report.observedAt),
+            "uid": report.uid,
+            "euid": report.euid,
+            "control_ok": report.controlOK,
+            "control_stage": report.controlStage,
+            "control_errno": report.controlErrno,
+            "sample_ran": report.sampleRan,
+            "outcome": report.outcome,
+            "errno": report.errorNumber,
+            "stage": report.stage,
+            "sample_id": report.sampleId,
+            // Decimal strings preserve 64-bit identities in JSON consumers.
+            "device": String(report.device),
+            "inode": String(report.inode),
+            "bytes": String(report.size),
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: values, options: [.sortedKeys, .prettyPrinted]) else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     private func row(_ label: String, _ value: String, mono: Bool) -> some View {
