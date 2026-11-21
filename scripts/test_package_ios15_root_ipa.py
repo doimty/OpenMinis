@@ -56,6 +56,44 @@ def native_metadata(command, **options):
 
 
 class RootIdentityTests(unittest.TestCase):
+    def test_public_capabilities_are_preserved_with_isolated_root_storage(self):
+        ordinary = load_plist(root.STANDARD_APP_ENTITLEMENTS)
+        actual = root.expected_entitlements("app")
+        for key, value in ordinary.items():
+            if key != "com.apple.security.application-groups":
+                with self.subTest(capability=key):
+                    self.assertTrue(root.entitlement_values_equal(actual[key], value))
+        self.assertEqual(actual["application-identifier"], root.ROOT_ID)
+        self.assertEqual(actual["com.apple.security.application-groups"], [root.ROOT_GROUP])
+        self.assertEqual(actual["keychain-access-groups"], [root.ROOT_ID])
+        for role in ("helper", "share", "fileprovider", "widget"):
+            self.assertFalse(set(root.public_app_capabilities()).intersection(root.expected_entitlements(role)))
+
+    def test_unreviewed_source_capability_changes_are_rejected(self):
+        ordinary = load_plist(root.STANDARD_APP_ENTITLEMENTS)
+        changes = [dict(ordinary, **{"com.apple.developer.new-public-capability": True}),
+                   dict(ordinary, **{"com.apple.developer.weatherkit": False}),
+                   {key: value for key, value in ordinary.items() if key != "com.apple.developer.homekit"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            override = Path(tmp) / "ordinary.entitlements"
+            for index, values in enumerate(changes):
+                with self.subTest(change=index):
+                    write_plist(override, values)
+                    with patch.object(root, "STANDARD_APP_ENTITLEMENTS", override), \
+                            self.assertRaisesRegex(PackageError, "capabilities changed"):
+                        root.validate_templates()
+
+    def test_root_profile_cannot_drop_any_public_capability(self):
+        current = root.expected_entitlements("app")
+        with tempfile.TemporaryDirectory() as tmp:
+            override = Path(tmp) / "root.entitlements"
+            for key in root.public_app_capabilities():
+                with self.subTest(capability=key):
+                    write_plist(override, {name: value for name, value in current.items() if name != key})
+                    with patch.object(root, "ROOT_ENTITLEMENTS", override), \
+                            self.assertRaisesRegex(PackageError, "app entitlements differ"):
+                        root.validate_templates()
+
     def test_templates_are_exact_and_share_stays_sandboxed(self):
         root.validate_templates()
         self.assertTrue(root.expected_entitlements("app")["com.apple.private.persona-mgmt"])

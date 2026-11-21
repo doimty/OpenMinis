@@ -30,6 +30,10 @@ com.apple.private.security.storage.AppDataContainers = true
 
 主 App 另带 `uicache.app-data-container-required = true`，让 RootHide 注册时仍为 Minis 创建独立数据容器，保持 Library、Documents 和容器回退存储的归属。helper 不需要 App 数据容器标记；它仍只有固定样本操作。分享、File Provider 和 Widget 扩展继续使用各自的沙盒签名配置。普通版的签名配置不因此改变。
 
+Root 主 App 的重签配置同时保留原 `src/ios/Minis.entitlements` 的公共能力：APNs 的 `aps-environment`、HealthKit 及健康记录、HomeKit、CloudKit/iCloud 和 ubiquity 容器、NFC TAG/PACE、WeatherKit。Root 的 bundle ID、App Group、Keychain group 继续独立；这些公共能力不会授予 helper 或扩展。打包器将已审查的公共键和值写成明确列表，并核对普通版源配置完全一致。今后若源配置新增、删除或修改能力，打包会停止，要求审查保留策略；不会无约束继承未知权限，也不会默默遗漏。
+
+保留签名中的公共能力只解决重签时丢失声明的问题。它不代替用户授权、Apple provisioning、Team ID 与服务端的 App ID／容器绑定。代码仍使用既有 `iCloud.com.openminis.app` 容器标识；新 Root 身份的实际 CloudKit、iCloud、APNs 和 WeatherKit 是否可用，需要相应合法签名／服务配置与目标设备证据。当前这些 Apple 服务行为仍未验证；不通过增添绕过服务授权的权限来宣称兼容。
+
 `RootManagementClient.c` 的 helper 解析先比较固定 Rootless／系统应用目录解析后的真实路径。若均不匹配，Root 专用分支才从当前 App 包内的固定路径 `/.jbroot/usr/lib/libroothide.dylib` 加载官方库，并查询 `jbroot`。只把固定参数 `/Applications/MinisRoot.app` 传给该 API，再用 `realpath` 与当前 App 的真实目录严格比较。缺库、缺符号、无效映射或映射到其他目录均拒绝执行。
 
 该分支依赖包管理器维护的 `.jbroot` 和可信的 RootHide 核心库。它不把调用者传入的路径交给 API，不用随机目录前缀或任意 `MinisRoot.app` 同名目录代替匹配。比较在 `dlclose` 之前完成，不保留或释放库拥有的返回字符串。选定 App 包后仍只追加固定 helper 名，并由 `lstat` 拒绝 helper 符号链接、不安全权限和多硬链接。

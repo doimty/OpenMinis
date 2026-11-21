@@ -29,6 +29,7 @@ from package_ios15_ipa import (
 )
 
 SCRIPTS = Path(__file__).resolve().parent
+STANDARD_APP_ENTITLEMENTS = SCRIPTS.parent / "src/ios/Minis.entitlements"
 ROOT_ID = "com.openminis.app.root"
 ROOT_GROUP = "group.com.openminis.app.root"
 HELPER_NAME = "minis-rootprobe"
@@ -66,6 +67,33 @@ ROOT_EXTENSION_POINTS = {
     "fileprovider": "com.apple.fileprovider-nonui",
     "widget": "com.apple.widgetkit-extension",
 }
+
+
+def public_app_capabilities() -> dict:
+    """Keep the ordinary App's known public capabilities when re-signing Root.
+
+    This explicit profile is reviewed with Minis.entitlements. A new, removed
+    or changed source capability must fail packaging until preservation has
+    been decided, rather than silently inheriting or dropping entitlement keys.
+    """
+    return {
+        "aps-environment": "development",
+        "com.apple.developer.healthkit": True,
+        "com.apple.developer.healthkit.access": ["health-records"],
+        "com.apple.developer.homekit": True,
+        "com.apple.developer.icloud-container-identifiers": ["iCloud.com.openminis.app"],
+        "com.apple.developer.icloud-services": ["CloudKit"],
+        "com.apple.developer.nfc.readersession.formats": ["TAG", "PACE"],
+        "com.apple.developer.ubiquity-container-identifiers": ["iCloud.com.openminis.app"],
+        "com.apple.developer.weatherkit": True,
+    }
+
+
+def validate_public_app_capabilities() -> None:
+    ordinary = public_app_capabilities()
+    ordinary["com.apple.security.application-groups"] = ["group." + NORMAL_BUNDLE_ID]
+    if not entitlement_values_equal(load_plist(STANDARD_APP_ENTITLEMENTS), ordinary):
+        raise PackageError("ordinary app capabilities changed; explicitly review Root capability preservation")
 
 
 def validated_plugins(app: Path, minimum_os: str, *, complete: bool = False) -> dict[Path, str]:
@@ -115,6 +143,7 @@ def expected_entitlements(role: str) -> dict:
     if role in {"app", "share"}:
         values["keychain-access-groups"] = [ROOT_ID]
     if role == "app":
+        values.update(public_app_capabilities())
         values.update({"com.apple.private.security.no-sandbox": True,
                        "platform-application": True,
                        "com.apple.private.security.storage.AppBundles": True,
@@ -127,6 +156,7 @@ def expected_entitlements(role: str) -> dict:
 
 
 def validate_templates() -> None:
+    validate_public_app_capabilities()
     for role, path in (("app", ROOT_ENTITLEMENTS), ("share", SHARE_ENTITLEMENTS),
                        ("fileprovider", FILEPROVIDER_ENTITLEMENTS),
                        ("widget", WIDGET_ENTITLEMENTS),

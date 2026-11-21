@@ -230,6 +230,17 @@ class DebTests(unittest.TestCase):
                     with self.assertRaisesRegex(deb.PackageError, "signature evidence"):
                         self.package("roothide")
 
+    def test_refuses_omitted_public_app_capabilities_for_both_requested_schemes(self):
+        original = json.loads(json.dumps(self.manifest["signature_entitlements"]))
+        for scheme in ("rootless", "roothide"):
+            for key in root.public_app_capabilities():
+                with self.subTest(scheme=scheme, capability=key):
+                    self.manifest["signature_entitlements"] = json.loads(json.dumps(original))
+                    self.manifest["signature_entitlements"]["."].pop(key)
+                    self.save()
+                    with self.assertRaisesRegex(deb.PackageError, "signature evidence"):
+                        self.package(scheme)
+
     def test_rechecks_actual_macho_floor_even_if_ipa_and_executable_hashes_are_replaced(self):
         modified = image("16.1")
         self.tamper_source("Minis", content=modified)
