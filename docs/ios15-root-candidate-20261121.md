@@ -64,6 +64,8 @@ Root 版的 `minis-device` 是内置、保留名称的 STDIO MCP server，在“
 
 跨 App 服务还需下载同一 run 的 `minis-automation-rootless` 或 `minis-automation-roothide`。每份包含 `automation-deb/` 中的 companion DEB、manifest，以及 `automation-build/` 中的构建和源锁定证据。主 App 三档按系统选择，companion 只有最低 iOS 15.0 的两种 scheme；两包的 commit、run 和 scheme 必须一致。快速门禁仅构建 companion 和原生回归，不能与另一 run 的主 App 混装作为最终验收组合。
 
+安装 companion 前先核对 `automation-build/build.json`：arm64e slice 必须 `signed_class_ro=false`、`objc_imageinfo_flags=64`（`0x40`）、保留 chained fixups 且 UUID 非空。2026-11-21 的 SpringBoard 安全模式 A/B 已确认旧 `0x50` 产物会在 `systemhook → dlopen → map_images` 处崩溃，停用 `MinisAutomation` 后恢复。`0x40` 是修复后的目标值，iOS 15 与 iOS 16+ 的真机复测都还没有完成；iOS 16+ 目前只有编译与打包验证。
+
 ```powershell
 gh run download "<RUN_ID>" --repo doimty/OpenMinis `
   --name minis-ios15-root-candidate `
