@@ -1,5 +1,6 @@
 #if MINIS_ROOT_MANAGEMENT
 import CoreFoundation
+import Darwin
 import Dispatch
 import Foundation
 
@@ -76,6 +77,18 @@ enum RootManagementRunner {
 
     private static func runOnWorker(_ operation: RootManagementOperation, build: RootManagementBuildIdentity,
                                     os: String, bundle: String) -> RootManagementReport {
+        let clientVersion = OMRootManagementClientVersion()
+        guard clientVersion == 1 else {
+            let transport = RootClientReport(
+                stage: "client.version", errorNumber: Int(EPROTO), exitCode: -1,
+                terminationSignal: 0, timedOut: false, outputTruncated: false, outputBytes: 0,
+                appUID: UInt32(getuid()), appEUID: UInt32(geteuid()))
+            return RootManagementReport(
+                build: build, osVersion: os, bundleIdentifier: bundle,
+                recordedAt: ISO8601DateFormatter().string(from: Date()),
+                requestedOperation: operation, transport: transport, helper: nil,
+                validationError: "The native root client version does not match this app.")
+        }
         let nativeOperation: OMRootOperation
         switch operation {
         case .identity: nativeOperation = OMRootOperationIdentity

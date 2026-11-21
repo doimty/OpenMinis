@@ -157,6 +157,7 @@ class DeviceProtocolTests(unittest.TestCase):
             "Set display brightness?",
             "The matching bundled helper reported UID 0 and EUID 0 for this operation.",
             "Root execution has not been verified by this result.",
+            "The native root client version does not match this app.",
         }
         keys.update(device_server.TOOLS.values())
         # Root operation titles and protocol failures remain stable English

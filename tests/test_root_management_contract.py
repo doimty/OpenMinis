@@ -50,7 +50,7 @@ def static_checks():
         assert token in view, token
     assert 'OMRootManagementRun(' not in view
     for token in ('RootHelperProtocol.validate(data, operation: operation, commit: build.commit)',
-                  'transport.exitCode == 0', 'helper?.euid == 0'):
+                  'OMRootManagementClientVersion()', 'transport.exitCode == 0', 'helper?.euid == 0'):
         assert token in runner, token
     for token in ('decoded.helperCommit == commit', 'Set(object.keys).isSubset(of: allowedKeys)',
                   'data.count <= 4095', 'decoded.bytes == sampleBytes', 'decoded.removed == true'):

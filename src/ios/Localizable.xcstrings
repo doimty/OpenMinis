@@ -9644,6 +9644,14 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "與目前建置相符的內建輔助程式回報：本次操作的 UID 和 EUID 均為 0。" } }
       }
     },
+    "The native root client version does not match this app." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The native root client version does not match this app." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "原生 Root 客户端版本与此 App 不匹配。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "原生 Root 用戶端版本與此 App 不相符。" } }
+      }
+    },
     "Root execution has not been verified by this result." : {
       "extractionState" : "manual",
       "localizations" : {
