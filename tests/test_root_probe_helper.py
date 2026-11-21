@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local contract test for the root probe helper (no device, no root needed here).
+"""Host contract test for the root probe helper (run as root in Actions).
 
 Proves the source's safety rules by compiling a test-root variant and exercising
 only the paths a symlink/hardlink/policy attack could take. The iOS build's
@@ -45,6 +45,14 @@ def main():
                         "-DMINIS_ROOT_PROBE_TEST_ROOT=1", "-D_POSIX_C_SOURCE=200809L",
                         str(SRC), "-o", str(binary)], check=True, timeout=30)
         root = tmp / "root"; root.mkdir()
+        # Identity requires no filesystem parent and preserves observed IDs.
+        rc, obj = run(binary, root, "identity")
+        assert rc == 0 and obj["ok"] and obj["schema"] == 1, obj
+        assert obj["helper_commit"] == "unknown" and obj["uid"] == obj["euid"] == 0, obj
+        assert not list(root.iterdir()), "identity created files"
+        rc, obj = run(binary, root, "identity", uid=501)
+        assert rc == 77 and obj["ok"] is False and obj["uid"] == obj["euid"] == 501, obj
+        assert not list(root.iterdir()), "non-root identity created files"
         for name in ("private", "private/var", "private/var/mobile", "private/var/mobile/Library"):
             (root / name).mkdir()
         parent = root / "private/var/mobile/Library"
@@ -105,7 +113,7 @@ def main():
         rc, obj = run(binary, root, "check", uid=501)
         assert rc == 77 and obj["ok"] is False, obj
 
-        print("PASS root probe helper: prepare/check/cleanup, dir policy, symlink, mode, hardlink, op allowlist, non-root refusal")
+        print("PASS root probe helper: identity without filesystem access, prepare/check/cleanup, dir policy, symlink, mode, hardlink, op allowlist, non-root refusal")
         print("NOTE  real iOS setuid/entitlement behaviour is unverified here; only source-level contracts were exercised")
     finally:
         os.chmod(tmp, 0o755)

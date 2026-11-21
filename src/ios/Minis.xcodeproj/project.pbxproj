@@ -60,6 +60,9 @@
 		AA0838A02F3B941A00049557 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838A12F3B941A00049557 /* AboutView.swift */; };
 		A1H0ST0001 /* HostFileAccessProbeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1H0ST0011 /* HostFileAccessProbeView.swift */; };
 		A1H0ST0002 /* HostFileAccessProbe.c in Sources */ = {isa = PBXBuildFile; fileRef = A1H0ST0012 /* HostFileAccessProbe.c */; };
+		52F025010000000000000001 /* RootManagementClient.c in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000011 /* RootManagementClient.c */; };
+		52F025010000000000000002 /* RootManagementAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000013 /* RootManagementAuthorization.swift */; };
+		52F025010000000000000003 /* RootManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000014 /* RootManagementView.swift */; };
 		AA0838C02F3B941A00049557 /* RootfsResetButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */; };
 		AA0838C32F3B941A00049557 /* RootfsManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */; };
 		AA0838CC2F3B941A00049557 /* StorageManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838CD2F3B941A00049557 /* StorageManagementView.swift */; };
@@ -802,6 +805,10 @@
 		A1H0ST0011 /* HostFileAccessProbeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostFileAccessProbeView.swift; sourceTree = "<group>"; };
 		A1H0ST0012 /* HostFileAccessProbe.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = HostFileAccessProbe.c; sourceTree = "<group>"; };
 		A1H0ST0013 /* HostFileAccessProbe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HostFileAccessProbe.h; sourceTree = "<group>"; };
+		52F025010000000000000011 /* RootManagementClient.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RootManagementClient.c; sourceTree = "<group>"; };
+		52F025010000000000000012 /* RootManagementClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RootManagementClient.h; sourceTree = "<group>"; };
+		52F025010000000000000013 /* RootManagementAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootManagementAuthorization.swift; sourceTree = "<group>"; };
+		52F025010000000000000014 /* RootManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootManagementView.swift; sourceTree = "<group>"; };
 		AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsManagementView.swift; sourceTree = "<group>"; };
 		AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsResetButton.swift; sourceTree = "<group>"; };
 		AA0838CD2F3B941A00049557 /* StorageManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageManagementView.swift; sourceTree = "<group>"; };
@@ -2057,6 +2064,9 @@
 				E5CDX0011 /* CrashDiagnosticsExport.swift */,
 				A1H0ST0012 /* HostFileAccessProbe.c */,
 				A1H0ST0013 /* HostFileAccessProbe.h */,
+				52F025010000000000000011 /* RootManagementClient.c */,
+				52F025010000000000000012 /* RootManagementClient.h */,
+				52F025010000000000000013 /* RootManagementAuthorization.swift */,
 			);
 			path = Diagnostics;
 			sourceTree = "<group>";
@@ -2657,6 +2667,7 @@
 			children = (
 				AA0838A12F3B941A00049557 /* AboutView.swift */,
 				A1H0ST0011 /* HostFileAccessProbeView.swift */,
+				52F025010000000000000014 /* RootManagementView.swift */,
 				E5S000014 /* CloudSyncSettingsView.swift */,
 				E5G000013 /* EnhancedBackgroundSettingsView.swift */,
 				E5P000012 /* EnvironmentVariablesView.swift */,
@@ -3191,6 +3202,9 @@
 				AA0838A02F3B941A00049557 /* AboutView.swift in Sources */,
 				A1H0ST0001 /* HostFileAccessProbeView.swift in Sources */,
 				A1H0ST0002 /* HostFileAccessProbe.c in Sources */,
+				52F025010000000000000001 /* RootManagementClient.c in Sources */,
+				52F025010000000000000002 /* RootManagementAuthorization.swift in Sources */,
+				52F025010000000000000003 /* RootManagementView.swift in Sources */,
 				BB1000100F700000000000AA /* ContextPolicy.swift in Sources */,
 				AADDA9E12F6ECCF400B66649 /* ThumbnailCache.swift in Sources */,
 				E5SRS0001 /* SessionRefreshScheduler.swift in Sources */,

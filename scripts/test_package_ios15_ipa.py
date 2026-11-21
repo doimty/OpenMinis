@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import plistlib
+import re
+import shlex
 import struct
 import subprocess
 import tempfile
@@ -403,6 +405,36 @@ class PackageTests(unittest.TestCase):
 
 
 class WorkflowWiringTests(unittest.TestCase):
+    def test_opt_in_full_builds_pass_c_defines_to_swift_importer(self):
+        # OTHER_CFLAGS reaches .c files but not Swift's Clang importer.
+        # The standalone swiftc gate already passed -Xcc; the full Xcode build
+        # must also do so or its bridging header hides the opted-in API.
+        source = WORKFLOW.read_text(encoding="utf-8")
+        builds = {
+            "Build host file probe app": ["MINIS_HOST_FILE_PROBE"],
+            "Build isolated Minis Root and bundled helper": [
+                "MINIS_HOST_FILE_PROBE", "MINIS_ROOT_MANAGEMENT",
+            ],
+        }
+        for step_name, definitions in builds.items():
+            with self.subTest(step=step_name):
+                block = source.split("- name: " + step_name, 1)[1]
+                block = block.split("\n      - name:", 1)[0]
+                c_match = re.search(r'OTHER_CFLAGS="([^"]*)"', block)
+                swift_match = re.search(r'OTHER_SWIFT_FLAGS="([^"]*)"', block)
+                self.assertIsNotNone(c_match)
+                self.assertIsNotNone(swift_match)
+                c_flags = shlex.split(c_match.group(1))
+                swift_flags = shlex.split(swift_match.group(1))
+                importer_flags = [swift_flags[index + 1]
+                                  for index, flag in enumerate(swift_flags[:-1])
+                                  if flag == "-Xcc"]
+                for definition in definitions:
+                    self.assertIn("-D" + definition + "=1", c_flags)
+                    self.assertIn("-D" + definition, swift_flags)
+                    self.assertIn("-D" + definition + "=1", importer_flags,
+                                  "Swift bridging header must see the same feature as the C source")
+
     def test_host_probe_packages_both_profiles_with_identity_and_reads_back_ipa(self):
         source = WORKFLOW.read_text(encoding="utf-8")
         start = source.index("- name: Package host file probe A/B IPAs")

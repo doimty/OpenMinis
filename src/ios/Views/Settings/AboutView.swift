@@ -111,6 +111,15 @@ struct AboutView: View {
 
             // MARK: - Links
             Section("Links") {
+#if MINIS_ROOT_MANAGEMENT && os(iOS)
+                if !ProcessInfo.processInfo.isiOSAppOnMac {
+                    NavigationLink {
+                        RootManagementView()
+                    } label: {
+                        Label("Root Management", systemImage: "lock.shield")
+                    }
+                }
+#endif
 #if DEBUG && MINIS_HOST_FILE_PROBE && os(iOS)
                 // [T-host-file-probe] Hidden from ordinary builds: the page and
                 // this row exist only when a build opts in. A plain tap starts

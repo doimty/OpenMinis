@@ -70,5 +70,9 @@
 #import "HostFileAccessProbe.h"
 #endif
 
+#if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT
+#import "RootManagementClient.h"
+#endif
+
 // rclone static library (deps/frameworks/Rclone.xcframework) — see RcloneBridge.swift
 #import "librclone.h"

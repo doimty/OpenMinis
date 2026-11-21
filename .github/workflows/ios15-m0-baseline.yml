@@ -15,6 +15,10 @@ on:
         description: 'Build the opt-in host file probe app + root helper (local diagnostics only; nothing is installed)'
         type: boolean
         default: false
+      root_management:
+        description: 'Build isolated Minis Root with the fixed-operation TrollStore helper (device unverified; no installation)'
+        type: boolean
+        default: false
       input_prompt_simulator:
         description: 'Run the unrelated input-prompt simulator UI probe'
         type: boolean
@@ -48,7 +52,7 @@ env:
 jobs:
   host-file-probe-linux:
     name: Host file probe Linux gates
-    if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+    if: github.event_name == 'workflow_dispatch' && (inputs.host_file_probe || inputs.root_management)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -59,6 +63,37 @@ jobs:
           fetch-depth: 1
       - name: Native host probe adversarial tests
         run: sudo env "PATH=$PATH" python3 tests/test_host_file_access_probe.py
+
+  root-management-linux:
+    name: Root helper Linux contracts
+    if: github.event_name == 'workflow_dispatch' && inputs.root_management
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Root contracts and helper fixtures
+        run: |
+          set -euo pipefail
+          python3 tests/test_root_management_contract.py --static
+          sudo env "PATH=$PATH" python3 tests/test_root_probe_helper.py
+
+  root-packaging-windows:
+    name: Root IPA portable ZIP contracts
+    if: github.event_name == 'workflow_dispatch' && inputs.root_management
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Verify executable modes and Root package fixtures
+        run: python scripts/test_package_ios15_root_ipa.py -v
 
   baseline:
     name: Native deps + iOS 15 compile probe
@@ -96,7 +131,7 @@ jobs:
       # page and the helper for local inspection; nothing here installs,
       # signs for a device or loads a launch daemon.
       - name: Host file probe gates
-        if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
+        if: github.event_name == 'workflow_dispatch' && (inputs.host_file_probe || inputs.root_management)
         run: |
           set -euo pipefail
           sudo env "PATH=$PATH" python3 tests/test_host_file_access_probe.py
@@ -122,6 +157,29 @@ jobs:
           "$RUNNER_TEMP/sf-symbol-venv/bin/python" scripts/test_ios15_sf_symbols.py -v \
             2>&1 | tee "$RUNNER_TEMP/sf-symbols/audit.log"
           bash scripts/check_ios15_symbols.sh 2>&1 | tee "$RUNNER_TEMP/sf-symbols/native.log"
+
+      - name: Root management native gates
+        if: github.event_name == 'workflow_dispatch' && inputs.root_management
+        run: |
+          set -euo pipefail
+          python3 tests/test_root_management_contract.py --static
+          python3 tests/test_root_management_contract.py --native
+          sudo env "PATH=$PATH" python3 tests/test_root_probe_helper.py
+          python3 scripts/test_ios15_root_identity.py
+          python3 scripts/test_package_ios15_root_ipa.py -v
+          clang -std=c11 -Wall -Wextra -Werror -c src/ios/Diagnostics/RootManagementClient.c -o "$RUNNER_TEMP/root-client-off.o"
+          xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 \
+            -std=c11 -Wall -Wextra -Werror -DMINIS_ROOT_MANAGEMENT=1 \
+            -c src/ios/Diagnostics/RootManagementClient.c -o "$RUNNER_TEMP/root-client-on.o"
+          sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+          xcrun --sdk iphoneos swiftc \
+            -typecheck -parse-as-library -swift-version 5 \
+            -target arm64-apple-ios15.0 -sdk "$sdk" \
+            -module-cache-path "$RUNNER_TEMP/root-module-cache" \
+            -D MINIS_ROOT_MANAGEMENT -Xcc -DMINIS_ROOT_MANAGEMENT=1 \
+            -import-objc-header src/ios/Diagnostics/RootManagementClient.h \
+            src/ios/Diagnostics/RootManagementAuthorization.swift \
+            src/ios/Views/Settings/RootManagementView.swift
 
       - name: Init pinned iSH submodule only
         run: |
@@ -223,6 +281,62 @@ jobs:
           fi
           test -f "$binary"
 
+      - name: Save native iOS deps cache
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            deps/libs
+            deps/include
+            deps/frameworks
+            deps/resources
+            deps/lame-build
+            vendor/RealTimeCutVADLibrary/Frameworks
+          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/build_vad_framework.sh','deps/rclone-mobile/go.sum') }}
+
+      - name: Build isolated Minis Root and bundled helper
+        if: github.event_name == 'workflow_dispatch' && inputs.root_management
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/root-build"
+          set +e
+          xcodebuild \
+            -project src/ios/Minis.xcodeproj -scheme Minis -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/root-dd" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO \
+            OTHER_CFLAGS="-DMINIS_ROOT_MANAGEMENT=1 -DMINIS_HOST_FILE_PROBE=1" \
+            OTHER_SWIFT_FLAGS="-DMINIS_ROOT_MANAGEMENT -DMINIS_HOST_FILE_PROBE -Xcc -DMINIS_ROOT_MANAGEMENT=1 -Xcc -DMINIS_HOST_FILE_PROBE=1" \
+            build > "$RUNNER_TEMP/root-build/xcodebuild.log" 2>&1
+          status=$?
+          set -e
+          python3 scripts/ios15_build_log.py "$RUNNER_TEMP/root-build/xcodebuild.log" --output-dir "$RUNNER_TEMP/root-build"
+          if [ "$status" -ne 0 ]; then
+            cat "$RUNNER_TEMP/root-build/errors.txt"
+            tail -n 80 "$RUNNER_TEMP/root-build/xcodebuild.log"
+          fi
+          test "$status" -eq 0
+          xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 \
+            -std=c11 -Wall -Wextra -Werror -O2 \
+            "-DMINIS_ROOT_HELPER_COMMIT=\"$GITHUB_SHA\"" \
+            roothelper/main.c -o "$RUNNER_TEMP/root-build/minis-rootprobe"
+          python3 scripts/package_ios15_root_ipa.py \
+            --derived-data "$RUNNER_TEMP/root-dd" \
+            --helper "$RUNNER_TEMP/root-build/minis-rootprobe" \
+            --output-dir "$RUNNER_TEMP/root-ipa" \
+            --source-commit "$GITHUB_SHA" --actions-run-id "$GITHUB_RUN_ID"
+
+      - name: Upload isolated Minis Root candidate
+        if: github.event_name == 'workflow_dispatch' && inputs.root_management
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: minis-ios15-root-candidate
+          path: |
+            ${{ runner.temp }}/root-ipa/*.ipa
+            ${{ runner.temp }}/root-ipa/manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
       # [T-host-file-probe] Build only after the pinned iSH submodule and all
       # native frameworks are ready. The opt-in target remains unsigned and
       # separate from the ordinary m1 build used for release packaging.
@@ -230,6 +344,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
         run: |
           set -euo pipefail
+          set +e
           xcodebuild \
             -project src/ios/Minis.xcodeproj \
             -scheme Minis \
@@ -240,10 +355,17 @@ jobs:
             CODE_SIGN_IDENTITY=- \
             CODE_SIGNING_REQUIRED=NO \
             OTHER_CFLAGS="-DMINIS_HOST_FILE_PROBE=1" \
-            OTHER_SWIFT_FLAGS="-DMINIS_HOST_FILE_PROBE" \
+            OTHER_SWIFT_FLAGS="-DMINIS_HOST_FILE_PROBE -Xcc -DMINIS_HOST_FILE_PROBE=1" \
             build \
             > "$RUNNER_TEMP/probe-build.log" 2>&1
+          status=$?
+          set -e
           python3 scripts/ios15_build_log.py "$RUNNER_TEMP/probe-build.log" --output-dir "$RUNNER_TEMP/probe-build"
+          if [ "$status" -ne 0 ]; then
+            cat "$RUNNER_TEMP/probe-build/errors.txt"
+            tail -n 80 "$RUNNER_TEMP/probe-build.log"
+          fi
+          test "$status" -eq 0
           app="$RUNNER_TEMP/probe-dd/Build/Products/Debug-iphoneos/Minis.app"
           test -d "$app"
           python3 - "$app/Info.plist" <<'PY'
@@ -358,23 +480,10 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Save native iOS deps cache
-        if: steps.native-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            deps/libs
-            deps/include
-            deps/frameworks
-            deps/resources
-            deps/lame-build
-            vendor/RealTimeCutVADLibrary/Frameworks
-          key: native-macos26-xcode262-${{ env.EXPECTED_ISH }}-${{ hashFiles('deps/build_lame.sh','deps/build_ffmpeg.sh','deps/build_ish.sh','deps/prepare_alpine_rootfs.sh','deps/build_rclone_ios.sh','deps/build_vad_framework.sh','deps/rclone-mobile/go.sum') }}
-
       # The candidate is compiled by the audited m1 step below; avoid a
       # redundant second full Debug build for the isolated IPA dispatch.
       - name: Compile unchanged baseline
-        if: github.event_name == 'workflow_dispatch' && !inputs.experimental_broad_files
+        if: github.event_name == 'workflow_dispatch' && !inputs.experimental_broad_files && !inputs.root_management
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/m0"
@@ -429,6 +538,7 @@ jobs:
           bash scripts/check_ios15_swiftui_compat.sh
 
       - name: Probe iOS 15 app target
+        if: github.event_name != 'workflow_dispatch' || !inputs.root_management
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/m1"
@@ -467,6 +577,7 @@ jobs:
           bash scripts/test_responses_tool_arguments.sh 2>&1 | tee "$out/swiftc-tests.log"
 
       - name: Package TrollStore IPA
+        if: github.event_name != 'workflow_dispatch' || !inputs.root_management
         run: |
           set -euo pipefail
           python3 scripts/package_ios15_ipa.py \
@@ -482,6 +593,7 @@ jobs:
           PY
 
       - name: Upload TrollStore IPA
+        if: github.event_name != 'workflow_dispatch' || !inputs.root_management
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: minis-ios15-trollstore-ipa
@@ -560,5 +672,8 @@ jobs:
             ${{ runner.temp }}/input-prompts/**
             ${{ runner.temp }}/retry-probe/**
             ${{ runner.temp }}/responses-api-args/**
+            ${{ runner.temp }}/root-build/**
+            ${{ runner.temp }}/probe-build.log
+            ${{ runner.temp }}/probe-build/**
           if-no-files-found: warn
           retention-days: 14

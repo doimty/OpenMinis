@@ -46,8 +46,8 @@ enum DeepLinkRouter {
 
     @MainActor
     static func handle(url: URL, shareCoordinator: ShareCoordinator) {
-        guard url.scheme == "minis"
-                || (SharedContainerStore.isBroadFilesBuild && url.scheme == SharedContainerStore.deepLinkScheme),
+        guard url.scheme == SharedContainerStore.deepLinkScheme
+                || (!SharedContainerStore.isRootBuild && url.scheme == "minis"),
               let host = url.host else {
             deepLinkLog.info("ignored — non-minis or missing host: \(url.absoluteString)")
             return

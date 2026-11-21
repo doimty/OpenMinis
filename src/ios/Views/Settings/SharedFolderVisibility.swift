@@ -6,8 +6,8 @@
 //  (shared / skills / memory) should appear in the iOS Files app.
 //  Both the main app process and the FileProvider extension read this.
 //
-//  Backing store: App Group UserDefaults (`group.com.openminis.app`) so
-//  the FileProvider extension sees the same state as the main app.
+//  Backing store: the current build's App Group UserDefaults, so the
+//  FileProvider extension sees the same state as the main app.
 //
 //  Semantics:
 //    - Default = visible (all three are exposed on first launch).
@@ -26,8 +26,12 @@ enum SharedFolderVisibility {
     private static let appGroupID: String = {
         // This file is also built into FileProvider, which does not link
         // SharedContainerStore. Keep the same bounded bundle-ID selection.
-        let base = "com.openminis.app.broadfiles"
         let id = Bundle.main.bundleIdentifier ?? ""
+        let root = "com.openminis.app.root"
+        if id == root || id.hasPrefix(root + ".") {
+            return "group.com.openminis.app.root"
+        }
+        let base = "com.openminis.app.broadfiles"
         return id == base || id.hasPrefix(base + ".")
             ? "group.com.openminis.app.broadfiles" : "group.com.openminis.app"
     }()

@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,10 @@
 #define PROBE_DIRECTORY "OpenMinisRootProbe"
 #define PROBE_FILENAME "sample-v1.txt"
 #define PROBE_ID "fb81bca8-f8c0-4f2e-9ff2-fbfaf351aa87"
+#ifndef MINIS_ROOT_HELPER_COMMIT
+#define MINIS_ROOT_HELPER_COMMIT "unknown"
+#endif
+#define RESPONSE_METADATA "\"schema\":1,\"helper_commit\":\"" MINIS_ROOT_HELPER_COMMIT "\","
 static const char payload[] = "OPENMINIS-ROOT-PROBE-V1:" PROBE_ID "\n";
 
 static int open_parent(void) {
@@ -77,7 +82,7 @@ static int read_exact_probe(int dirfd, struct stat *identity) {
 }
 
 static void emit_error(const char *operation, int error_number) {
-    printf("{\"ok\":false,\"operation\":\"%s\",\"uid\":%u,\"euid\":%u,\"errno\":%d}\n",
+    printf("{" RESPONSE_METADATA "\"ok\":false,\"operation\":\"%s\",\"uid\":%u,\"euid\":%u,\"errno\":%d}\n",
            operation, (unsigned)getuid(), (unsigned)geteuid(), error_number);
 }
 
@@ -91,7 +96,7 @@ static int operation_prepare(int parent) {
     int fd = openat(dir, PROBE_FILENAME, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
     if (fd < 0 && errno == EEXIST) {
         if (read_exact_probe(dir, NULL) == 0) {
-            printf("{\"ok\":true,\"operation\":\"prepare\",\"already_prepared\":true,\"uid\":%u,\"euid\":%u,\"marker_id\":\"%s\"}\n",
+            printf("{" RESPONSE_METADATA "\"ok\":true,\"operation\":\"prepare\",\"already_prepared\":true,\"uid\":%u,\"euid\":%u,\"marker_id\":\"%s\"}\n",
                    (unsigned)getuid(), (unsigned)geteuid(), PROBE_ID);
             close(dir); return 0;
         }
@@ -114,7 +119,7 @@ static int operation_prepare(int parent) {
         close(dir); emit_error("prepare.write", saved ? saved : EIO); return 1;
     }
     close(dir);
-    printf("{\"ok\":true,\"operation\":\"prepare\",\"uid\":%u,\"euid\":%u,\"marker_id\":\"%s\"}\n",
+    printf("{" RESPONSE_METADATA "\"ok\":true,\"operation\":\"prepare\",\"uid\":%u,\"euid\":%u,\"marker_id\":\"%s\"}\n",
            (unsigned)getuid(), (unsigned)geteuid(), PROBE_ID);
     return 0;
 }
@@ -126,7 +131,7 @@ static int operation_check(int parent) {
     struct stat st;
     if (read_exact_probe(dir, &st) != 0) { int e = errno; close(dir); emit_error("check.read", e); return 1; }
     close(dir);
-    printf("{\"ok\":true,\"operation\":\"check\",\"uid\":%u,\"euid\":%u,\"marker_id\":\"%s\",\"device\":\"%" PRIuMAX "\",\"inode\":\"%" PRIuMAX "\",\"bytes\":%" PRIuMAX "}\n",
+    printf("{" RESPONSE_METADATA "\"ok\":true,\"operation\":\"check\",\"uid\":%u,\"euid\":%u,\"marker_id\":\"%s\",\"device\":\"%" PRIuMAX "\",\"inode\":\"%" PRIuMAX "\",\"bytes\":%" PRIuMAX "}\n",
            (unsigned)getuid(), (unsigned)geteuid(), PROBE_ID,
            (uintmax_t)st.st_dev, (uintmax_t)st.st_ino, (uintmax_t)st.st_size);
     return 0;
@@ -139,15 +144,34 @@ static int operation_cleanup(int parent) {
     if (read_exact_probe(dir, NULL) != 0) { int e = errno; close(dir); emit_error("cleanup.verify", e); return 1; }
     if (unlinkat(dir, PROBE_FILENAME, 0) != 0) { int e = errno; close(dir); emit_error("cleanup.unlink", e); return 1; }
     close(dir); /* Leave the empty, root-owned 0700 directory; never unlink a raced replacement. */
-    printf("{\"ok\":true,\"operation\":\"cleanup\",\"uid\":%u,\"euid\":%u,\"removed\":true}\n",
+    printf("{" RESPONSE_METADATA "\"ok\":true,\"operation\":\"cleanup\",\"uid\":%u,\"euid\":%u,\"removed\":true}\n",
            (unsigned)getuid(), (unsigned)geteuid());
     return 0;
 }
 
 int main(int argc, char **argv) {
+    if (argc != 2 || !argv[1]) { emit_error("invalid-arguments", EINVAL); return 64; }
+    /* This path does not open the sample, create directories or change IDs.
+     * It can report a failed persona transition without hiding the real EUID. */
+    if (strcmp(argv[1], "identity") == 0) {
+        int root = geteuid() == 0;
+        printf("{" RESPONSE_METADATA "\"ok\":%s,\"operation\":\"identity\",\"uid\":%u,\"euid\":%u,\"errno\":%d}\n",
+               root ? "true" : "false", (unsigned)getuid(), (unsigned)geteuid(), root ? 0 : EPERM);
+        return root ? 0 : 77;
+    }
+    if (strcmp(argv[1], "prepare") != 0 && strcmp(argv[1], "check") != 0 && strcmp(argv[1], "cleanup") != 0) {
+        emit_error("operation-not-allowed", EINVAL); return 64;
+    }
     if (geteuid() != 0) { emit_error("not-root", EPERM); return 77; }
     if (setgid(0) != 0 || setuid(0) != 0) { emit_error("drop-real-ids", errno); return 77; }
-    if (argc != 2 || !argv[1]) { emit_error("invalid-arguments", EINVAL); return 64; }
+    /* A mobile parent may not be able to signal its root child. The helper
+     * therefore owns its deadline before touching the fixed sample. */
+    sigset_t alarm_mask;
+    if (signal(SIGALRM, SIG_DFL) == SIG_ERR || sigemptyset(&alarm_mask) != 0 ||
+        sigaddset(&alarm_mask, SIGALRM) != 0 || sigprocmask(SIG_UNBLOCK, &alarm_mask, NULL) != 0) {
+        emit_error("watchdog", errno); return 1;
+    }
+    alarm(4);
     const int parent = open_parent();
     if (parent < 0) { emit_error("open-parent", errno); return 1; }
     int rc;

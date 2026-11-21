@@ -3,17 +3,24 @@ import Foundation
 /// Reads and writes PendingShare data to the App Group shared container.
 /// Compiled into both the main app target and the Share Extension target.
 enum SharedContainerStore {
-    // The opt-in TrollStore file-access IPA is repackaged with its own bundle
-    // identifier. Resolve this at runtime so its share extension, rootfs and
-    // global stores never attach to the ordinary build's App Group.
+    // Opt-in TrollStore IPAs have separate bundle identities. Resolve this at
+    // runtime so their share extensions, rootfs and global stores use their
+    // own App Groups, including when the same app binary is repackaged.
     static let isBroadFilesBuild: Bool = {
         let id = Bundle.main.bundleIdentifier ?? ""
         let base = "com.openminis.app.broadfiles"
         return id == base || id.hasPrefix(base + ".")
     }()
-    static let appGroupID = isBroadFilesBuild
-        ? "group.com.openminis.app.broadfiles" : "group.com.openminis.app"
-    static let deepLinkScheme = isBroadFilesBuild ? "minis-broadfiles" : "minis"
+    static let isRootBuild: Bool = {
+        let id = Bundle.main.bundleIdentifier ?? ""
+        let base = "com.openminis.app.root"
+        return id == base || id.hasPrefix(base + ".")
+    }()
+    static let appGroupID = isRootBuild
+        ? "group.com.openminis.app.root"
+        : (isBroadFilesBuild ? "group.com.openminis.app.broadfiles" : "group.com.openminis.app")
+    static let deepLinkScheme = isRootBuild
+        ? "minis-root" : (isBroadFilesBuild ? "minis-broadfiles" : "minis")
 
     /// Shared containers may be unavailable after an installer re-signs the
     /// experimental IPA. Keep main-app storage usable without falling back to

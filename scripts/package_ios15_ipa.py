@@ -468,6 +468,10 @@ def package_app(
         host_probe_build = {"schema": 1, "source_commit": host_file_probe_commit,
                             "actions_run_id": host_file_probe_run_id}
     info = validate_app(source_app)
+    if info.get("MinisRootManagementEnabled") or info.get("MinisFileAccessProfile") == "root-helper" \
+            or info.get("CFBundleIdentifier") == "com.openminis.app.root" \
+            or (source_app / "minis-rootprobe").exists():
+        raise PackageError("Root source must use the separate Root packager; it cannot be relabelled as standard or file-only")
     entitlement_path, requested_entitlements = validate_file_access_profile(file_access_profile, entitlements)
     if file_access_profile == "broad-files" and (keep_incompatible_plugins or diagnostic_commit is not None):
         raise PackageError("broad-files cannot keep incompatible extensions or activate diagnostic probes")
