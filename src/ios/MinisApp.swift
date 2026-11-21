@@ -750,8 +750,8 @@ struct MinisApp: App {
 
     @available(iOS 16.0, *)
     private static let fileProviderDomain = NSFileProviderDomain(
-        identifier: NSFileProviderDomainIdentifier("com.openminis.app.files"),
-        displayName: "Minis"
+        identifier: NSFileProviderDomainIdentifier(SharedContainerStore.fileProviderDomainIdentifier),
+        displayName: MinisBuildIdentity.current.displayName
     )
 
     /// Bumped when we need to force-rebuild the FileProvider domain on next launch

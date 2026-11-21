@@ -9412,6 +9412,94 @@
         }
       }
     },
+    "Allow device tool requests" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow device tool requests" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "允许设备工具请求" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "允許裝置工具請求" } }
+      }
+    },
+    "Show device tools" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show device tools" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示设备工具" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "顯示裝置工具" } }
+      }
+    },
+    "Copy device activity report" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy device activity report" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制设备活动报告" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "複製裝置活動報告" } }
+      }
+    },
+    "Clear device activity report" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear device activity report" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除设备活动报告" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "清除裝置活動報告" } }
+      }
+    },
+    "This device" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This device" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本机" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "本機" } }
+      }
+    },
+    "Allows model, screen size and display brightness requests while Minis is in the foreground. Each call asks you to allow it once. Leaving the app turns this off." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allows model, screen size and display brightness requests while Minis is in the foreground. Each call asks you to allow it once. Leaving the app turns this off." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "允许 Minis 在前台读取设备型号、屏幕尺寸和显示亮度。每次调用都会请求一次确认。离开 App 后会自动关闭。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "允許 Minis 在前景讀取裝置型號、螢幕尺寸和顯示亮度。每次呼叫都會請求一次確認。離開 App 後會自動關閉。" } }
+      }
+    },
+    "Minis device tools" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Minis device tools" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Minis 设备工具" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Minis 裝置工具" } }
+      }
+    },
+    "Share this device’s model and iOS version with the requesting tool?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Share this device’s model and iOS version with the requesting tool?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "允许请求工具读取本机型号和 iOS 版本吗？" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "允許請求工具讀取本機型號和 iOS 版本嗎？" } }
+      }
+    },
+    "Share the screen dimensions and scale with the requesting tool?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Share the screen dimensions and scale with the requesting tool?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "允许请求工具读取屏幕尺寸和缩放比例吗？" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "允許請求工具讀取螢幕尺寸和縮放比例嗎？" } }
+      }
+    },
+    "Share the current display brightness with the requesting tool?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Share the current display brightness with the requesting tool?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "允许请求工具读取当前屏幕亮度吗？" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "允許請求工具讀取目前螢幕亮度嗎？" } }
+      }
+    },
+    "Set display brightness?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Set display brightness?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设置屏幕亮度吗？" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "設定螢幕亮度嗎？" } }
+      }
+    },
     "Allow once" : {
       "extractionState" : "manual",
       "localizations" : {

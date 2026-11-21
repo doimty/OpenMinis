@@ -87,7 +87,7 @@ def version_to_string(version):
 
 
 def version_gt(version, limit=_FLOOR):
-    """Compare padded version tuples; 15.0.0 equals 15.0, while 15.0.1 is newer."""
+    """Compare padded version tuples against a caller-selected deployment floor."""
     if version is None:
         return True
     width = max(len(version), len(limit))
@@ -134,7 +134,7 @@ def parse_output(text):
     return blocks
 
 
-def _audit_block(header, body, image_path, require_minimum=True):
+def _audit_block(header, body, image_path, require_minimum=True, floor=_FLOOR):
     """Audit one image block; returns (entry, errors)."""
     block = '\n'.join([header] + body)
     has_legacy_command = 'LC_VERSION_MIN_IPHONEOS' in block
@@ -176,9 +176,9 @@ def _audit_block(header, body, image_path, require_minimum=True):
         errors.append(f'{image_path}: {entry["header"]}: no deployment '
                       'minimum (LC_BUILD_VERSION/minos or '
                       'LC_VERSION_MIN_IPHONEOS) found')
-    elif minos is not None and version_gt(minos):
+    elif minos is not None and version_gt(minos, floor):
         errors.append(f'{image_path}: {entry["header"]}: deployment minimum '
-                      f'{version_to_string(minos)} > 15.0')
+                      f'{version_to_string(minos)} > {version_to_string(floor)}')
     if len(minos_matches) > 1:
         errors.append(f'{image_path}: {entry["header"]}: duplicate minos '
                       f'fields ({", ".join(minos_matches)})')
@@ -190,7 +190,7 @@ def _audit_block(header, body, image_path, require_minimum=True):
     return entry, errors
 
 
-def audit_image(image_text, arch_text, image_path, require_minimum=True):
+def audit_image(image_text, arch_text, image_path, require_minimum=True, floor=_FLOOR):
     """Audit one image (dynamic dylib, executable, or static archive)."""
     arch_from_file = None
     arch_match = _ARCH_PATTERN.search(arch_text)
@@ -202,7 +202,7 @@ def audit_image(image_text, arch_text, image_path, require_minimum=True):
     errors = []
     for header, body in blocks:
         entry, block_errors = _audit_block(header, body, image_path,
-                                           require_minimum)
+                                           require_minimum, floor)
         if entry['arch'] is None and arch_from_file is not None:
             entry['arch'] = arch_from_file
         if entry['arch'] is None:
@@ -225,10 +225,10 @@ def audit_image(image_text, arch_text, image_path, require_minimum=True):
     }
 
 
-def audit_metadata(otool_text, arch_text, plist, output=False):
+def audit_metadata(otool_text, arch_text, plist, output=False, floor=_FLOOR):
     """Audit a single (otool -l text, file(1) text, plist dict) triple."""
     errors = []
-    result = audit_image(otool_text, arch_text, '<input>')
+    result = audit_image(otool_text, arch_text, '<input>', floor=floor)
     errors.extend(result['errors'])
     if plist is not None:
         minimum = plist.get('MinimumOSVersion')
@@ -238,9 +238,9 @@ def audit_metadata(otool_text, arch_text, plist, output=False):
         elif version is None:
             errors.append(f'<input>: Info.plist MinimumOSVersion '
                           f'{minimum!r} is not parseable')
-        elif version_gt(version):
+        elif version_gt(version, floor):
             errors.append(f'<input>: Info.plist MinimumOSVersion '
-                          f'{minimum} > 15.0')
+                          f'{minimum} > {version_to_string(floor)}')
         platforms = plist.get('CFBundleSupportedPlatforms')
         if platforms is None or not isinstance(platforms, list) or not platforms:
             errors.append('<input>: Info.plist missing/empty '

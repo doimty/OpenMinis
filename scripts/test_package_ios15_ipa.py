@@ -59,13 +59,24 @@ def make_app(
     (app / "embedded.mobileprovision").write_text("not-used\n")
     for name, plugin_minos in (plugins or {}).items():
         plugin = app / "PlugIns" / name
+        suffix = {"MinisShare.appex": "ShareExtension",
+                  "MinisFileProvider.appex": "FileProvider",
+                  "AgentWidgetExtension.appex": "AgentWidget"}.get(name, name)
+        point = {"MinisShare.appex": "com.apple.share-services",
+                 "MinisFileProvider.appex": "com.apple.fileprovider-nonui",
+                 "AgentWidgetExtension.appex": "com.apple.widgetkit-extension"}.get(name)
+        plugin_info = {
+            "CFBundleIdentifier": f"com.openminis.app.{suffix}",
+            "CFBundleExecutable": Path(name).stem,
+            "MinimumOSVersion": plugin_minos,
+        }
+        if point:
+            plugin_info["NSExtension"] = {"NSExtensionPointIdentifier": point}
+        if name == "MinisFileProvider.appex":
+            plugin_info["NSExtension"]["NSExtensionFileProviderDocumentGroup"] = "group.com.openminis.app"
         write_plist(
             plugin / "Info.plist",
-            {
-                "CFBundleIdentifier": f"com.openminis.app.{name}",
-                "CFBundleExecutable": Path(name).stem,
-                "MinimumOSVersion": plugin_minos,
-            },
+            plugin_info,
         )
         binary = plugin / Path(name).stem
         binary.write_bytes(b"fake-plugin")
@@ -82,6 +93,11 @@ class VersionTests(unittest.TestCase):
         self.assertGreater(parse_version("16.0"), parse_version("15.0"))
         with self.assertRaises(PackageError):
             parse_version("15.x")
+
+    def test_extra_components_and_non_ascii_versions_are_rejected(self):
+        for version in ("15.0.0.1", "15.0.0.unchecked", "１６.０"):
+            with self.subTest(version=version), self.assertRaises(PackageError):
+                parse_version(version)
 
 
 class ResolveAndValidateTests(unittest.TestCase):

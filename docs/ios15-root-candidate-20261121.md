@@ -38,6 +38,16 @@
 
 Root 候选包含输入框提交 `7c45140702c2f9a824d329bb015c69610988a6cd` 的两个文件补丁。iOS 15 子代理输入框保留一层原生底色与一物理像素描边；Root 能力与输入框外观仍分别验收。
 
+## 跨版本 Root 与本机设备 MCP
+
+Root 打包器现在接受 `--minimum-os 15.0|16.0|16.2`。15.0 档保留分享扩展，16.0 档另外保留 File Provider，16.2 档保留 Widget；主 App、helper、分享扩展和共享框架仍分别按自己的原生下限审计。File Provider 与 Widget 使用 Root 专用 App Group、domain 和签名配置，避免与普通版并存时共享容器串线。
+
+越狱安装包由 `scripts/package_jailbreak_deb.py` 从同一份已验证 IPA 生成 rootful、rootless、roothide 三种架构档案。安装路径和 `uicache` 脚本固定，包不会把主 App 伪装成 UID 0，也不会给 helper 添加 setuid；`persona_support` 和设备运行状态在 manifest 中保持 `unverified`。
+
+Root 版的 `minis-device` 是内置、保留名称的 STDIO MCP server，只在用户在 Settings → MCP Integrations → This device 中开启后出现。它只提供设备信息、屏幕尺寸、亮度读取和亮度设置；每次操作都由前台原生确认，后台、关闭、取消、超时和断线会撤销，调用不会自动重放。普通版不会注入这个 server，`servers.json` 也不能伪造或覆盖保留名称。
+
+设备验收使用 `scripts/verify_jailbreak_device_report.py`，要求新构建的 commit/run、`runtime: physical-device` 和完整 MCP JSONL 回执匹配；旧 Root helper 报告不能作为新设备 MCP 证据。当前仍没有新构建的 iOS 15 MCP 真机报告，也没有 iOS 16+ 真机报告。
+
 ## 构建与验收证据
 
 | 断言 | 证据与状态 | 最便宜的证伪方式 / 若假设错 |

@@ -32,6 +32,8 @@ def static_checks():
                   "S_ISREG", "st_nlink != 1", "O_NONBLOCK", "OM_ROOT_TIMEOUT_MS 6000",
                   "OM_ROOT_OUTPUT_CAPACITY 4096", "POSIX_SPAWN_CLOEXEC_DEFAULT", "WNOHANG"):
         assert token in client, token
+    assert '"/Applications/MinisRoot.app"' in client
+    assert '"/private/var/jb/Applications/MinisRoot.app"' in client
     assert "getenv(" not in client and "environ" not in client.replace("environment", "")
     assert "system(" not in client and "popen(" not in client and '"/bin/sh"' not in client
     assert 'set_persona(&attributes, 99, 1)' in client

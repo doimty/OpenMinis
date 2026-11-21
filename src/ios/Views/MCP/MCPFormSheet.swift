@@ -86,7 +86,8 @@ struct MCPFormSheet: View {
     private var isEditing: Bool { server != nil }
 
     private var canSave: Bool {
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmedName.isEmpty, !MCPStore.isReservedServerName(trimmedName) else { return false }
         switch transport {
         case .http, .sse: return !url.trimmingCharacters(in: .whitespaces).isEmpty
         case .stdio: return !command.trimmingCharacters(in: .whitespaces).isEmpty

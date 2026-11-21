@@ -68,6 +68,7 @@ static NSString *const AOJITEnabledDefaultsKey = @"aojitEnabled";
 #import "SpeakOffload.h"
 #import "SpeechOffload.h"
 #import "DeviceOffload.h"
+#import "DeviceMCPOffload.h"
 #import "HomeKitOffload.h"
 #import "NotificationOffload.h"
 #import "PlayerOffload.h"
@@ -1412,6 +1413,9 @@ static void handle_process_exit(struct task *task, int code) {
     speak_offload_register();
     speech_offload_register();
     device_offload_register();
+#if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT
+    device_mcp_offload_register();
+#endif
     homekit_offload_register();
     notification_offload_register();
     player_offload_register();

@@ -496,16 +496,17 @@ class MCPPool:
             session.last_activity = time.time()
             self._slot_freed.notify_all()
 
-    def call_with_retry(self, name, fn):
+    def call_with_retry(self, name, fn, *, replay=True):
         for attempt in range(2):
             session = self.get(name, lease=True)
             try:
                 return fn(session)
             except MCPError as exc:
                 if exc.code in ("STDIO_CRASH", "TIMEOUT") and attempt == 0:
-                    log.warning("[%s] %s, retrying", name, exc.code)
                     self.evict(name)
-                    continue
+                    if replay:
+                        log.warning("[%s] %s, retrying", name, exc.code)
+                        continue
                 raise
             finally:
                 self.release(session)
@@ -627,7 +628,10 @@ class DaemonServer:
             if cmd == "call":
                 tool = data.get("tool", "")
                 args = data.get("args") or {}
-                result = self.pool.call_with_retry(server, lambda s: s.call_tool(tool, args))
+                if server == "minis-device":
+                    result = self.pool.call_with_retry(server, lambda s: s.call_tool(tool, args), replay=False)
+                else:
+                    result = self.pool.call_with_retry(server, lambda s: s.call_tool(tool, args))
                 return {"ok": True, "result": {"server": server, "tool": tool, "result": result}}
 
             if cmd == "ping":

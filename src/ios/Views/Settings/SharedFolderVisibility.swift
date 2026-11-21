@@ -23,18 +23,7 @@ enum SharedFolderVisibility {
     /// Must match FileProviderExtension.topLevelSubdirs.
     static let allFolderNames: [String] = ["shared", "skills", "memory"]
 
-    private static let appGroupID: String = {
-        // This file is also built into FileProvider, which does not link
-        // SharedContainerStore. Keep the same bounded bundle-ID selection.
-        let id = Bundle.main.bundleIdentifier ?? ""
-        let root = "com.openminis.app.root"
-        if id == root || id.hasPrefix(root + ".") {
-            return "group.com.openminis.app.root"
-        }
-        let base = "com.openminis.app.broadfiles"
-        return id == base || id.hasPrefix(base + ".")
-            ? "group.com.openminis.app.broadfiles" : "group.com.openminis.app"
-    }()
+    private static let appGroupID = MinisBuildIdentity.current.appGroupID
     private static let userDefaultsKeyPrefix = "fileProviderVisible."
 
     private static var store: UserDefaults {

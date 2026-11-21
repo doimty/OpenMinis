@@ -112,6 +112,26 @@ class FloorTests(unittest.TestCase):
         self.assertFalse(result['ok'])
         self.assertTrue(any('15.6' in error for error in result['errors']))
 
+    def test_selected_floor_enforces_binary_and_plist_without_changing_default(self):
+        for floor in ((16, 0, 0), (16, 2, 0)):
+            minimum = '.'.join(str(part) for part in floor[:2])
+            text = MODERN.replace('minos 15.0', 'minos ' + minimum)
+            plist = dict(PLIST_OK, MinimumOSVersion=minimum)
+            with self.subTest(floor=floor):
+                result = audit_metadata(text, 'arm64', plist, output=True, floor=floor)
+                self.assertTrue(result['ok'], result['errors'])
+                self.assertFalse(audit_metadata(text, 'arm64', plist)['ok'])
+                too_high = minimum + '.1'
+                binary_high = text.replace('minos ' + minimum, 'minos ' + too_high)
+                self.assertFalse(audit_metadata(binary_high, 'arm64', plist, floor=floor)['ok'])
+                self.assertFalse(audit_metadata(text, 'arm64', dict(plist, MinimumOSVersion=too_high), floor=floor)['ok'])
+
+    def test_selected_floor_keeps_architecture_platform_and_missing_metadata_guards(self):
+        for text, arch in ((MODERN_X86, 'x86_64'), (MODERN_MACOS, 'arm64'),
+                           (MODERN_NO_MIN, 'arm64')):
+            with self.subTest(arch=arch):
+                self.assertFalse(audit_metadata(text, arch, PLIST_OK, floor=(16, 2, 0))['ok'])
+
     def test_zero_patch_matches_floor_but_nonzero_patch_is_rejected(self):
         for spelling in ('15', '15.0', '15.0.0'):
             with self.subTest(minimum=spelling):

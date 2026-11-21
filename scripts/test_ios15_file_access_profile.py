@@ -150,14 +150,16 @@ class ProfileTests(unittest.TestCase):
 
     def test_source_uses_current_identity_for_shared_stores(self):
         base = ROOT / "src/ios"
-        shared = (base / "Shared/SharedContainerStore.swift").read_text()
-        self.assertIn('id == base || id.hasPrefix(base + ".")', shared)
-        self.assertIn('"group.com.openminis.app.broadfiles"', shared)
+        shared = (base / "Shared/SharedContainerStore.swift").read_text(encoding="utf-8")
+        identity = (base / "Shared/MinisBuildIdentity.swift").read_text(encoding="utf-8")
+        self.assertIn('bundleIdentifier == base || bundleIdentifier.hasPrefix(base + ".")', identity)
+        self.assertIn('case .broadFiles: return "com.openminis.app.broadfiles"', identity)
+        self.assertIn("MinisBuildIdentity.current.appGroupID", shared)
         for name in ("MinisApp.swift", "Debug/DebugJSONRPC.swift"):
-            text = (base / name).read_text()
+            text = (base / name).read_text(encoding="utf-8")
             self.assertNotIn('forSecurityApplicationGroupIdentifier: "group.com.openminis.app"', text)
             self.assertIn("SharedContainerStore.appGroupID", text)
-        share = (base / "ShareExtension/ShareViewController.swift").read_text()
+        share = (base / "ShareExtension/ShareViewController.swift").read_text(encoding="utf-8")
         self.assertIn("SharedContainerStore.deepLinkScheme", share)
 
 

@@ -50,7 +50,15 @@ static int helper_path(char path[PATH_MAX]) {
     if (!slash) return EINVAL;
     *slash = '\0';
     const char *bundle = strrchr(path, '/');
-    if (!bundle || strcmp(bundle + 1, "Minis.app") != 0) return EINVAL;
+    if (!bundle) return EINVAL;
+    if (strcmp(bundle + 1, "Minis.app") != 0) {
+        const char *rootful = "/Applications/MinisRoot.app";
+        const char *rootless = "/var/jb/Applications/MinisRoot.app";
+        const char *rootlessCanonical = "/private/var/jb/Applications/MinisRoot.app";
+        if (strcmp(path, rootful) != 0 && strcmp(path, rootless) != 0 &&
+            strcmp(path, rootlessCanonical) != 0)
+            return EINVAL;
+    }
     const char suffix[] = "/minis-rootprobe";
     if (strlen(path) + sizeof(suffix) > PATH_MAX) return ENAMETOOLONG;
     strcat(path, suffix);

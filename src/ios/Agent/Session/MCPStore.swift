@@ -77,6 +77,11 @@ struct MCPServerConfig: Codable, Identifiable, Hashable {
 @MainActor
 final class MCPStore: ObservableObject {
     static let shared = MCPStore()
+    nonisolated static let reservedDeviceServerName = "minis-device"
+
+    nonisolated static func isReservedServerName(_ name: String) -> Bool {
+        name.caseInsensitiveCompare(reservedDeviceServerName) == .orderedSame
+    }
 
     @Published private(set) var servers: [MCPServerConfig] = []
 
@@ -293,6 +298,10 @@ final class MCPStore: ObservableObject {
         // on first sight and persisted back, so it doesn't churn on every read.
         let now = Date().timeIntervalSince1970
         for (name, rawEntry) in rawServers.sorted(by: { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }) {
+            guard !Self.isReservedServerName(name) else {
+                logger.warning("Skipping reserved MCP server entry '\(name)'")
+                continue
+            }
             do {
                 let entryData = try JSONSerialization.data(withJSONObject: rawEntry)
                 let entry = try decoder.decode(ServerEntry.self, from: entryData)
@@ -402,6 +411,10 @@ final class MCPStore: ObservableObject {
     // MARK: - CRUD
 
     func add(_ server: MCPServerConfig) {
+        guard !Self.isReservedServerName(server.id) else {
+            AppLogger(category: "MCPStore").warning("[MCP] refusing user-configured reserved server '\(server.id)'")
+            return
+        }
         var server = server
         server.updatedAt = Date().timeIntervalSince1970   // per-server LWW clock
         if let idx = servers.firstIndex(where: { $0.id == server.id }) {
@@ -424,6 +437,7 @@ final class MCPStore: ObservableObject {
     }
 
     func delete(id: String) {
+        guard !Self.isReservedServerName(id) else { return }
         servers.removeAll { $0.id == id }
         save()
         noteSyncedLocalDeletion(names: [id])
@@ -433,6 +447,7 @@ final class MCPStore: ObservableObject {
     }
 
     func toggle(id: String) {
+        guard !Self.isReservedServerName(id) else { return }
         guard let idx = servers.firstIndex(where: { $0.id == id }) else { return }
         servers[idx].enabled.toggle()
         servers[idx].updatedAt = Date().timeIntervalSince1970
@@ -492,6 +507,7 @@ final class MCPStore: ObservableObject {
             }
         }
 
+        result.removeAll { Self.isReservedServerName($0.id) }
         guard !result.isEmpty else { throw ImportError.noServers }
         return result.sorted { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
     }
@@ -499,7 +515,7 @@ final class MCPStore: ObservableObject {
     /// Persist the parsed servers, overwriting any name collisions (LWW).
     func commitImport(_ parsed: [MCPServerConfig]) {
         let now = Date().timeIntervalSince1970
-        for server in parsed {
+        for server in parsed where !Self.isReservedServerName(server.id) {
             var server = server
             server.updatedAt = now
             if let idx = servers.firstIndex(where: { $0.id == server.id }) {
@@ -514,7 +530,7 @@ final class MCPStore: ObservableObject {
         }
         servers.sort { $0.id.localizedCaseInsensitiveCompare($1.id) == .orderedAscending }
         save()
-        noteSyncedLocalChange(names: parsed.map(\.id))
+        noteSyncedLocalChange(names: parsed.map(\.id).filter { !Self.isReservedServerName($0) })
     }
 
     /// Convenience: parse + commit in one call.
@@ -605,7 +621,17 @@ final class MCPStore: ObservableObject {
     /// name as tiebreak. Note is truncated to the same cap as Skill descriptions
     /// (200 chars). [T-mcp-review-fixes-ios] Unified with Android on createdAt-desc.
     func systemPromptSnippet(for sessionId: String) -> String? {
-        let enabled = servers.filter { isEnabledForSession($0.id, sessionId: sessionId) }
+        var enabled = servers.filter { isEnabledForSession($0.id, sessionId: sessionId) }
+#if MINIS_ROOT_MANAGEMENT
+        if DeviceMCPController.shared.supported {
+            enabled.removeAll { $0.id == DeviceMCPController.serverName }
+            if DeviceMCPController.shared.enabled {
+                enabled.append(MCPServerConfig(id: DeviceMCPController.serverName,
+                    note: "This iPhone's device model, screen size and brightness. Every call requires a foreground approval.",
+                    enabled: true, createdAt: Date().timeIntervalSince1970))
+            }
+        }
+#endif
         guard !enabled.isEmpty else { return nil }
 
         // Sort by createdAt desc, name asc as tiebreak, then take Top-N. Missing
@@ -787,6 +813,7 @@ final class MCPStore: ObservableObject {
     /// Full ServerEntry JSON for the sync builder (verbatim round-trip shape,
     /// same encoder settings as save()). nil when the server doesn't exist.
     nonisolated static func entryJsonForSync(name: String) -> (json: String, createdAt: Date, updatedAt: Date)? {
+        guard !Self.isReservedServerName(name) else { return nil }
         // Read straight from disk so the builder (off-MainActor) never races
         // the in-memory list.
         guard let data = try? Data(contentsOf: syncFileURL),
@@ -806,6 +833,10 @@ final class MCPStore: ObservableObject {
     /// Updates the fingerprint so the external-edit scan doesn't echo the
     /// applied content back with a fresh clock.
     func applyRemoteServerItem(name: String, entryJson: String, remoteCreatedAt: Date, remoteUpdatedAt: Date) {
+        guard !Self.isReservedServerName(name) else {
+            AppLogger(category: "MCPStore").warning("[Sync] refusing reserved MCP server '\(name)'")
+            return
+        }
         guard let data = entryJson.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             AppLogger(category: "MCPStore").error("[Sync] applyRemoteServerItem '\(name)': unparseable entryJson")
@@ -846,6 +877,7 @@ final class MCPStore: ObservableObject {
     /// Hard-delete a server locally from an inbound op=delete tombstone,
     /// without re-queueing the delete back into the sync layer.
     func applyRemoteServerDeletion(name: String) {
+        guard !Self.isReservedServerName(name) else { return }
         guard servers.contains(where: { $0.id == name }) else { return }
         servers.removeAll { $0.id == name }
         save()

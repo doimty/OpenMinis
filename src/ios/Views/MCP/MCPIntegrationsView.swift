@@ -27,6 +27,9 @@ struct MCPIntegrationsView: View {
 
     var body: some View {
         List {
+#if MINIS_ROOT_MANAGEMENT
+            if DeviceMCPController.shared.supported { DeviceMCPSettingsSection() }
+#endif
             if store.servers.isEmpty {
                 emptyState
             } else {
@@ -159,6 +162,31 @@ struct MCPIntegrationsView: View {
         .contentShape(Rectangle())
     }
 }
+
+#if MINIS_ROOT_MANAGEMENT
+private struct DeviceMCPSettingsSection: View {
+    @ObservedObject private var controller = DeviceMCPController.shared
+    @State private var tools = false
+
+    var body: some View {
+        Section {
+            Toggle(AppLocalized("Allow device tool requests"), isOn: Binding(get: { controller.enabled }, set: controller.setEnabled))
+            if controller.enabled { Button(AppLocalized("Show device tools")) { tools = true } }
+            if !controller.records.isEmpty {
+                Button(AppLocalized("Copy device activity report")) {
+                    if let report = controller.report { UIPasteboard.general.string = report }
+                }
+                Button(AppLocalized("Clear device activity report")) { controller.clearReport() }
+            }
+        } header: {
+            Text(AppLocalized("This device"))
+        } footer: {
+            Text(AppLocalized("Allows model, screen size and display brightness requests while Minis is in the foreground. Each call asks you to allow it once. Leaving the app turns this off."))
+        }
+        .sheet(isPresented: $tools) { MCPToolsSheet(serverName: DeviceMCPController.serverName) }
+    }
+}
+#endif
 
 // MARK: - Tools sheet [T-mcp-tools-refresh]
 

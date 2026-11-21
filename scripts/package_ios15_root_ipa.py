@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Package the explicitly compiled, isolated TrollStore Minis Root candidate.
+"""Package the explicitly compiled, isolated Minis Root candidate.
 
 This is intentionally separate from the standard/file-only packager. It embeds
-one fixed-operation helper, verifies each signature and the iOS 15 native floor,
-and records device privileges as UNVERIFIED. It does not install anything.
+one fixed-operation helper and emits iOS 15.0, 16.0 or 16.2 installation tiers.
+Core images stay at iOS 15.0; each retained extension has its own native floor.
+Signatures and archive contents are verified; device privileges remain UNVERIFIED.
 """
 from __future__ import annotations
 
@@ -17,12 +18,13 @@ import stat
 import subprocess
 import sys
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from package_ios15_ipa import (
-    APP_NAME, NORMAL_BUNDLE_ID, PackageError, audit_staged_native_floor,
+    APP_NAME, MACHO_MAGICS, NORMAL_BUNDLE_ID, PackageError, audit_staged_native_floor,
+    bundle_minimum_os,
     chmod_executable, entitlement_values_equal, is_macho, load_plist,
-    plugin_bundles, resolve_app, run_codesign, sha256_file, signed_entitlements,
+    parse_version, plugin_bundles, resolve_app, run_codesign, sha256_file, signed_entitlements,
     strip_incompatible_plugins, validate_app, write_bundle_info,
 )
 
@@ -33,7 +35,66 @@ HELPER_NAME = "minis-rootprobe"
 SCHEMA = 1
 ROOT_ENTITLEMENTS = SCRIPTS / "ios15-root.entitlements"
 SHARE_ENTITLEMENTS = SCRIPTS / "ios15-root-share.entitlements"
+FILEPROVIDER_ENTITLEMENTS = SCRIPTS / "ios15-root-fileprovider.entitlements"
+WIDGET_ENTITLEMENTS = SCRIPTS / "ios15-root-widget.entitlements"
 HELPER_ENTITLEMENTS = SCRIPTS / "ios15-root-helper.entitlements"
+ROOT_PLUGIN_ROLES = {
+    "MinisShare.appex": "share",
+    "MinisFileProvider.appex": "fileprovider",
+    "AgentWidgetExtension.appex": "widget",
+}
+ROOT_PRODUCT_FLOORS = {
+    "15.0": (15, 0, 0),
+    "16.0": (16, 0, 0),
+    "16.2": (16, 2, 0),
+}
+ROOT_ROLE_FLOORS = {
+    "app": (15, 0, 0),
+    "helper": (15, 0, 0),
+    "share": (15, 0, 0),
+    "fileprovider": (16, 0, 0),
+    "widget": (16, 2, 0),
+}
+ROOT_ROLE_SUFFIXES = {
+    "app": "",
+    "share": ".ShareExtension",
+    "fileprovider": ".FileProvider",
+    "widget": ".AgentWidget",
+}
+ROOT_EXTENSION_POINTS = {
+    "share": "com.apple.share-services",
+    "fileprovider": "com.apple.fileprovider-nonui",
+    "widget": "com.apple.widgetkit-extension",
+}
+
+
+def validated_plugins(app: Path, minimum_os: str, *, complete: bool = False) -> dict[Path, str]:
+    if minimum_os not in ROOT_PRODUCT_FLOORS:
+        raise PackageError(f"unsupported Root package floor: {minimum_os}")
+    roles = {}
+    for plugin in plugin_bundles(app):
+        role = ROOT_PLUGIN_ROLES.get(plugin.name)
+        if role is None:
+            raise PackageError(f"unrecognized app extension in Root IPA: {plugin.name}")
+        if role in roles.values():
+            raise PackageError(f"duplicate Root extension role: {role}")
+        plugin_info = load_plist(plugin / "Info.plist")
+        minimum = bundle_minimum_os(plugin_info)
+        if minimum is None or parse_version(minimum) != ROOT_ROLE_FLOORS[role]:
+            raise PackageError(f"{role} extension must preserve its declared deployment floor")
+        if plugin_info.get("CFBundleIdentifier") != NORMAL_BUNDLE_ID + ROOT_ROLE_SUFFIXES[role]:
+            raise PackageError(f"unrecognized {role} extension source identity")
+        extension = plugin_info.get("NSExtension")
+        if not isinstance(extension, dict) or extension.get("NSExtensionPointIdentifier") != ROOT_EXTENSION_POINTS[role]:
+            raise PackageError(f"invalid {role} extension metadata")
+        roles[plugin] = role
+    if complete:
+        required = {role for role in ROOT_PLUGIN_ROLES.values()
+                    if ROOT_ROLE_FLOORS[role] <= ROOT_PRODUCT_FLOORS[minimum_os]}
+        missing = required - set(roles.values())
+        if missing:
+            raise PackageError(f"Root package is missing compatible extensions: {', '.join(sorted(missing))}")
+    return roles
 
 
 def expected_entitlements(role: str) -> dict:
@@ -41,14 +102,16 @@ def expected_entitlements(role: str) -> dict:
         return {"get-task-allow": False,
                 "com.apple.private.security.no-sandbox": True,
                 "platform-application": True}
-    if role not in {"app", "share"}:
+    if role not in {"app", "share", "fileprovider", "widget"}:
         raise PackageError(f"unknown root signature role: {role}")
+    bundle_suffix = ROOT_ROLE_SUFFIXES[role]
     values = {
-        "application-identifier": ROOT_ID + (".ShareExtension" if role == "share" else ""),
+        "application-identifier": ROOT_ID + bundle_suffix,
         "com.apple.security.application-groups": [ROOT_GROUP],
-        "keychain-access-groups": [ROOT_ID],
         "get-task-allow": False,
     }
+    if role in {"app", "share"}:
+        values["keychain-access-groups"] = [ROOT_ID]
     if role == "app":
         values.update({"com.apple.private.security.no-sandbox": True,
                        "platform-application": True,
@@ -59,6 +122,8 @@ def expected_entitlements(role: str) -> dict:
 
 def validate_templates() -> None:
     for role, path in (("app", ROOT_ENTITLEMENTS), ("share", SHARE_ENTITLEMENTS),
+                       ("fileprovider", FILEPROVIDER_ENTITLEMENTS),
+                       ("widget", WIDGET_ENTITLEMENTS),
                        ("helper", HELPER_ENTITLEMENTS)):
         if not entitlement_values_equal(load_plist(path), expected_entitlements(role)):
             raise PackageError(f"{role} entitlements differ from the explicit root profile")
@@ -71,7 +136,9 @@ def validate_build_identity(commit: str, run_id: str) -> None:
         raise PackageError("Actions run ID must be a positive ASCII decimal string")
 
 
-def prepare_root_identity(app: Path, commit: str, run_id: str) -> dict:
+def prepare_root_identity(app: Path, commit: str, run_id: str, minimum_os: str = "15.0") -> dict:
+    validate_build_identity(commit, run_id)
+    roles = validated_plugins(app, minimum_os)
     info = validate_app(app)
     if info.get("CFBundleIdentifier") != NORMAL_BUNDLE_ID:
         raise PackageError("root packaging requires the unchanged build identity com.openminis.app")
@@ -89,6 +156,7 @@ def prepare_root_identity(app: Path, commit: str, run_id: str) -> dict:
         "MinisRootActionsRunID": run_id,
         "MinisHostFileProbeBuild": {"schema": 1, "source_commit": commit,
                                    "actions_run_id": run_id},
+        "MinimumOSVersion": minimum_os,
     })
     # Keep provider callbacks while removing other variants' share handoffs.
     urls = []
@@ -102,14 +170,16 @@ def prepare_root_identity(app: Path, commit: str, run_id: str) -> dict:
     urls.append({"CFBundleURLName": "Minis Root", "CFBundleURLSchemes": ["minis-root"]})
     info["CFBundleURLTypes"] = urls
     write_bundle_info(app, info)
-    for plugin in plugin_bundles(app):
-        if plugin.name != "MinisShare.appex":
-            raise PackageError(f"root IPA only retains MinisShare.appex, not {plugin.name}")
+    for plugin, role in roles.items():
         plugin_info = load_plist(plugin / "Info.plist")
-        if not str(plugin_info.get("CFBundleIdentifier", "")).startswith(NORMAL_BUNDLE_ID + "."):
-            raise PackageError("unrecognized root share source identity")
-        plugin_info.update({"CFBundleIdentifier": ROOT_ID + ".ShareExtension",
-                            "MinisFileAccessProfile": "root-helper"})
+        original_suffix = ROOT_ROLE_SUFFIXES[role]
+        plugin_info["CFBundleIdentifier"] = ROOT_ID + original_suffix
+        if role == "share":
+            plugin_info["MinisFileAccessProfile"] = "root-helper"
+        if role == "fileprovider":
+            extension = dict(plugin_info["NSExtension"])
+            extension["NSExtensionFileProviderDocumentGroup"] = ROOT_GROUP
+            plugin_info["NSExtension"] = extension
         write_bundle_info(plugin, plugin_info)
     return info
 
@@ -136,24 +206,47 @@ def sign_and_verify(app: Path) -> dict:
     if not codesign:
         raise PackageError("codesign is required for the Root candidate")
     helper = app / HELPER_NAME
+    plugin_roles = {plugin: ROOT_PLUGIN_ROLES[plugin.name] for plugin in plugin_bundles(app)}
+    entitlement_paths = {
+        "app": ROOT_ENTITLEMENTS,
+        "share": SHARE_ENTITLEMENTS,
+        "fileprovider": FILEPROVIDER_ENTITLEMENTS,
+        "widget": WIDGET_ENTITLEMENTS,
+        "helper": HELPER_ENTITLEMENTS,
+    }
+
+    def role_for_path(path: Path) -> str | None:
+        if path == app:
+            return "app"
+        if path == helper:
+            return "helper"
+        if path in plugin_roles:
+            return plugin_roles[path]
+        for plugin, role in plugin_roles.items():
+            plugin_info = load_plist(plugin / "Info.plist")
+            if path == plugin / str(plugin_info.get("CFBundleExecutable", "")):
+                return role
+            if path == plugin / (str(plugin_info.get("CFBundleExecutable", "")) + ".debug.dylib"):
+                return role
+        return None
+
     binaries = sorted((p for p in app.rglob("*") if is_macho(p)),
                       key=lambda p: (len(p.parts), str(p)), reverse=True)
     for binary in binaries:
         chmod_executable(binary)
-        extra: list[str] = []
-        if binary == helper:
-            extra = ["--entitlements", str(HELPER_ENTITLEMENTS)]
-        elif binary.parent.suffix == ".appex":
-            extra = ["--entitlements", str(SHARE_ENTITLEMENTS)]
+        role = role_for_path(binary)
+        extra = ["--entitlements", str(entitlement_paths[role])] if role else []
         run_codesign(codesign, binary, extra)
     bundles = sorted([*app.rglob("*.framework"), *app.rglob("*.appex"), app],
                      key=lambda p: (len(p.parts), str(p)), reverse=True)
     for bundle in bundles:
-        extra = (["--entitlements", str(ROOT_ENTITLEMENTS)] if bundle == app else
-                 ["--entitlements", str(SHARE_ENTITLEMENTS)] if bundle.suffix == ".appex" else [])
+        role = role_for_path(bundle)
+        extra = ["--entitlements", str(entitlement_paths[role])] if role else []
         run_codesign(codesign, bundle, extra)
     verified: dict = {}
-    targets = [("app", app), ("helper", helper)] + [("share", p) for p in plugin_bundles(app)]
+    targets = [("app", app), ("helper", helper)] + [
+        (ROOT_PLUGIN_ROLES[p.name], p) for p in plugin_bundles(app)
+    ]
     for role, target in targets:
         result = subprocess.run([codesign, "--verify", "--strict", str(target)],
                                 capture_output=True, text=True, check=False)
@@ -162,7 +255,7 @@ def sign_and_verify(app: Path) -> dict:
         values = signed_entitlements(codesign, target)
         if not entitlement_values_equal(values, expected_entitlements(role)):
             raise PackageError(f"signed {role} entitlements differ from the root profile")
-        verified[str(target.relative_to(app))] = values
+        verified[target.relative_to(app).as_posix()] = values
     result = subprocess.run([codesign, "--verify", "--deep", "--strict", str(app)],
                             capture_output=True, text=True, check=False)
     if result.returncode != 0:
@@ -170,27 +263,60 @@ def sign_and_verify(app: Path) -> dict:
     return verified
 
 
+def declared_executables(app: Path) -> set[Path]:
+    paths = {app / HELPER_NAME}
+    for info_path in app.rglob("Info.plist"):
+        bundle = info_path.parent
+        if bundle != app and bundle.suffix not in {".appex", ".framework", ".bundle"}:
+            continue
+        info = load_plist(info_path)
+        name = info.get("CFBundleExecutable")
+        if name is None:
+            continue
+        if not isinstance(name, str) or not name or PurePosixPath(name).name != name or "\\" in name:
+            raise PackageError(f"invalid bundle executable name: {info_path}")
+        executable = bundle / name
+        if not executable.is_file() or executable.is_symlink():
+            raise PackageError(f"missing regular bundle executable: {executable}")
+        paths.add(executable)
+    return paths
+
+
+def executable_hashes(app: Path) -> dict[str, str]:
+    declared = declared_executables(app)
+    return {path.relative_to(app).as_posix(): sha256_file(path)
+            for path in sorted(app.rglob("*"))
+            if path.is_file() and (path in declared or is_macho(path) or path.stat().st_mode & 0o111)}
+
+
 def zip_root_payload(stage: Path, ipa: Path) -> None:
-    """Record the helper as a Unix executable, including in portable fixtures."""
+    """Record all native and declared executables as regular Unix 0755 files."""
     payload = stage / "Payload"
-    if not (payload / APP_NAME / HELPER_NAME).is_file():
+    app = payload / APP_NAME
+    if not (app / HELPER_NAME).is_file():
         raise PackageError("root staging tree is missing its helper")
+    executables = set(executable_hashes(app))
     with zipfile.ZipFile(ipa, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
         for path in sorted(payload.rglob("*")):
+            if path.is_symlink():
+                raise PackageError(f"Root staging tree contains a symlink: {path}")
             if not path.is_file():
                 continue
             name = path.relative_to(stage).as_posix()
-            if name == f"Payload/{APP_NAME}/{HELPER_NAME}":
-                info = zipfile.ZipInfo.from_file(path, name)
-                info.create_system = 3
-                info.external_attr = (stat.S_IFREG | 0o755) << 16
-                info.compress_type = zipfile.ZIP_DEFLATED
-                archive.writestr(info, path.read_bytes())
-            else:
-                archive.write(path, arcname=name)
+            mode = 0o755 if path.relative_to(app).as_posix() in executables else 0o644
+            info = zipfile.ZipInfo.from_file(path, name)
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | mode) << 16
+            info.compress_type = zipfile.ZIP_DEFLATED
+            with path.open("rb") as source, archive.open(info, "w") as destination:
+                shutil.copyfileobj(source, destination)
 
 
-def verify_root_archive(ipa: Path, info: dict, helper_sha256: str) -> None:
+def verify_root_archive(
+    ipa: Path, info: dict, helper_sha256: str, *,
+    expected_executables: dict[str, str] | None = None,
+    expected_plugins: dict[str, dict] | None = None,
+) -> None:
     with zipfile.ZipFile(ipa) as archive:
         if archive.testzip() is not None:
             raise PackageError("Root IPA ZIP CRC failed")
@@ -207,15 +333,63 @@ def verify_root_archive(ipa: Path, info: dict, helper_sha256: str) -> None:
             raise PackageError("Root helper executable mode was not preserved in the IPA")
         if hashlib.sha256(archive.read(stored_helper)).hexdigest() != helper_sha256:
             raise PackageError("Root IPA helper differs from the signed staging binary")
+        names = archive.namelist()
+        if len(names) != len(set(names)):
+            raise PackageError("Root IPA contains duplicate archive members")
+        declared = {f"Payload/{APP_NAME}/{info['CFBundleExecutable']}", helper_path}
+        plugin_infos = {}
+        prefix = f"Payload/{APP_NAME}/"
+        for name in names:
+            path = PurePosixPath(name)
+            if not name.startswith(prefix) or ".." in path.parts or "\\" in name:
+                raise PackageError(f"invalid Root archive path: {name}")
+            if path.name != "Info.plist":
+                continue
+            bundle = path.parent
+            if bundle.suffix not in {".appex", ".framework", ".bundle"}:
+                continue
+            bundle_info = plistlib.loads(archive.read(name))
+            executable = bundle_info.get("CFBundleExecutable")
+            if executable:
+                if not isinstance(executable, str) or PurePosixPath(executable).name != executable or "\\" in executable:
+                    raise PackageError(f"invalid archived executable name: {name}")
+                declared.add(f"{bundle.as_posix()}/{executable}")
+            if bundle.suffix == ".appex":
+                plugin_infos[bundle.relative_to(PurePosixPath(prefix)).as_posix()] = bundle_info
+        if not declared <= set(names):
+            raise PackageError("Root IPA is missing a declared executable")
+        observed = {}
+        for member in archive.infolist():
+            with archive.open(member) as source:
+                head = source.read(4)
+                digest = hashlib.sha256(head)
+                for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            native = head in MACHO_MAGICS
+            executable = member.filename in declared or native or member.external_attr >> 16 & 0o111
+            if not executable:
+                continue
+            mode = member.external_attr >> 16
+            if member.create_system != 3 or not stat.S_ISREG(mode) or stat.S_IMODE(mode) != 0o755:
+                raise PackageError(f"Root executable mode was not preserved in the IPA: {member.filename}")
+            observed[member.filename[len(prefix):]] = digest.hexdigest()
+        if expected_executables is not None and observed != expected_executables:
+            raise PackageError("Root IPA executables differ from the signed staging binaries")
+        if expected_plugins is not None and plugin_infos != expected_plugins:
+            raise PackageError("Root IPA extension metadata differs from the signed staging bundles")
 
 
 def package_root_app(source_app: Path, helper: Path, output_dir: Path, *,
-                     commit: str, run_id: str) -> dict:
+                     commit: str, run_id: str, minimum_os: str = "15.0") -> dict:
     validate_build_identity(commit, run_id)
     validate_templates()
+    if minimum_os not in ROOT_PRODUCT_FLOORS:
+        raise PackageError(f"unsupported Root package floor: {minimum_os}")
+    product_floor = ROOT_PRODUCT_FLOORS[minimum_os]
     if sys.platform != "darwin":
         raise PackageError("Root IPA packaging requires macOS signing and native audits")
     validate_app(source_app)
+    validated_plugins(source_app, minimum_os, complete=True)
     if not is_macho(helper) or helper.is_symlink():
         raise PackageError("root helper must be a regular Mach-O executable")
     verify_compiled_client(source_app)
@@ -230,29 +404,38 @@ def package_root_app(source_app: Path, helper: Path, output_dir: Path, *,
         raise PackageError("root staging directory already exists")
     app = stage / "Payload" / APP_NAME
     shutil.copytree(source_app, app, symlinks=False)
-    kept, stripped = strip_incompatible_plugins(app)
-    info = prepare_root_identity(app, commit, run_id)
+    kept, stripped = strip_incompatible_plugins(app, product_floor)
+    info = prepare_root_identity(app, commit, run_id, minimum_os)
     source_helper_sha = sha256_file(helper)
     staged_helper = app / HELPER_NAME
     if staged_helper.exists():
         raise PackageError("source App unexpectedly already contains a root helper")
     shutil.copy2(helper, staged_helper)
     staged_helper.chmod(0o755)  # Persona spawning, deliberately no setuid bit.
-    native_floor = audit_staged_native_floor(app)
+    extension_floors = {plugin.relative_to(app).as_posix(): ROOT_ROLE_FLOORS[ROOT_PLUGIN_ROLES[plugin.name]]
+                        for plugin in plugin_bundles(app)}
+    native_floor = audit_staged_native_floor(app, extension_floors=extension_floors)
     if not any(item["path"] == HELPER_NAME for item in native_floor):
         raise PackageError("native-floor audit did not cover the helper")
     signatures = sign_and_verify(app)
     signed_helper_sha = sha256_file(staged_helper)
-    name = f"Minis-{info.get('CFBundleShortVersionString', 'unknown')}-ios15-root-{commit[:8]}.ipa"
+    archive_executables = executable_hashes(app)
+    archive_plugins = {plugin.relative_to(app).as_posix(): load_plist(plugin / "Info.plist")
+                       for plugin in plugin_bundles(app)}
+    floor_name = "15" if minimum_os == "15.0" else minimum_os
+    name = f"Minis-{info.get('CFBundleShortVersionString', 'unknown')}-ios{floor_name}-root-{commit[:8]}.ipa"
     ipa = output_dir / name
     zip_root_payload(stage, ipa)
-    verify_root_archive(ipa, info, signed_helper_sha)
+    verify_root_archive(ipa, info, signed_helper_sha,
+                        expected_executables=archive_executables,
+                        expected_plugins=archive_plugins)
     manifest = {
         "bundle_id": ROOT_ID, "app_group_id": ROOT_GROUP,
         "minimum_os": info.get("MinimumOSVersion"),
         "marketing_version": info.get("CFBundleShortVersionString"),
         "file_access_profile": "root-helper", "purpose": "TrollStore root-helper candidate; device acceptance required",
         "source_commit": commit, "actions_run_id": run_id, "root_management_schema": SCHEMA,
+        "package_floor": minimum_os,
         "host_file_probe_build": info["MinisHostFileProbeBuild"],
         "root_helper_included": True, "root_helper_path": HELPER_NAME,
         "root_helper_source_binary_sha256": source_helper_sha,
@@ -264,6 +447,9 @@ def package_root_app(source_app: Path, helper: Path, output_dir: Path, *,
         "runtime_file_access_verified": False, "device_runtime_verified": False,
         "signed": True, "signature_entitlements_verified": True,
         "signature_entitlements": signatures, "native_floor_audit": native_floor,
+        "archive_executable_hashes": archive_executables,
+        "archive_executable_modes_verified": True,
+        "extension_metadata_verified": True,
         "plugins_kept": kept, "plugins_stripped": stripped,
         "ipa_name": name, "ipa_bytes": ipa.stat().st_size, "ipa_sha256": sha256_file(ipa),
     }
@@ -277,6 +463,7 @@ def main() -> int:
     parser.add_argument("--derived-data", type=Path)
     parser.add_argument("--configuration", default="Debug")
     parser.add_argument("--helper", type=Path, required=True)
+    parser.add_argument("--minimum-os", choices=tuple(ROOT_PRODUCT_FLOORS), default="15.0")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--actions-run-id", required=True)
@@ -284,7 +471,8 @@ def main() -> int:
     try:
         source = resolve_app(args.app, args.derived_data, args.configuration)
         result = package_root_app(source, args.helper, args.output_dir,
-                                  commit=args.source_commit, run_id=args.actions_run_id)
+                                  commit=args.source_commit, run_id=args.actions_run_id,
+                                  minimum_os=args.minimum_os)
     except (PackageError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

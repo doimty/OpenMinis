@@ -79,7 +79,29 @@ def save_config(config):
 
 def get_servers():
     """Return the mcpServers dict (name -> server object)."""
-    return load_config().get("mcpServers", {})
+    servers = load_config().get("mcpServers", {})
+    state = _local_device_state()
+    # The local bridge is a reserved capability, never user-configurable
+    # through servers.json. Drop a stale or forged entry before exposing it.
+    servers.pop("minis-device", None)
+    if state:
+        servers["minis-device"] = {"enabled": True, "command": "/usr/bin/python3",
+            "args": ["-I", "-S", "-B", "/usr/local/lib/minis-mcp-cli/device_server.py"],
+            "note": "Device information and brightness with foreground approval"}
+    return servers
+
+
+def _local_device_state():
+    import subprocess
+    bridge = "/usr/local/bin/minis-device-call"
+    if not os.path.isfile(bridge):
+        return None
+    try:
+        reply = subprocess.run([bridge, "status"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               stdin=subprocess.DEVNULL, timeout=2, check=False)
+        return reply.returncode == 0 and json.loads(reply.stdout) == {"enabled": True}
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return False
 
 
 def get_server(name):
@@ -89,6 +111,8 @@ def get_server(name):
 
 def upsert_server(name, server):
     """Add or overwrite a server (last-write-wins on name collision)."""
+    if name == "minis-device":
+        return False
     config = load_config()
     config.setdefault("mcpServers", {})[name] = server
     save_config(config)
@@ -96,6 +120,8 @@ def upsert_server(name, server):
 
 def remove_server(name):
     """Delete a server. Returns True if it existed."""
+    if name == "minis-device":
+        return False
     config = load_config()
     servers = config.setdefault("mcpServers", {})
     if name in servers:
@@ -107,6 +133,8 @@ def remove_server(name):
 
 def set_enabled(name, enabled):
     """Flip a server's enabled flag. Returns True if the server existed."""
+    if name == "minis-device":
+        return False
     config = load_config()
     server = config.get("mcpServers", {}).get(name)
     if server is None:

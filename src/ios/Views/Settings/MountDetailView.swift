@@ -340,7 +340,7 @@ struct MountDetailView: View {
     }
 
     private func signalFileProviderRoot() {
-        let domainIdentifier = NSFileProviderDomainIdentifier("com.openminis.app.files")
+        let domainIdentifier = NSFileProviderDomainIdentifier(SharedContainerStore.fileProviderDomainIdentifier)
         NSFileProviderManager.getDomainsWithCompletionHandler { domains, _ in
             guard let domain = domains.first(where: { $0.identifier == domainIdentifier }) else {
                 return

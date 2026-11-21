@@ -259,7 +259,8 @@ def call_daemon(request, pretty):
     retry if the daemon wasn't ready yet right after a fresh fork."""
     maybe_start_daemon()
     resp = send_to_daemon(request)
-    if not resp.get("ok") and resp.get("code") == "NO_DAEMON":
+    device_call = request.get("server") == "minis-device" and request.get("cmd") == "call"
+    if not resp.get("ok") and resp.get("code") == "NO_DAEMON" and not device_call:
         time.sleep(0.5)
         resp = send_to_daemon(request)
     if not resp.get("ok"):

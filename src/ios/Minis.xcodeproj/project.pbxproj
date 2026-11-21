@@ -64,6 +64,9 @@
 		52F025010000000000000002 /* RootManagementAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000013 /* RootManagementAuthorization.swift */; };
 		52F025010000000000000003 /* RootManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000014 /* RootManagementView.swift */; };
 		52F025010000000000000004 /* RootManagementRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000015 /* RootManagementRunner.swift */; };
+		52F025010000000000000030 /* DeviceMCPApproval.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000034 /* DeviceMCPApproval.swift */; };
+		52F025010000000000000031 /* DeviceMCPNativeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000035 /* DeviceMCPNativeBridge.swift */; };
+		52F025010000000000000032 /* DeviceMCPOffload.m in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000036 /* DeviceMCPOffload.m */; };
 		AA0838C02F3B941A00049557 /* RootfsResetButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */; };
 		AA0838C32F3B941A00049557 /* RootfsManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */; };
 		AA0838CC2F3B941A00049557 /* StorageManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838CD2F3B941A00049557 /* StorageManagementView.swift */; };
@@ -297,6 +300,10 @@
 		E5E000005 /* SharedContainerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E000017 /* SharedContainerStore.swift */; };
 		E5E000006 /* PendingShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E000016 /* PendingShare.swift */; };
 		E5E000007 /* SharedContainerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E000017 /* SharedContainerStore.swift */; };
+		52F025010000000000000020 /* MinisBuildIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000025 /* MinisBuildIdentity.swift */; };
+		52F025010000000000000021 /* MinisBuildIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000025 /* MinisBuildIdentity.swift */; };
+		52F025010000000000000022 /* MinisBuildIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000025 /* MinisBuildIdentity.swift */; };
+		52F025010000000000000023 /* MinisBuildIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000025 /* MinisBuildIdentity.swift */; };
 		E5E000008 /* ShareCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E000019 /* ShareCoordinator.swift */; };
 		E5E000009 /* MinisShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E5E000010 /* MinisShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E5E00000A /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E5E00001A /* MainInterface.storyboard */; };
@@ -811,6 +818,10 @@
 		52F025010000000000000013 /* RootManagementAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootManagementAuthorization.swift; sourceTree = "<group>"; };
 		52F025010000000000000014 /* RootManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootManagementView.swift; sourceTree = "<group>"; };
 		52F025010000000000000015 /* RootManagementRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootManagementRunner.swift; sourceTree = "<group>"; };
+		52F025010000000000000034 /* DeviceMCPApproval.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceMCPApproval.swift; sourceTree = "<group>"; };
+		52F025010000000000000035 /* DeviceMCPNativeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceMCPNativeBridge.swift; sourceTree = "<group>"; };
+		52F025010000000000000036 /* DeviceMCPOffload.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DeviceMCPOffload.m; sourceTree = "<group>"; };
+		52F025010000000000000037 /* DeviceMCPOffload.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeviceMCPOffload.h; sourceTree = "<group>"; };
 		AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsManagementView.swift; sourceTree = "<group>"; };
 		AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsResetButton.swift; sourceTree = "<group>"; };
 		AA0838CD2F3B941A00049557 /* StorageManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageManagementView.swift; sourceTree = "<group>"; };
@@ -1108,6 +1119,7 @@
 		E5E000015 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		E5E000016 /* PendingShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingShare.swift; sourceTree = "<group>"; };
 		E5E000017 /* SharedContainerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedContainerStore.swift; sourceTree = "<group>"; };
+		52F025010000000000000025 /* MinisBuildIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinisBuildIdentity.swift; sourceTree = "<group>"; };
 		E5E000018 /* Minis.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Minis.entitlements; sourceTree = "<group>"; };
 		E5E000019 /* ShareCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCoordinator.swift; sourceTree = "<group>"; };
 		E5E00001A /* MainInterface.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = MainInterface.storyboard; sourceTree = "<group>"; };
@@ -2070,6 +2082,8 @@
 				52F025010000000000000012 /* RootManagementClient.h */,
 				52F025010000000000000013 /* RootManagementAuthorization.swift */,
 				52F025010000000000000015 /* RootManagementRunner.swift */,
+				52F025010000000000000034 /* DeviceMCPApproval.swift */,
+				52F025010000000000000035 /* DeviceMCPNativeBridge.swift */,
 			);
 			path = Diagnostics;
 			sourceTree = "<group>";
@@ -2169,6 +2183,7 @@
 				E5E000019 /* ShareCoordinator.swift */,
 				E5E0000A2 /* ExternalFileImporter.swift */,
 				E5E000017 /* SharedContainerStore.swift */,
+				52F025010000000000000025 /* MinisBuildIdentity.swift */,
 				AADDA9E02F6ECCF400B66649 /* ThumbnailCache.swift */,
 			);
 			path = Shared;
@@ -2238,6 +2253,8 @@
 				E5L200090 /* SpeechOffload.h */,
 				E5L200091 /* SpeechOffload.m */,
 				E5L2000A0 /* DeviceOffload.h */,
+				52F025010000000000000036 /* DeviceMCPOffload.m */,
+				52F025010000000000000037 /* DeviceMCPOffload.h */,
 				E5L2000A1 /* DeviceOffload.m */,
 				E5L2000B0 /* HomeKitOffload.h */,
 				E5L2000B1 /* HomeKitOffload.m */,
@@ -3209,6 +3226,9 @@
 				52F025010000000000000002 /* RootManagementAuthorization.swift in Sources */,
 				52F025010000000000000003 /* RootManagementView.swift in Sources */,
 				52F025010000000000000004 /* RootManagementRunner.swift in Sources */,
+				52F025010000000000000030 /* DeviceMCPApproval.swift in Sources */,
+				52F025010000000000000031 /* DeviceMCPNativeBridge.swift in Sources */,
+				52F025010000000000000032 /* DeviceMCPOffload.m in Sources */,
 				BB1000100F700000000000AA /* ContextPolicy.swift in Sources */,
 				AADDA9E12F6ECCF400B66649 /* ThumbnailCache.swift in Sources */,
 				E5SRS0001 /* SessionRefreshScheduler.swift in Sources */,
@@ -3570,6 +3590,7 @@
 				E5D00026 /* OnboardingModelSelectionView.swift in Sources */,
 				E5E000006 /* PendingShare.swift in Sources */,
 				E5E000007 /* SharedContainerStore.swift in Sources */,
+				52F025010000000000000020 /* MinisBuildIdentity.swift in Sources */,
 				E5E000008 /* ShareCoordinator.swift in Sources */,
 				E5E0000A1 /* ExternalFileImporter.swift in Sources */,
 				E5G000001 /* BackgroundKeepAliveManager.swift in Sources */,
@@ -3775,6 +3796,7 @@
 				E5E000003 /* ShareViewModel.swift in Sources */,
 				E5E000004 /* PendingShare.swift in Sources */,
 				E5E000005 /* SharedContainerStore.swift in Sources */,
+				52F025010000000000000021 /* MinisBuildIdentity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3788,6 +3810,7 @@
 				E5FP00200 /* FPSyncTraceLog.swift in Sources */,
 				E5FPBH01 /* FileProviderBootHealth.swift in Sources */,
 				E5SHV0002 /* SharedFolderVisibility.swift in Sources */,
+				52F025010000000000000022 /* MinisBuildIdentity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3796,6 +3819,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E5H000001 /* AgentWidgetBundle.swift in Sources */,
+				52F025010000000000000023 /* MinisBuildIdentity.swift in Sources */,
 				E5H000002 /* AgentLiveActivityWidget.swift in Sources */,
 				E5H000003 /* AgentActivityAttributes.swift in Sources */,
 				E5AT00003 /* AudioTogglePlaybackIntent.swift in Sources */,

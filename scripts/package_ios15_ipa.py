@@ -74,12 +74,9 @@ def parse_version(value: str) -> tuple[int, int, int]:
     text = str(value).strip()
     if not text:
         raise PackageError("empty version string")
-    parts = text.split(".")
-    numbers = []
-    for part in parts[:3]:
-        if not part.isdigit():
-            raise PackageError(f"invalid version {value!r}")
-        numbers.append(int(part))
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", text):
+        raise PackageError(f"invalid version {value!r}")
+    numbers = [int(part) for part in text.split(".")]
     while len(numbers) < 3:
         numbers.append(0)
     return tuple(numbers)  # type: ignore[return-value]
@@ -277,13 +274,15 @@ def plugin_bundles(app: Path) -> list[Path]:
     return found
 
 
-def strip_incompatible_plugins(app: Path) -> tuple[list[str], list[dict]]:
+def strip_incompatible_plugins(
+    app: Path, product_floor: tuple[int, int, int] = PRODUCT_FLOOR,
+) -> tuple[list[str], list[dict]]:
     kept: list[str] = []
     stripped: list[dict] = []
     for plugin in plugin_bundles(app):
         info = load_plist(plugin / "Info.plist")
         minimum = bundle_minimum_os(info)
-        if minimum is not None and parse_version(minimum) > PRODUCT_FLOOR:
+        if minimum is not None and parse_version(minimum) > product_floor:
             shutil.rmtree(plugin)
             stripped.append({"name": plugin.name, "minimum_os": minimum})
             continue
@@ -392,13 +391,22 @@ def zip_payload(stage: Path, ipa: Path) -> None:
             archive.write(path, arcname=str(path.relative_to(stage).as_posix()))
 
 
-def audit_staged_native_floor(app: Path) -> list[dict]:
-    """Fail closed if a staged device binary cannot be shown to support iOS 15.0."""
+def audit_staged_native_floor(
+    app: Path, product_floor: tuple[int, int, int] = PRODUCT_FLOOR, *,
+    extension_floors: dict[str, tuple[int, int, int]] | None = None,
+) -> list[dict]:
+    """Fail closed if staged device binaries exceed the package deployment floor."""
     if sys.platform != "darwin":
         raise PackageError("native-floor audit requires macOS and xcrun")
     xcrun = shutil.which("xcrun")
     if not xcrun:
         raise PackageError("xcrun not found for native-floor audit")
+    extension_paths = {}
+    for relative, floor in (extension_floors or {}).items():
+        bundle = app / relative
+        if relative not in {path.relative_to(app).as_posix() for path in plugin_bundles(app)}:
+            raise PackageError(f"native-floor audit cannot assign an extension floor: {relative}")
+        extension_paths[bundle] = floor
     binaries = sorted(path for path in app.rglob("*") if is_macho(path))
     executable = app / str(load_plist(app / "Info.plist").get("CFBundleExecutable") or APP_EXECUTABLE)
     if executable not in binaries:
@@ -406,6 +414,8 @@ def audit_staged_native_floor(app: Path) -> list[dict]:
     results = []
     for binary in binaries:
         relative = binary.relative_to(app).as_posix()
+        binary_floor = next((floor for bundle, floor in extension_paths.items()
+                             if bundle in binary.parents), product_floor)
         with binary.open("rb") as stream:
             header = stream.read(16)
         if header[:4] in {b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe"} and len(header) == 16:
@@ -424,16 +434,18 @@ def audit_staged_native_floor(app: Path) -> list[dict]:
                                   capture_output=True, text=True)
         if commands.returncode != 0:
             raise PackageError(f"native-floor audit could not read load commands for {relative}: {commands.stderr.strip()}")
-        audit = audit_metadata(commands.stdout, "arm64", None, output=True)
+        audit = audit_metadata(commands.stdout, "arm64", None, output=True, floor=binary_floor)
         if not audit["ok"]:
             raise PackageError(f"native-floor audit failed for {relative}: {'; '.join(audit['errors'])}")
         plist_path = binary.parent / "Info.plist"
         if binary.parent.suffix == ".framework" and plist_path.is_file():
             minimum = bundle_minimum_os(load_plist(plist_path))
-            if minimum is not None and parse_version(minimum) > PRODUCT_FLOOR:
-                raise PackageError(f"native-floor audit failed for {relative}: framework Info.plist minimum {minimum} > 15.0")
+            if minimum is not None and parse_version(minimum) > binary_floor:
+                floor_text = ".".join(str(part) for part in binary_floor[:2])
+                raise PackageError(f"native-floor audit failed for {relative}: framework Info.plist minimum {minimum} > {floor_text}")
         results.append({"path": relative, "arch": "arm64",
-                        "minimum_os": audit["images"][0]["minimum"]})
+                        "minimum_os": audit["images"][0]["minimum"],
+                        "allowed_minimum_os": ".".join(str(part) for part in binary_floor[:2])})
     return results
 
 
