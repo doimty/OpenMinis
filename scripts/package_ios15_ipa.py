@@ -36,6 +36,7 @@ NORMAL_BUNDLE_ID = "com.openminis.app"
 BROAD_BUNDLE_ID = "com.openminis.app.broadfiles"
 BROAD_APP_GROUP = "group.com.openminis.app.broadfiles"
 FILE_ACCESS_PROFILES = ("standard", "broad-files")
+HOST_PROBE_INFO_KEY = "MinisHostFileProbeBuild"
 BROAD_FILE_KEYS = {
     "com.apple.security.exception.files.absolute-path.read-write",
     "com.apple.private.security.storage.AppDataContainers",
@@ -451,9 +452,21 @@ def package_app(
     file_access_profile: str = "standard",
     ipa_name: str | None = None,
     diagnostic_commit: str | None = None,
+    host_file_probe_commit: str | None = None,
+    host_file_probe_run_id: str | None = None,
 ) -> dict:
     if diagnostic_commit is not None and not re.fullmatch(r"[0-9a-f]{40}", diagnostic_commit):
         raise PackageError("diagnostic commit must be a full lowercase Git SHA")
+    host_probe_build = None
+    if host_file_probe_commit is not None or host_file_probe_run_id is not None:
+        if host_file_probe_commit is None or not re.fullmatch(r"[0-9a-f]{40}", host_file_probe_commit):
+            raise PackageError("host file probe commit must be a full lowercase Git SHA")
+        if host_file_probe_run_id is None or not re.fullmatch(r"[1-9][0-9]*", host_file_probe_run_id):
+            raise PackageError("host file probe run ID must be a positive ASCII decimal Actions run ID")
+        if diagnostic_commit is not None:
+            raise PackageError("host file probe and re-entry diagnostics must be packaged separately")
+        host_probe_build = {"schema": 1, "source_commit": host_file_probe_commit,
+                            "actions_run_id": host_file_probe_run_id}
     info = validate_app(source_app)
     entitlement_path, requested_entitlements = validate_file_access_profile(file_access_profile, entitlements)
     if file_access_profile == "broad-files" and (keep_incompatible_plugins or diagnostic_commit is not None):
@@ -472,6 +485,16 @@ def package_app(
         shutil.rmtree(stage)
     staged_app = stage / "Payload" / APP_NAME
     shutil.copytree(source_app, staged_app, symlinks=False)
+    if host_probe_build is not None or HOST_PROBE_INFO_KEY in info:
+        # This identity describes the explicit host-probe build, not the
+        # unrelated re-entry trace switch. Never inherit it on an ordinary
+        # repack, and never mutate the source app shared by the A/B packages.
+        info = dict(info)
+        if host_probe_build is not None:
+            info[HOST_PROBE_INFO_KEY] = host_probe_build
+        else:
+            info.pop(HOST_PROBE_INFO_KEY, None)
+        write_bundle_info(staged_app, info)
     if diagnostic_commit is not None or "MinisReentryDiagnostics" in info or "MinisDiagnosticCommit" in info:
         # Opt in only on the staged copy, before signing. An ordinary repack
         # must not inherit activation from a previously diagnostic source.
@@ -550,6 +573,9 @@ def package_app(
     if diagnostic_commit is not None:
         manifest["diagnostic_commit"] = diagnostic_commit
         manifest["diagnostics_schema"] = 1
+    if host_probe_build is not None:
+        manifest["host_file_probe_build"] = host_probe_build
+        manifest["purpose"] = "read-only host file access A/B diagnostic (not root verification)"
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     return manifest
@@ -568,6 +594,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Opt-in isolated native file-access build; does not grant Linux/root execution")
     parser.add_argument("--ipa-name")
     parser.add_argument("--diagnostic-commit", help="Opt staged Debug IPA into scalar re-entry diagnostics for this Git SHA")
+    parser.add_argument("--host-file-probe-commit", help="Stamp an explicitly compiled host-probe IPA with its full Git SHA")
+    parser.add_argument("--host-file-probe-run-id", help="Actions run ID paired with --host-file-probe-commit")
     return parser
 
 
@@ -584,6 +612,8 @@ def main(argv: list[str] | None = None) -> int:
             file_access_profile=args.file_access_profile,
             ipa_name=args.ipa_name,
             diagnostic_commit=args.diagnostic_commit,
+            host_file_probe_commit=args.host_file_probe_commit,
+            host_file_probe_run_id=args.host_file_probe_run_id,
         )
     except PackageError as exc:
         print(f"error: {exc}", file=sys.stderr)

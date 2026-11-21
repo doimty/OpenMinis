@@ -13,6 +13,7 @@ import zipfile
 from pathlib import Path
 
 from package_ios15_ipa import (
+    HOST_PROBE_INFO_KEY,
     PackageError,
     audit_staged_native_floor,
     package_app,
@@ -175,6 +176,92 @@ class NativeFloorAuditTests(unittest.TestCase):
 
 
 class PackageTests(unittest.TestCase):
+    def test_host_probe_identity_is_explicit_and_equal_in_both_profiles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source", binary_plist=True,
+                           plugins={"MinisShare.appex": "15.0"})
+            original = (app / "Info.plist").read_bytes()
+            identity = {"schema": 1, "source_commit": "b" * 40, "actions_run_id": "44794967504"}
+            manifests = []
+            for profile in ("standard", "broad-files"):
+                output = root / profile
+                result = package_app(app, output, skip_sign=True, file_access_profile=profile,
+                                     host_file_probe_commit=identity["source_commit"],
+                                     host_file_probe_run_id=identity["actions_run_id"])
+                with zipfile.ZipFile(output / result["ipa_name"]) as ipa:
+                    staged = plistlib.loads(ipa.read("Payload/Minis.app/Info.plist"))
+                    self.assertIsNone(ipa.testzip())
+                self.assertEqual(staged[HOST_PROBE_INFO_KEY], identity)
+                self.assertEqual(result["host_file_probe_build"], identity)
+                self.assertNotIn("MinisReentryDiagnostics", staged)
+                self.assertFalse(result["runtime_file_access_verified"])
+                self.assertFalse(result["root_helper_included"])
+                manifests.append(result)
+            self.assertNotEqual(manifests[0]["bundle_id"], manifests[1]["bundle_id"])
+            self.assertEqual(manifests[0]["source_app"], manifests[1]["source_app"])
+            self.assertEqual((app / "Info.plist").read_bytes(), original)
+
+    def test_host_probe_identity_is_stamped_before_signing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source")
+            identity = {"schema": 1, "source_commit": "b" * 40, "actions_run_id": "123"}
+
+            def sign(staged, entitlements):
+                self.assertEqual(plistlib.loads((staged / "Info.plist").read_bytes())[HOST_PROBE_INFO_KEY],
+                                 identity)
+
+            with patch("package_ios15_ipa.audit_staged_native_floor", return_value=[]), \
+                 patch("package_ios15_ipa.adhoc_sign", side_effect=sign) as signer:
+                result = package_app(app, root / "out", host_file_probe_commit="b" * 40,
+                                     host_file_probe_run_id="123")
+            signer.assert_called_once()
+            self.assertTrue(result["signed"])
+
+    def test_ordinary_repack_clears_inherited_host_probe_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source")
+            info = plistlib.loads((app / "Info.plist").read_bytes())
+            info[HOST_PROBE_INFO_KEY] = {"schema": 1, "source_commit": "a" * 40, "actions_run_id": "123"}
+            write_plist(app / "Info.plist", info)
+            original = (app / "Info.plist").read_bytes()
+            for profile in ("standard", "broad-files"):
+                output = root / profile
+                result = package_app(app, output, skip_sign=True, file_access_profile=profile)
+                with zipfile.ZipFile(output / result["ipa_name"]) as ipa:
+                    staged = plistlib.loads(ipa.read("Payload/Minis.app/Info.plist"))
+                self.assertNotIn(HOST_PROBE_INFO_KEY, staged)
+                self.assertNotIn("host_file_probe_build", result)
+            self.assertEqual((app / "Info.plist").read_bytes(), original)
+
+    def test_invalid_or_partial_host_probe_identity_is_rejected_before_staging(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source")
+            invalid = [
+                {"host_file_probe_commit": "a" * 40},
+                {"host_file_probe_run_id": "123"},
+                {"host_file_probe_commit": "short", "host_file_probe_run_id": "123"},
+                {"host_file_probe_commit": "a" * 39 + "\n", "host_file_probe_run_id": "123"},
+            ]
+            invalid.extend({"host_file_probe_commit": "a" * 40, "host_file_probe_run_id": value}
+                           for value in ("", "0", "-1", "0123", "１２３", "1\n", "1/2"))
+            for options in invalid:
+                with self.subTest(options=options), self.assertRaises(PackageError):
+                    package_app(app, root / "out", skip_sign=True, **options)
+            self.assertFalse((root / "out").exists())
+
+    def test_host_probe_cannot_be_mixed_with_reentry_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = make_app(root / "source")
+            with self.assertRaisesRegex(PackageError, "packaged separately"):
+                package_app(app, root / "out", skip_sign=True, diagnostic_commit="a" * 40,
+                            host_file_probe_commit="b" * 40, host_file_probe_run_id="123")
+            self.assertFalse((root / "out").exists())
+
     def test_signed_package_fails_before_codesign_when_native_floor_is_high(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -316,6 +403,17 @@ class PackageTests(unittest.TestCase):
 
 
 class WorkflowWiringTests(unittest.TestCase):
+    def test_host_probe_packages_both_profiles_with_identity_and_reads_back_ipa(self):
+        source = WORKFLOW.read_text(encoding="utf-8")
+        start = source.index("- name: Package host file probe A/B IPAs")
+        end = source.index("- name: Upload host file probe artifacts", start)
+        package = source[start:end]
+        self.assertEqual(package.count('--host-file-probe-commit "$GITHUB_SHA"'), 2)
+        self.assertEqual(package.count('--host-file-probe-run-id "$GITHUB_RUN_ID"'), 2)
+        self.assertIn('assert manifest["host_file_probe_build"] == identity', package)
+        self.assertIn('assert info["MinisHostFileProbeBuild"] == identity', package)
+        self.assertIn('ipa.read("Payload/Minis.app/Info.plist")', package)
+
     def test_baseline_workflow_packages_and_uploads_ipa(self):
         source = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("python3 scripts/test_package_ios15_ipa.py -v", source)

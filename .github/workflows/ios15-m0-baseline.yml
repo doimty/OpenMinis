@@ -281,14 +281,18 @@ jobs:
             --derived-data "$RUNNER_TEMP/probe-dd" \
             --configuration Debug \
             --output-dir "$RUNNER_TEMP/probe-ipa-standard" \
+            --host-file-probe-commit "$GITHUB_SHA" \
+            --host-file-probe-run-id "$GITHUB_RUN_ID" \
             --entitlements scripts/ios15-trollstore.entitlements
           python3 scripts/package_ios15_ipa.py \
             --derived-data "$RUNNER_TEMP/probe-dd" \
             --configuration Debug \
             --output-dir "$RUNNER_TEMP/probe-ipa-broad-files" \
+            --host-file-probe-commit "$GITHUB_SHA" \
+            --host-file-probe-run-id "$GITHUB_RUN_ID" \
             --file-access-profile broad-files
           python3 - "$RUNNER_TEMP" <<'PY'
-          import json, sys
+          import json, os, plistlib, sys, zipfile
           from pathlib import Path
           root = Path(sys.argv[1])
           expected = {
@@ -296,6 +300,8 @@ jobs:
               "probe-ipa-broad-files": ("com.openminis.app.broadfiles", "broad-files"),
           }
           manifests = []
+          identity = {"schema": 1, "source_commit": os.environ["GITHUB_SHA"],
+                      "actions_run_id": os.environ["GITHUB_RUN_ID"]}
           for directory, (bundle_id, profile) in expected.items():
               manifest = json.loads((root / directory / "manifest.json").read_text())
               assert manifest["bundle_id"] == bundle_id, manifest
@@ -304,8 +310,16 @@ jobs:
               assert manifest["runtime_file_access_verified"] is False, manifest
               assert manifest["root_helper_included"] is False, manifest
               assert manifest["signed"] is True, manifest
+              assert manifest["host_file_probe_build"] == identity, manifest
+              with zipfile.ZipFile(root / directory / manifest["ipa_name"]) as ipa:
+                  assert ipa.testzip() is None
+                  info = plistlib.loads(ipa.read("Payload/Minis.app/Info.plist"))
+              assert info["MinisHostFileProbeBuild"] == identity, info
+              assert info["CFBundleIdentifier"] == bundle_id, info
+              assert info["MinimumOSVersion"] == "15.0", info
               manifests.append(manifest)
           assert manifests[0]["source_app"] == manifests[1]["source_app"]
+          assert manifests[0]["host_file_probe_build"] == manifests[1]["host_file_probe_build"]
           print(json.dumps(manifests, indent=2))
           PY
 
