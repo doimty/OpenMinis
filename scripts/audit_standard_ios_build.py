@@ -28,6 +28,11 @@ SWIFT_INPUTS = {"RootManagementAuthorization.swift", "RootManagementRunner.swift
 FEATURES = {"MINIS_ROOT_MANAGEMENT", "MINIS_HOST_FILE_PROBE"}
 SYMBOLS = {"_OMRootManagementRun", "_OMRootManagementClientVersion", "_device_mcp_offload_register",
            "_OMHostFileProbeReadSample", "_OMHostFileProbeSamplePath", "_OBJC_CLASS_$_DeviceMCPNativeBridge"}
+# Xcode's scheme enables coverage even for Release. Clang emits this one
+# runtime reference function in an otherwise empty translation unit. The
+# Actions native guard probe verifies coverage-on/off objects and a real
+# Root-enabled negative control against this same classifier.
+COVERAGE_RUNTIME_SYMBOLS = {"___llvm_profile_runtime_user"}
 MARKERS = {"MinisFileAccessProfile", "MinisRootManagementEnabled", "MinisRootManagementSchema",
            "MinisRootBuildCommit", "MinisRootActionsRunID", "MinisHostFileProbeBuild"}
 
@@ -162,7 +167,8 @@ def prestrip_symbols(path: Path, *, reject_all=False) -> str:
     if reject_all:
         unexpected = [fields[-1] for line in result.stdout.splitlines()
                       if len(fields := line.split()) >= 3 and fields[-2] in {"T", "t"}
-                      and not re.fullmatch(r"ltmp[0-9]+", fields[-1])]
+                      and not re.fullmatch(r"ltmp[0-9]+", fields[-1])
+                      and fields[-1] not in COVERAGE_RUNTIME_SYMBOLS]
         require(not unexpected,
                 f"guarded translation unit emitted executable code: {path.name}: {', '.join(unexpected)}")
     return sha256_file(path)

@@ -126,9 +126,15 @@ class AuditTests(unittest.TestCase):
             self.evidence()
 
     def test_prestrip_guarded_object_or_symbol_contamination_is_detected(self):
-        for probe in ("0000000000000000 T _some_implementation\n", "0000000000000000 T _device_mcp_offload_register\n"):
+        for probe in ("0000000000000000 T _some_implementation\n", "0000000000000000 T _device_mcp_offload_register\n",
+                      "0000000000000000 T ___llvm_profile_runtime_user_extra\n"):
             with self.subTest(probe=probe), self.assertRaisesRegex(audit.PackageError, "emitted executable code|implementation found"):
                 self.evidence(probe)
+
+    def test_empty_guarded_unit_can_reference_the_observed_llvm_coverage_runtime(self):
+        result = self.evidence("0000000000000000 T ___llvm_profile_runtime_user\n0000000000000000 t ltmp0\n")
+        self.assertFalse(result["root_defines_seen"])
+        self.assertEqual(set(result["native_object_sha256"]), audit.C_INPUTS)
 
     def test_missing_swift_and_clang_evidence_is_not_proof_of_absence(self):
         self.swift.write_text("/repo/src/Other.swift")
