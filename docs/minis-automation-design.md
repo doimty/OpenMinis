@@ -1,6 +1,6 @@
 # Minis Automation：跨 App 自动化接续方案
 
-状态：2026-11-21 的源码核对与待实现设计。本文不是实现完成、成功出包或真机验收记录。
+状态：2026-11-21 的实现契约与源码依据。主要服务端、Minis 授权界面、MCP 接线、图像落盘和验收校验器已进入源码，仍在 GitHub Actions 验证与修复；没有本轮真机成功结论。下文保留设计取舍，当前具体实现以 `jailbreak/automation/`、`AutomationMCPController.swift` 和 Python MCP 源码为准。
 
 ## 目标与现状
 
@@ -9,6 +9,10 @@
 用户指定 DEB 只交付 Rootless、RootHide。主 App 继续使用 15.0、16.0、16.2 三档，保留对应分享、File Provider、Widget；本文的 companion 无 App 扩展，只需两份最低 iOS 15.0 的 tweak DEB。iOS 16+ 的实际运行仍需单独记录，不能由安装下限或上游报告代替。
 
 最短实现路径是在 SpringBoard 中运行独立的 `Minis Automation` companion，复用钉定版本 iOS MCP 的设备实现，增加本项目的有限授权层。Minis 通过现有 HTTP MCP 客户端访问本机服务；授权有效期不依赖 Minis 是否始终处于前台。保持当前四工具的逐次前台确认，并为跨 App 会话使用独立的开始、停止和到期机制。
+
+已实现的原生会话固定为 180 秒，reader 最多接受 600 秒的协议上限，但 UI 不提供延长或自动续期。companion 使用纯 Xcode/Clang 构造函数注册控制入口，无 Logos hook、PreferenceLoader 或 Theos 构建依赖；只依赖现有 tweak 注入环境，RootHide 另依赖官方 `roothide` 核心库。`prepare_sources.py` 校验原始上游每文件哈希，生成独立命名空间与受限执行源码；`build.sh`、`verify_build.py` 和 `package_automation_deb.py` 检查两架构最低系统、签名、链接、过滤器及归档。
+
+同一 boot 内已停止的授权 ID 和时间高水位不能被旧 START 恢复；旧请求 ticket 不会借新会话继续。HID、Unicode 输入和 App 切换在执行前重查有效会话与锁屏状态，长按等待按不超过 10ms 的片段检查撤销，释放触点/按键始终放行。这些是生产代码和门禁覆盖的契约；真实 SpringBoard 的私有 API 行为仍需设备证据。
 
 ## 已核对的上游
 

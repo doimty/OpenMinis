@@ -36,7 +36,7 @@ def static():
         assert "if (down && !OMMAInteractionAlive())" in text and "if (!OMMAInteractionAlive()) return NO;" in text
         assert 'if ([self typeTextViaHID:text' not in text
         assert "usleep(" not in hid and "usleep(" not in text
-        assert "OMMAInteractionSleep(" in hid and "OMMAInteractionSleep(" in text
+        assert "OMMAEventSleep(" in hid and "OMMAEventSleep(" in text
         logger = (folder / "OMMAV_MCPLogger.m").read_text(encoding="utf-8")
         assert "+ (BOOL)isDebugLoggingEnabled { return NO; }" in logger
         print(f"PASS verified pinned MIT/RootHide sources and generated {len(lock['generated_source_hashes'])} namespaced source/header files")
@@ -56,6 +56,16 @@ def native():
             str(ROOT / "MinisAutomationSession.m"), str(ROOT / "MinisAutomationPolicy.m"),
             str(ROOT / "tests/SessionTests.m"), "-o", str(binary)], check=True, timeout=120)
         subprocess.run([str(binary), str(fixture)], check=True, timeout=15)
+        screen_header = folder / "ScreenManager.h"
+        screen_header.write_text('#import <Foundation/Foundation.h>\n@interface ScreenManager : NSObject\n'
+                                 '+ (instancetype)sharedInstance;\n- (NSDictionary *)deviceInteractionState;\n@end\n', encoding="utf-8")
+        interaction = folder / "interaction-tests"
+        subprocess.run(["xcrun", "clang", "-fobjc-arc", "-fblocks", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+            "-DOMMA_SESSION_TESTS=1", '-DOMMA_BUILD_COMMIT="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
+            '-DOMMA_BUILD_RUN_ID="12345"', "-I", str(folder), "-I", str(ROOT), "-framework", "Foundation",
+            str(ROOT / "MinisAutomationSession.m"), str(ROOT / "MinisAutomationInteraction.m"),
+            str(ROOT / "tests/InteractionTests.m"), "-o", str(interaction)], check=True, timeout=120)
+        subprocess.run([str(interaction)], check=True, timeout=15)
 
 
 if __name__ == "__main__":

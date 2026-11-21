@@ -168,7 +168,7 @@ def prepare(output):
     texts["TextInputManager.m"] = patch_text(texts["TextInputManager.m"])
     texts["AppManager.m"] = patch_apps(texts["AppManager.m"])
     for name in ("HIDManager.m", "TextInputManager.m"):
-        texts[name] = texts[name].replace("usleep(", "OMMAInteractionSleep(")
+        texts[name] = texts[name].replace("usleep(", "OMMAEventSleep(")
         texts[name] = texts[name].replace("OMMARequestAlive()", "OMMAInteractionAlive()")
         texts[name] = '#import "MinisAutomationInteraction.h"\n' + texts[name]
     texts["AppManager.m"] = texts["AppManager.m"].replace("OMMARequestAlive()", "OMMAInteractionAlive()")

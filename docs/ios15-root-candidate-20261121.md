@@ -48,15 +48,21 @@ Rootless 将当前 App 和固定安装根都解析为真实路径，以覆盖 `/
 
 Root 版的 `minis-device` 是内置、保留名称的 STDIO MCP server，在“设置 → MCP 集成 → 本机”（Settings → MCP Integrations → This device）中开启“允许设备工具请求”后出现。无需填写 URL、token 或手动配置 MCP JSON。它只提供 `get_device_info`、`get_screen_info`、`get_brightness`、`set_brightness` 四个工具，最后一个接受 0–100 的整数 `percent`。每次操作都由前台原生确认；离开 App 会关闭开关，取消、超时和断线使本次请求失效，调用不会自动重放。普通版不会注入这个 server，`servers.json` 也不能伪造或覆盖保留名称。
 
-这四项是当前已实现的基础设备能力。截图、跨 App 点击/滑动、UI 观察和输入仍未接入；其授权会话需要覆盖 Minis 离开前台后的执行，不能直接沿用这四项工具的前台逐次确认模型。跨 App 能力仍属于本目标待完成部分，不能以本候选的构建或亮度验收宣布整体自动化目标完成。
+这四项保留为基础设备能力。跨 App 截图、UI 观察、点击、滑动、输入和 App 切换另由 `minis-automation` 提供，使用独立的 SpringBoard companion。Root 设置页明确开始一次 180 秒会话，通过固定本机 HTTP、随机 Bearer 和连续时钟到期门禁接入 22 个工具；设置页可以随时停止。该授权不因 Minis 切到后台立即撤销，但 iOS 后台执行预算耗尽会结束会话；不自动开启后台音频或定位。
+
+跨 App companion 基于固定上游提交 `witchan/ios-mcp@62c4464f688c8f269419924b1a19c996de75f175`，保留原始 MIT 源与许可证，编译时增加命名空间、授权和工具白名单。它默认关闭，只监听 `127.0.0.1:8091`；不会开放上游的文件上传下载、任意命令和安装工具。MCP 交互不会自动重放，截图经过验证后保存到本地文件，并提示 agent 用 `read_image` 实际查看。实现依据见 [自动化设计](minis-automation-design.md)，完整设备流程见 [跨 App 真机验收](minis-automation-device-acceptance.md)。源码和 CI 结果仍不能代替真实设备操作链的验收。
 
 设备验收使用 `scripts/verify_jailbreak_device_report.py`，要求新构建的 commit/run、`runtime: physical-device` 和完整 MCP JSONL 回执匹配；旧 Root helper 报告不能作为新设备 MCP 证据。当前仍没有新构建的 iOS 15 MCP 真机报告，也没有 iOS 16+ 真机报告。
 
 ## 下载与选包
 
-已发起的原生 gate 修复构建为 `5021a58fa743dcf0e3f9c6911b8c0974016aaa4c` / [Actions 44900128255](https://github.com/doimty/OpenMinis/actions/runs/44900128255)。本文补写时该轮构建尚在进行，尚未记录最终构建结果或新候选包校验值。此前 `44899653106` 在 Root 原生检查阶段失败，没有可安装的本轮候选 IPA/DEB；该失败不能记为编译通过。后续源码修复必须使用对应新 run 的产物与 manifest，不能继续沿用本段的构建身份。
+构建记录：`44899653106` 在原生类型检查中漏带本地化依赖而失败；`44900128255` 的普通 Release 实际编译成功，但审计把 LLVM 覆盖率的 `___llvm_profile_runtime_user` 误判为 Root 实现。后续 Actions 的真实宏关闭/开启对象探针已验证分类修复。`44906639474` 的 companion 首轮发现 macOS Bash 3 空数组和符号子串检查问题，两项均已修正。跨 App lifecycle、锁屏复查和验收报告仍在后续提交继续验证，交付时必须使用同一次最终 run 的主 App 与 companion。
+
+当前完整构建的跟踪入口为 [Actions 44907273441](https://github.com/doimty/OpenMinis/actions/runs/44907273441)，原生/companion 快速门禁为 [Actions 44907227207](https://github.com/doimty/OpenMinis/actions/runs/44907227207)。本文未记录最终成功结论或候选包校验值；后续源码修复必须改用对应新 run 的产物与 manifest。以实际提交和 run 为准，不能混用不同轮次的包。
 
 在对应新 run 成功上传后，从 Actions 页面底部 Artifacts 下载 `minis-ios15-root-candidate`。该 artifact 保留 14 天，目标内容为三份 IPA、六份 DEB 及各自相邻的 `manifest.json`。前述旧 run 不包含本轮 Rootless 路径与汉化收尾修改，不能作为最终候选。下面的路径、版本、run 和文件名均为占位符，必须替换为实际下载内容；测试夹具生成的 IPA、DEB、manifest 或报告不能充当交付产物。
+
+跨 App 服务还需下载同一 run 的 `minis-automation-rootless` 或 `minis-automation-roothide`。每份包含 `automation-deb/` 中的 companion DEB、manifest，以及 `automation-build/` 中的构建和源锁定证据。主 App 三档按系统选择，companion 只有最低 iOS 15.0 的两种 scheme；两包的 commit、run 和 scheme 必须一致。快速门禁仅构建 companion 和原生回归，不能与另一 run 的主 App 混装作为最终验收组合。
 
 ```powershell
 gh run download "<RUN_ID>" --repo doimty/OpenMinis `
@@ -108,7 +114,7 @@ Get-FileHash -LiteralPath "C:\path\to\candidate\deb-15.0-<SCHEME>\<DEB_NAME>.deb
 | 原有未提交工作已保存 | 接手时 23 个文件复制到本机恢复目录并记录 SHA-256；已验证。 | 对比恢复副本和接手后的 diff。遗失修改会使后续结果无法复现。 |
 | Windows ZIP 可执行位夹具可通过 | 历史记录中 `py -3 scripts/test_package_ios15_root_ipa.py -v` 为 18/18；这是当时的夹具计数，不是本轮完整测试数量，也不是真实产物。 | 把 ZIP helper 改成 0644、4755、0777、符号链接或 DOS 元数据，必须拒绝。删除检查会掩盖安装后无法执行。 |
 | 归档 helper 对应签名后的文件 | 同一套测试包含合法 CRC 下替换 helper 的负例；已验证，仅夹具。 | 对比 manifest 的 signed/archive helper SHA-256 和实际归档字节。若不一致，设备运行的文件可能不是审计的文件。 |
-| 本轮 Root App 能编译、签名并生成三档 IPA/DEB | `5021a58` 的 Actions 已启动；本文未记录最终结果。 | 读取完整构建首错、签名读回及包内 native floor，并检查真实 artifact 与 manifest；静态测试不能替代。 |
+| 本轮 Root App 能编译、签名并生成三档 IPA/DEB | 等待包含完整自动化和公开能力保留修复的同一提交完整 Actions；本文未记录最终结果。 | 读取完整构建首错、签名读回及包内 native floor，并检查真实 artifact 与 manifest；静态测试不能替代。 |
 | 历史 helper 在目标 iOS 15 上取得 UID/EUID 0 | 用户提供的 `2bb94a2c353ec1b162aafa0cf18a839842cec50f` / `44872743232` 报告中 identity、prepare、check、cleanup 均为 `0/0`，transport 正常；仅证明旧包。 | 新包先执行 `identity`。若 helper 非 0/0、commit 不符或启动失败，不能沿用旧包结论。 |
 | 历史原生 App 能读取固定容器外样本 | 同一旧包以 UID/EUID `501/501` 在 `sample.compare` 读到匹配的 56 字节样本；不代表任意路径读写。 | 新包需对应的新报告；缺失样本或只有 bundle 正对照不能判容器外权限通过。 |
 | 新设备 MCP 的授权、拒绝、亮度修改及恢复完整链路 | 尚无本轮 iOS 15 真机报告与配套 JSONL；未验证。 | 按下节采集九次操作，使用所装包的 manifest 运行离线验证器；仅 native 报告不够。 |
