@@ -25,7 +25,9 @@ typedef struct {
 } OMRootManagementResult;
 
 /* Exists in root-enabled binaries only; the packager checks the linked symbol. */
-int OMRootManagementClientVersion(void);
+/* Release compiles this target with -fvisibility=hidden, so the sentinel opts
+ * back into default visibility to stay externally visible in the product. */
+__attribute__((visibility("default"))) int OMRootManagementClientVersion(void);
 
 /*
  * Call on a worker thread. Only the four enum values above can be executed.

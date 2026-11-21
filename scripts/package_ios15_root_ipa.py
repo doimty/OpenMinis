@@ -232,7 +232,9 @@ def verify_compiled_client(app: Path) -> None:
                                 capture_output=True, text=True, check=False)
         if result.returncode != 0:
             raise PackageError(f"cannot inspect root client symbols: {binary.name}")
-        if re.search(r"\bT\s+_OMRootManagementClientVersion\s*$", result.stdout, re.MULTILINE):
+        # Release can localize a defined symbol; a defined text symbol still
+        # proves the client compiled in. An undefined (U) entry does not.
+        if re.search(r"\b[Tt]\s+_OMRootManagementClientVersion\s*$", result.stdout, re.MULTILINE):
             return
     raise PackageError("App was not compiled with the native root management client")
 

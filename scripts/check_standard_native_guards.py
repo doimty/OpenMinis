@@ -43,6 +43,21 @@ def main():
             error = str(failure)
         rows.append({"name": name, "compile": command, "refused": refused, "expected_refusal": enabled,
                      "error": error})
+    # Release compiles the Minis target with -fvisibility=hidden. The packager
+    # proves the Root client compiled into the product by finding an externally
+    # visible _OMRootManagementClientVersion, so the sentinel must keep default
+    # visibility under that flag.
+    hidden_target = args.output_dir / "on-hidden.o"
+    hidden_command = ["xcrun", "--sdk", "iphoneos", "clang", "-target", "arm64-apple-ios15.0",
+                      "-isysroot", sdk, "-Os", "-g", "-Wall", "-Wextra", "-Werror",
+                      "-DMINIS_ROOT_MANAGEMENT=1", "-fvisibility=hidden",
+                      "-c", str(source), "-o", str(hidden_target)]
+    subprocess.run(hidden_command, check=True, timeout=60)
+    hidden_symbols = subprocess.check_output(["xcrun", "nm", "-gU", str(hidden_target)], text=True)
+    (args.output_dir / "on-hidden.nm.txt").write_text(hidden_symbols, encoding="utf-8")
+    print("on-hidden:\n" + hidden_symbols, flush=True)
+    if "T _OMRootManagementClientVersion" not in hidden_symbols:
+        raise SystemExit("root client sentinel lost external visibility under -fvisibility=hidden")
     (args.output_dir / "guard-probe.json").write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
     return 0 if all(row["refused"] == row["expected_refusal"] for row in rows) else 1
 

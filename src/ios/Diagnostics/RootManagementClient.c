@@ -23,6 +23,14 @@
 typedef int (*persona_fn)(const posix_spawnattr_t *, uid_t, uint32_t);
 typedef int (*persona_id_fn)(const posix_spawnattr_t *, uid_t);
 
+/*
+ * The packager proves the Root client compiled into the app by reading this
+ * symbol out of the linked binary. Release compiles this target with
+ * -fvisibility=hidden, which would demote the definition to a local symbol
+ * that `nm -gU` never reports, so the sentinel opts back into default
+ * visibility. `used` keeps it if the caller is ever optimized away.
+ */
+__attribute__((used, visibility("default")))
 int OMRootManagementClientVersion(void) { return 1; }
 
 static const char *operation_name(OMRootOperation operation) {

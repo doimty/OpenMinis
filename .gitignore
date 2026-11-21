@@ -55,6 +55,15 @@ DerivedData/
 *.dSYM.zip
 *.dSYM
 
+# Jailbreak delivery downloads (Actions artifacts pulled locally by
+# scripts/verify_release_bundle.py and by hand). The release gate compares
+# hashes from download; the binaries themselves never belong in git.
+release/
+gate/
+release-check/
+.verify-*/
+*.deb
+
 # CocoaPods
 Pods/
 Podfile.lock
