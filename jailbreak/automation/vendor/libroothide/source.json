@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "repository": "https://github.com/roothide/libroothide",
+  "commit": "cb236f9cf1c5e2ac932611328998a62b4b133e33",
+  "files": {
+    "roothide.h": "086e3d87f45c43e705d50b5b095380d5d307fcf667e0b0259698e9b4f0dd833f",
+    "stub.h": "4ac29efae6867a0e8172f19949c0763736ed9157d02b60c7519e53beefdec8e8",
+    "roothide-xcode.h": "fc1f7f465bf66b976e686b5963256c27599fc9c5cb6a240c3cfbd163446604e5",
+    "Makefile": "cf7a9592483cef9f2d10edcd05a232922fafe22a448dade0434a092f7648513c",
+    "LICENSE": "6fcda17dfab9672260e928a0c0917f055b9ee458d5fbf652abc58f61d0267d3c"
+  }
+}

@@ -11,11 +11,34 @@ on:
       - scripts/test_automation_mcp_native.py
       - src/ios/Diagnostics/AutomationMCPController.swift
       - tests/AutomationSessionTests.swift
+      - jailbreak/automation/**
+      - scripts/package_automation_deb.py
+      - scripts/test_package_automation_deb.py
+      - scripts/test_automation_mcp_transport.py
+      - src/ios/default_mount/usr/local/lib/minis-mcp-cli/**
 
 permissions:
   contents: read
 
 jobs:
+  protocol:
+    name: Automation protocol and package fixtures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Validate local transport, images and archives
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/automation-python"
+          "$RUNNER_TEMP/automation-python/bin/pip" install --disable-pip-version-check httpx==0.28.1
+          "$RUNNER_TEMP/automation-python/bin/python" scripts/test_automation_mcp_transport.py -v
+          python3 scripts/test_package_automation_deb.py -v
+          python3 jailbreak/automation/test_native.py --static
+
   native:
     name: Root native contracts
     runs-on: macos-26-intel
@@ -41,4 +64,45 @@ jobs:
           name: root-native-object-probe
           path: ${{ runner.temp }}/native-guards
           if-no-files-found: error
+          retention-days: 14
+
+  companion:
+    name: Companion (${{ matrix.scheme }})
+    runs-on: macos-26-intel
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        scheme: [rootless, roothide]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Check production companion policy
+        run: python3 jailbreak/automation/test_native.py --native
+      - name: Build companion and verify Debian archive
+        env:
+          PACKAGE_SCHEME: ${{ matrix.scheme }}
+        run: |
+          set -euo pipefail
+          bash jailbreak/automation/build.sh "$PACKAGE_SCHEME" "$RUNNER_TEMP/automation-build"
+          python3 scripts/package_automation_deb.py \
+            --build-dir "$RUNNER_TEMP/automation-build" --output-dir "$RUNNER_TEMP/automation-deb" \
+            --scheme "$PACKAGE_SCHEME" \
+            --source-commit "$GITHUB_SHA" --actions-run-id "$GITHUB_RUN_ID"
+      - name: Upload companion build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: minis-automation-${{ matrix.scheme }}
+          path: |
+            ${{ runner.temp }}/automation-deb/*.deb
+            ${{ runner.temp }}/automation-deb/manifest.json
+            ${{ runner.temp }}/automation-build/build.json
+            ${{ runner.temp }}/automation-build/source-lock.json
+            ${{ runner.temp }}/automation-build/*.log
+          if-no-files-found: warn
           retention-days: 14

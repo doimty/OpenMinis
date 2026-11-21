@@ -36,7 +36,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from transport.http import MCPError  # noqa: E402
+from transport.http import MCPError, AUTOMATION_OUTCOME_UNKNOWN, AUTOMATION_UNAVAILABLE  # noqa: E402
 from utils import config  # noqa: E402
 
 LOG_PATH = "/var/minis/mcp-servers/mcp-cli.log"
@@ -257,13 +257,23 @@ def send_to_daemon(request, timeout=CONN_TIMEOUT):
 def call_daemon(request, pretty):
     """Ensure the daemon is up, send the request, unwrap into _emit/_fail. One
     retry if the daemon wasn't ready yet right after a fresh fork."""
+    if config.is_automation_server(request.get("server")):
+        native = config.local_automation_config()
+        if native is None:
+            _fail(AUTOMATION_UNAVAILABLE, "AUTOMATION_UNAVAILABLE", config.AUTOMATION_SERVER, pretty)
+        # Bind this particular user request before IPC/forking. A queued input
+        # from grant A must not acquire grant B when the daemon gets to it.
+        request = dict(request, automationSession=native["session"])
     maybe_start_daemon()
     resp = send_to_daemon(request)
-    device_call = request.get("server") == "minis-device" and request.get("cmd") == "call"
-    if not resp.get("ok") and resp.get("code") == "NO_DAEMON" and not device_call:
+    native_call = config.is_reserved_server(request.get("server")) and request.get("cmd") == "call"
+    if not resp.get("ok") and resp.get("code") == "NO_DAEMON" and not native_call:
         time.sleep(0.5)
         resp = send_to_daemon(request)
     if not resp.get("ok"):
+        if config.is_automation_server(request.get("server")) and request.get("cmd") == "call" \
+                and resp.get("code") in ("NO_DAEMON", "TIMEOUT"):
+            _fail(AUTOMATION_OUTCOME_UNKNOWN, "AUTOMATION_OUTCOME_UNKNOWN", request.get("server"), pretty)
         _fail(resp.get("error", "daemon error"), resp.get("code", "MCP_ERROR"),
               request.get("server"), pretty)
     return resp.get("result")
@@ -316,7 +326,7 @@ def cmd_info(args, pretty):
     if not name:
         _fail("usage: info <server>", "PARSE_ERROR", None, pretty)
     server = _require_server(name, pretty)
-    _emit({"name": name, "config": server}, pretty)
+    _emit({"name": config.canonical_server_name(name), "config": config.public_server_config(name, server)}, pretty)
 
 
 def cmd_tools(args, pretty, force_refresh=False):
@@ -369,6 +379,7 @@ def cmd_call(args, pretty):
         _fail("usage: call <server> <tool> ['{\"k\":\"v\"}'] [--input '{}'] [key=value ...]. "
               "Run 'minis-mcp-cli --help' for examples.", "PARSE_ERROR", None, pretty)
     name, tool = args[0], args[1]
+    name = config.canonical_server_name(name)
     rest = args[2:]
     raw_input = _pop_opt(rest, "--input")
     pos = next((i for i, token in enumerate(rest) if _looks_like_json(token)), None)
@@ -391,6 +402,12 @@ def cmd_call(args, pretty):
                   "Example: minis-mcp-cli call %s %s '{\"query\":\"test\"}'" % (token, name, tool),
                   "PARSE_ERROR", name, pretty)
     result = call_daemon({"cmd": "call", "server": name, "tool": tool, "args": arguments}, pretty)
+    if config.is_automation_server(name) and tool == "screenshot":
+        from automation_images import AutomationImageError, materialize_screenshot
+        try:
+            result = materialize_screenshot(result)
+        except AutomationImageError as exc:
+            _fail(str(exc), "AUTOMATION_IMAGE_INVALID", name, pretty)
     _emit(result, pretty)
 
 
@@ -409,6 +426,9 @@ def cmd_add(args, pretty):
     name = _pop_opt(args, "--name")
     if not name:
         _fail("add requires --name", "PARSE_ERROR", None, pretty)
+    if config.is_reserved_server(name):
+        _fail("本机设备工具与自动化会话由 Minis 设置管理，不能添加为服务器配置。",
+              "RESERVED_SERVER", config.canonical_server_name(name), pretty)
     url = _pop_opt(args, "--url")
     command = _pop_opt(args, "--command")
     note = _pop_opt(args, "--note")

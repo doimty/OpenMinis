@@ -16,7 +16,7 @@ on:
         type: boolean
         default: false
       root_management:
-        description: 'Build isolated Minis Root with the fixed-operation TrollStore helper (device unverified; no installation)'
+        description: 'Build Minis Root and Rootless/RootHide automation companion (device unverified; no installation)'
         type: boolean
         default: false
       input_prompt_simulator:
@@ -81,10 +81,15 @@ jobs:
           python3 tests/test_root_management_contract.py --static
           sudo env "PATH=$PATH" python3 tests/test_root_probe_helper.py
           python3 scripts/test_device_mcp_native.py
+          python3 scripts/test_automation_mcp_native.py
           python3 scripts/test_device_mcp_stdio.py -v
           python3 scripts/test_verify_jailbreak_device_report.py -v
           python3 scripts/test_package_jailbreak_deb.py -v
           python3 scripts/test_audit_standard_ios_build.py -v
+          python3 scripts/test_package_automation_deb.py -v
+          python3 -m venv "$RUNNER_TEMP/automation-python"
+          "$RUNNER_TEMP/automation-python/bin/pip" install --disable-pip-version-check httpx==0.28.1
+          "$RUNNER_TEMP/automation-python/bin/python" scripts/test_automation_mcp_transport.py -v
 
   root-packaging-windows:
     name: Root IPA portable ZIP contracts
@@ -105,6 +110,50 @@ jobs:
           python scripts/test_package_jailbreak_deb.py -v
           python scripts/test_verify_jailbreak_device_report.py -v
           python scripts/test_device_mcp_stdio.py -v
+          python scripts/test_package_automation_deb.py -v
+
+  automation-companion:
+    name: Automation companion (${{ matrix.scheme }})
+    if: github.event_name == 'workflow_dispatch' && inputs.root_management
+    runs-on: macos-26-intel
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        scheme: [rootless, roothide]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Build and package authorized companion
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+          PACKAGE_SCHEME: ${{ matrix.scheme }}
+        run: |
+          set -euo pipefail
+          python3 jailbreak/automation/test_native.py --static
+          python3 jailbreak/automation/test_native.py --native
+          bash jailbreak/automation/build.sh "$PACKAGE_SCHEME" "$RUNNER_TEMP/automation-build"
+          python3 scripts/package_automation_deb.py \
+            --build-dir "$RUNNER_TEMP/automation-build" \
+            --output-dir "$RUNNER_TEMP/automation-deb" \
+            --scheme "$PACKAGE_SCHEME" \
+            --source-commit "$GITHUB_SHA" --actions-run-id "$GITHUB_RUN_ID"
+      - name: Upload companion and provenance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: minis-automation-${{ matrix.scheme }}
+          path: |
+            ${{ runner.temp }}/automation-deb/*.deb
+            ${{ runner.temp }}/automation-deb/manifest.json
+            ${{ runner.temp }}/automation-build/build.json
+            ${{ runner.temp }}/automation-build/source-lock.json
+            ${{ runner.temp }}/automation-build/*.log
+          if-no-files-found: warn
+          retention-days: 14
 
   baseline:
     name: Native deps + iOS 15 compile probe
@@ -180,6 +229,8 @@ jobs:
           python3 scripts/test_ios15_root_identity.py --native
           python3 scripts/test_package_ios15_root_ipa.py -v
           python3 scripts/test_device_mcp_native.py --native
+          python3 scripts/test_automation_mcp_native.py --native
+          python3 scripts/check_standard_native_guards.py --output-dir "$RUNNER_TEMP/native-guards"
           clang -std=c11 -Wall -Wextra -Werror -c src/ios/Diagnostics/RootManagementClient.c -o "$RUNNER_TEMP/root-client-off.o"
           xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 \
             -std=c11 -Wall -Wextra -Werror -DMINIS_ROOT_MANAGEMENT=1 \
@@ -362,6 +413,14 @@ jobs:
             -I "$GITHUB_WORKSPACE/deps/include/ish" \
             -I "$GITHUB_WORKSPACE/src/ios/NativeOffloads" \
             src/ios/NativeOffloads/DeviceMCPOffload.m
+          xcrun --sdk iphoneos clang -fobjc-arc -fblocks -fsyntax-only \
+            -target arm64-apple-ios15.0 -isysroot "$sdk" \
+            -D MINIS_ROOT_MANAGEMENT=1 \
+            -I "$(dirname "$swift_header")" \
+            -I "$GITHUB_WORKSPACE/deps/include" \
+            -I "$GITHUB_WORKSPACE/deps/include/ish" \
+            -I "$GITHUB_WORKSPACE/src/ios/NativeOffloads" \
+            src/ios/NativeOffloads/AutomationMCPOffload.m
           xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 \
             -std=c11 -Wall -Wextra -Werror -O2 \
             "-DMINIS_ROOT_HELPER_COMMIT=\"$GITHUB_SHA\"" \

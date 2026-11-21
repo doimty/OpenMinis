@@ -36,7 +36,8 @@ import time
 import sys
 sys.path.insert(0, "/usr/local/lib/minis-mcp-cli")
 
-from transport.http import HTTPTransport, MCPError, expand_env  # noqa: E402
+from transport.http import (HTTPTransport, MCPError, expand_env, AUTOMATION_UNAVAILABLE,
+                            AUTOMATION_OUTCOME_UNKNOWN, AUTOMATION_SESSION_CHANGED)  # noqa: E402
 from utils import config  # noqa: E402
 from utils import deps  # noqa: E402
 
@@ -323,31 +324,40 @@ class MCPHTTPSession:
 
     def __init__(self, name, cfg):
         self.name = name
+        self.cfg = dict(cfg, headers=dict(cfg.get("headers") or {}))
         self._transport = HTTPTransport(cfg, name)
         self._lock = threading.Lock()
+        self._stopped = False
         self.last_activity = time.time()
         self.inflight = 0
 
     def is_alive(self):
-        return True
+        return not self._stopped
+
+    def _require_live(self):
+        if self._stopped and config.is_automation_server(self.name):
+            raise MCPError("AUTOMATION_UNAVAILABLE", AUTOMATION_UNAVAILABLE)
 
     def list_tools(self):
         with self._lock:
+            self._require_live()
             self.last_activity = time.time()
             return self._transport.list_tools()
 
     def call_tool(self, tool, arguments):
         with self._lock:
+            self._require_live()
             self.last_activity = time.time()
             return self._transport.call_tool(tool, arguments)
 
     def ping(self):
         with self._lock:
+            self._require_live()
             self.last_activity = time.time()
             return self._transport.ping()
 
     def stop(self):
-        pass
+        self._stopped = True
 
 
 # --- connection pool --------------------------------------------------------
@@ -452,12 +462,26 @@ class MCPPool:
                      len(stdio), cap, name)
             self._slot_freed.wait(remaining)
 
-    def get(self, name, lease=False):
+    def get(self, name, lease=False, expected_session=None):
         """Return the live session for `name`, creating it if needed. With
         lease=True the session is marked in use until release(session), which
         protects it from LRU eviction (call_with_retry always leases)."""
+        name = config.canonical_server_name(name)
         with self._lock:
             session = self._pool.get(name)
+            cfg = None
+            if config.is_automation_server(name):
+                # Every lease consults the native deadline, including a warm
+                # daemon session. New grants replace old transports instead of
+                # mutating their bearer while requests wait on the session lock.
+                cfg = config.local_automation_config()
+                if session is not None and (cfg is None or session.cfg != cfg):
+                    self.evict(name)
+                    session = None
+                if cfg is None:
+                    raise MCPError("AUTOMATION_UNAVAILABLE", AUTOMATION_UNAVAILABLE)
+                if expected_session is not None and cfg["session"] != expected_session:
+                    raise MCPError("AUTOMATION_SESSION_CHANGED", AUTOMATION_SESSION_CHANGED)
             if session is not None and not session.is_alive():
                 log.warning("[%s] process died, evicting", name)
                 session.stop()
@@ -465,7 +489,7 @@ class MCPPool:
                 self._slot_freed.notify_all()
                 session = None
             if session is None:
-                cfg = config.get_server(name)
+                cfg = cfg if cfg is not None else config.get_server(name)
                 if cfg is None:
                     raise MCPError("NOT_FOUND", "server '%s' not found" % name)
                 if not cfg.get("enabled", True):
@@ -496,9 +520,9 @@ class MCPPool:
             session.last_activity = time.time()
             self._slot_freed.notify_all()
 
-    def call_with_retry(self, name, fn, *, replay=True):
+    def call_with_retry(self, name, fn, *, replay=True, expected_session=None):
         for attempt in range(2):
-            session = self.get(name, lease=True)
+            session = self.get(name, lease=True, expected_session=expected_session)
             try:
                 return fn(session)
             except MCPError as exc:
@@ -515,6 +539,7 @@ class MCPPool:
         """Remove `name` from the pool and stop it. When called from get()
         (lock already held) the stop completes before the caller goes on to
         spawn a replacement."""
+        name = config.canonical_server_name(name)
         with self._lock:
             session = self._pool.pop(name, None)
             if session is not None:
@@ -595,8 +620,16 @@ class DaemonServer:
 
     def handle_request(self, data):
         cmd = data.get("cmd", "")
-        server = data.get("server", "")
+        server = config.canonical_server_name(data.get("server", ""))
         try:
+            expected_session = data.get("automationSession") if config.is_automation_server(server) else None
+            if config.is_automation_server(server) and cmd in ("tools", "call", "ping"):
+                native = config.local_automation_config()
+                if native is None:
+                    self.pool.evict(server)
+                    raise MCPError("AUTOMATION_UNAVAILABLE", AUTOMATION_UNAVAILABLE)
+                if expected_session != native["session"]:
+                    raise MCPError("AUTOMATION_SESSION_CHANGED", AUTOMATION_SESSION_CHANGED)
             if cmd == "list":
                 servers = config.get_servers()
                 alive = self.pool.alive_servers()
@@ -622,21 +655,22 @@ class DaemonServer:
                 # [T-mcp-tools-refresh]
                 if data.get("refresh"):
                     self.pool.evict(server)
-                tools = self.pool.call_with_retry(server, lambda s: s.list_tools())
+                tools = self.pool.call_with_retry(server, lambda s: s.list_tools(), expected_session=expected_session)
                 return {"ok": True, "result": {"server": server, "tools": tools, "count": len(tools)}}
 
             if cmd == "call":
                 tool = data.get("tool", "")
                 args = data.get("args") or {}
-                if server == "minis-device":
-                    result = self.pool.call_with_retry(server, lambda s: s.call_tool(tool, args), replay=False)
+                if config.is_reserved_server(server):
+                    result = self.pool.call_with_retry(server, lambda s: s.call_tool(tool, args), replay=False,
+                                                       expected_session=expected_session)
                 else:
                     result = self.pool.call_with_retry(server, lambda s: s.call_tool(tool, args))
                 return {"ok": True, "result": {"server": server, "tool": tool, "result": result}}
 
             if cmd == "ping":
                 start = time.time()
-                self.pool.call_with_retry(server, lambda s: s.ping())
+                self.pool.call_with_retry(server, lambda s: s.ping(), expected_session=expected_session)
                 elapsed = int((time.time() - start) * 1000)
                 return {"ok": True, "result": {"server": server, "ok": True, "elapsed_ms": elapsed}}
 
@@ -648,10 +682,25 @@ class DaemonServer:
 
         except MCPError as exc:
             code = exc.code
+            if config.is_automation_server(server):
+                messages = {"AUTOMATION_UNAVAILABLE": AUTOMATION_UNAVAILABLE,
+                            "AUTOMATION_SESSION_CHANGED": AUTOMATION_SESSION_CHANGED,
+                            "AUTOMATION_OUTCOME_UNKNOWN": AUTOMATION_OUTCOME_UNKNOWN,
+                            "TOOL_NOT_FOUND": "此自动化会话不提供请求的工具。"}
+                if code not in messages:
+                    code = "AUTOMATION_OUTCOME_UNKNOWN" if cmd == "call" else "AUTOMATION_UNAVAILABLE"
+                return {"ok": False, "error": messages[code], "code": code, "server": server}
             if code == "MCP_ERROR" and "not found" in (exc.message or "").lower():
                 code = "TOOL_NOT_FOUND"
             return {"ok": False, "error": exc.message, "code": code, "server": server}
         except Exception as exc:  # noqa: BLE001 - never crash the connection thread
+            if config.is_automation_server(server):
+                # Unexpected transport/config exceptions may contain headers.
+                # Do not serialize or log those exceptions for a native grant.
+                log.warning("automation request failed (%s); no automatic replay", cmd)
+                return {"ok": False, "error": AUTOMATION_OUTCOME_UNKNOWN if cmd == "call" else AUTOMATION_UNAVAILABLE,
+                        "code": "AUTOMATION_OUTCOME_UNKNOWN" if cmd == "call" else "AUTOMATION_UNAVAILABLE",
+                        "server": server}
             log.exception("unexpected error handling %s", cmd)
             return {"ok": False, "error": str(exc), "code": "MCP_ERROR", "server": server}
 

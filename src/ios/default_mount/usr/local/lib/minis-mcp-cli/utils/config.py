@@ -18,9 +18,35 @@ stay exactly the mcpServers object form:
 
 import json
 import os
+import re
+import subprocess
+import uuid
 
 CONFIG_DIR = "/var/minis/mcp-servers"
 CONFIG_PATH = os.path.join(CONFIG_DIR, "servers.json")
+DEVICE_SERVER = "minis-device"
+AUTOMATION_SERVER = "minis-automation"
+AUTOMATION_URL = "http://127.0.0.1:8091/mcp"
+AUTOMATION_BRIDGE = "/usr/local/bin/minis-automation-config"
+RESERVED_SERVERS = frozenset((DEVICE_SERVER, AUTOMATION_SERVER))
+
+
+def canonical_server_name(name):
+    """Reserved local capabilities have one identity, irrespective of casing."""
+    folded = name.casefold() if isinstance(name, str) else ""
+    return folded if folded in RESERVED_SERVERS else name
+
+
+def is_reserved_server(name):
+    return canonical_server_name(name) in RESERVED_SERVERS if isinstance(name, str) else False
+
+
+def is_automation_server(name):
+    return canonical_server_name(name) == AUTOMATION_SERVER
+
+
+def _without_reserved(servers):
+    return {name: server for name, server in servers.items() if not is_reserved_server(name)}
 
 # Startup / handshake timeout for a STDIO MCP server's first `initialize` RPC.
 # This is a Minis server-configuration knob, NOT part of the MCP protocol (MCP
@@ -72,27 +98,95 @@ def save_config(config):
     reader (Settings UI / agent) never sees a half-written file."""
     _ensure_dir()
     tmp = CONFIG_PATH + ".tmp"
+    stored = dict(config)
+    stored["mcpServers"] = _without_reserved(stored.get("mcpServers", {}))
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+        json.dump(stored, f, ensure_ascii=False, indent=2)
     os.replace(tmp, CONFIG_PATH)
 
 
 def get_servers():
     """Return the mcpServers dict (name -> server object)."""
-    servers = load_config().get("mcpServers", {})
+    servers = _without_reserved(load_config().get("mcpServers", {}))
     state = _local_device_state()
     # The local bridge is a reserved capability, never user-configurable
     # through servers.json. Drop a stale or forged entry before exposing it.
-    servers.pop("minis-device", None)
     if state:
-        servers["minis-device"] = {"enabled": True, "command": "/usr/bin/python3",
+        servers[DEVICE_SERVER] = {"enabled": True, "command": "/usr/bin/python3",
             "args": ["-I", "-S", "-B", "/usr/local/lib/minis-mcp-cli/device_server.py"],
             "note": "Device information and brightness with foreground approval"}
+    automation = local_automation_config()
+    if automation is not None:
+        servers[AUTOMATION_SERVER] = automation
     return servers
 
 
+def _strict_json(data):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate native config field")
+            result[key] = value
+        return result
+
+    def reject_constant(_):
+        raise ValueError("invalid native config number")
+
+    return json.loads(data, object_pairs_hook=pairs, parse_constant=reject_constant)
+
+
+def valid_automation_config(value):
+    """Exact native bridge schema. No URL, headers or credentials from disk."""
+    if type(value) is not dict or set(value) != {"enabled", "url", "headers", "session"}:
+        return False
+    if value["enabled"] is not True or value["url"] != AUTOMATION_URL:
+        return False
+    headers = value["headers"]
+    if type(headers) is not dict or set(headers) != {"Authorization"}:
+        return False
+    bearer = headers["Authorization"]
+    if type(bearer) is not str or re.fullmatch(r"Bearer [0-9a-f]{64}", bearer, re.ASCII) is None:
+        return False
+    session = value["session"]
+    if type(session) is not str:
+        return False
+    try:
+        identifier = uuid.UUID(session)
+    except (ValueError, AttributeError):
+        return False
+    return identifier.version == 4 and str(identifier) == session
+
+
+def local_automation_config():
+    """Read ephemeral credentials through the fixed offload, never a file.
+
+    Invalid, absent, disabled and expired native state all fail closed. Errors
+    deliberately contain neither bridge output nor bearer header values.
+    """
+    if not os.path.isfile(AUTOMATION_BRIDGE):
+        return None
+    try:
+        reply = subprocess.run([AUTOMATION_BRIDGE], stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                               timeout=2, check=False)
+        if reply.returncode != 0 or len(reply.stdout) > 2048:
+            return None
+        value = _strict_json(reply.stdout)
+        return value if valid_automation_config(value) else None
+    except (OSError, ValueError, TypeError, RecursionError, subprocess.SubprocessError):
+        return None
+
+
+def public_server_config(name, server):
+    """Config display is not a route for ephemeral automation credentials."""
+    if not is_automation_server(name):
+        return server
+    return {"enabled": True, "url": AUTOMATION_URL, "session": server.get("session"),
+            "authentication": "native automation session (credential hidden)"}
+
+
 def _local_device_state():
-    import subprocess
     bridge = "/usr/local/bin/minis-device-call"
     if not os.path.isfile(bridge):
         return None
@@ -106,12 +200,12 @@ def _local_device_state():
 
 def get_server(name):
     """Return one server object or None."""
-    return get_servers().get(name)
+    return get_servers().get(canonical_server_name(name))
 
 
 def upsert_server(name, server):
     """Add or overwrite a server (last-write-wins on name collision)."""
-    if name == "minis-device":
+    if is_reserved_server(name):
         return False
     config = load_config()
     config.setdefault("mcpServers", {})[name] = server
@@ -120,7 +214,7 @@ def upsert_server(name, server):
 
 def remove_server(name):
     """Delete a server. Returns True if it existed."""
-    if name == "minis-device":
+    if is_reserved_server(name):
         return False
     config = load_config()
     servers = config.setdefault("mcpServers", {})
@@ -133,7 +227,7 @@ def remove_server(name):
 
 def set_enabled(name, enabled):
     """Flip a server's enabled flag. Returns True if the server existed."""
-    if name == "minis-device":
+    if is_reserved_server(name):
         return False
     config = load_config()
     server = config.get("mcpServers", {}).get(name)

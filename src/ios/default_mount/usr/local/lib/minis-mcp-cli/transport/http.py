@@ -16,12 +16,25 @@ import sys
 import os
 import re
 
+from utils import config
+
 try:
     import httpx
 except ImportError:  # pragma: no cover - the sh wrapper installs httpx first
     httpx = None
 
 TIMEOUT_SECONDS = 300  # 5 min
+AUTOMATION_OUTCOME_UNKNOWN = (
+    "自动化请求的执行结果未知；没有自动重放。请先观察设备状态，再决定下一步操作。"
+)
+AUTOMATION_UNAVAILABLE = "自动化会话已停止、到期或不可用，请在 Minis 中重新开始会话。"
+AUTOMATION_SESSION_CHANGED = "自动化会话已更换；旧请求没有使用新会话重试，请重新观察设备状态。"
+AUTOMATION_TOOLS = frozenset((
+    "get_device_info", "get_screen_info", "screenshot", "get_frontmost_app", "list_apps", "list_running_apps",
+    "get_ui_elements", "get_element_at_point", "wait_for_element", "wait_for_disappear",
+    "tap_screen", "tap_element", "swipe_screen", "long_press", "double_tap", "drag_and_drop",
+    "input_text", "type_text", "press_key", "launch_app", "kill_app", "press_home",
+))
 
 # $VAR and $$VAR both expand from the process env; the UI picker emits $$VAR to
 # make a reference visually explicit. The optional second `$` is consumed in the
@@ -173,10 +186,21 @@ def _save_oauth_tokens(server_name, tokens):
 
 class HTTPTransport:
     def __init__(self, server, server_name):
-        self.url = expand_env(server.get("url", ""))
-        self.headers = _expand_headers(server.get("headers"))
-        self.server_name = server_name
-        self.oauth_cfg = server.get("oauth") if isinstance(server.get("oauth"), dict) else None
+        self._automation = config.is_automation_server(server_name)
+        self.server_name = config.canonical_server_name(server_name)
+        if self._automation:
+            if not config.valid_automation_config(server):
+                raise MCPError("AUTOMATION_UNAVAILABLE", AUTOMATION_UNAVAILABLE)
+            # Copy only the exact native schema. These values remain in memory
+            # and are compared, never refreshed in-place, before every request.
+            self.url = config.AUTOMATION_URL
+            self.headers = dict(server["headers"])
+            self._automation_session = server["session"]
+            self.oauth_cfg = None
+        else:
+            self.url = expand_env(server.get("url", ""))
+            self.headers = _expand_headers(server.get("headers"))
+            self.oauth_cfg = server.get("oauth") if isinstance(server.get("oauth"), dict) else None
         self._id = 0
         self._session_id = None
         # [T-mcp-http-reinit] True once a handshake has completed for this
@@ -187,6 +211,40 @@ class HTTPTransport:
         # _session_id because a stateless server never sets _session_id yet
         # still must not be re-initialized.
         self._initialized = False
+
+    def _validate_automation_session(self):
+        if not self._automation:
+            return
+        current = config.local_automation_config()
+        if current is None:
+            self._reset_session()
+            raise MCPError("AUTOMATION_UNAVAILABLE", AUTOMATION_UNAVAILABLE)
+        if current["session"] != self._automation_session or current["headers"] != self.headers:
+            self._reset_session()
+            raise MCPError("AUTOMATION_SESSION_CHANGED", AUTOMATION_SESSION_CHANGED)
+
+    def _sent_automation_error(self, method):
+        self._reset_session()
+        if method == "tools/call":
+            return MCPError("AUTOMATION_OUTCOME_UNKNOWN", AUTOMATION_OUTCOME_UNKNOWN)
+        return MCPError("AUTOMATION_UNAVAILABLE", AUTOMATION_UNAVAILABLE)
+
+    def _redact_automation_value(self, value):
+        # An error result may echo a request header even on HTTP 200. Never
+        # let the ephemeral credential enter CLI output, reports or chat.
+        token = self.headers["Authorization"].split(" ", 1)[1]
+
+        def redact(item):
+            if isinstance(item, dict):
+                return {key: "[credential hidden]" if key.casefold() == "authorization" else redact(nested)
+                        for key, nested in item.items()}
+            if isinstance(item, list):
+                return [redact(nested) for nested in item]
+            if isinstance(item, str):
+                return re.sub(re.escape(token), "[credential hidden]", item, flags=re.IGNORECASE)
+            return item
+
+        return redact(value)
 
     def _next_id(self):
         self._id += 1
@@ -267,6 +325,7 @@ class HTTPTransport:
         return new_tokens
 
     def _post(self, method, params=None, notify=False, _oauth_retried=False):
+        self._validate_automation_session()
         if httpx is None:
             raise MCPError("CONNECTION_ERROR", "httpx unavailable")
         body = {"jsonrpc": "2.0", "method": method}
@@ -296,13 +355,24 @@ class HTTPTransport:
         if self._session_id:
             headers["Mcp-Session-Id"] = self._session_id
         try:
-            resp = httpx.post(
-                self.url, json=body, headers=headers, timeout=TIMEOUT_SECONDS
-            )
+            options = {"json": body, "headers": headers, "timeout": TIMEOUT_SECONDS}
+            if self._automation:
+                # Local credentials must never follow redirects or consult
+                # proxy environment variables, even on a configured host.
+                options.update(trust_env=False, follow_redirects=False)
+            resp = httpx.post(self.url, **options)
         except httpx.TimeoutException:
+            if self._automation:
+                raise self._sent_automation_error(method) from None
             raise MCPError("TIMEOUT", "request timed out after %ds" % TIMEOUT_SECONDS)
         except httpx.HTTPError as exc:
+            if self._automation:
+                raise self._sent_automation_error(method) from None
             raise MCPError("CONNECTION_ERROR", str(exc))
+        if self._automation and (resp.status_code >= 300 or len(resp.content) > 24 * 1024 * 1024):
+            # Do not include response bodies or exception strings: either may
+            # echo the Authorization header. Sent tool calls are never replayed.
+            raise self._sent_automation_error(method)
         # Capture a session id handed back by the server (streamable-HTTP).
         sid = resp.headers.get("mcp-session-id")
         if sid:
@@ -319,11 +389,22 @@ class HTTPTransport:
             )
         if notify:
             return None
-        rpc = _parse_response(resp)
+        try:
+            rpc = _parse_response(resp)
+        except (MCPError, RecursionError):
+            if self._automation:
+                raise self._sent_automation_error(method) from None
+            raise
+        if self._automation and (not isinstance(rpc, dict) or rpc.get("jsonrpc") != "2.0"
+                                 or rpc.get("id") != body["id"]):
+            raise self._sent_automation_error(method)
         if isinstance(rpc, dict) and rpc.get("error"):
+            if self._automation:
+                raise self._sent_automation_error(method)
             err = rpc["error"]
             raise MCPError("MCP_ERROR", err.get("message", json.dumps(err)))
-        return rpc.get("result") if isinstance(rpc, dict) else rpc
+        result = rpc.get("result") if isinstance(rpc, dict) else rpc
+        return self._redact_automation_value(result) if self._automation else result
 
     def initialize(self):
         result = self._post(
@@ -334,11 +415,15 @@ class HTTPTransport:
                 "clientInfo": {"name": "minis-mcp-cli", "version": "1.0.0"},
             },
         )
+        if self._automation and (not isinstance(result, dict) or not isinstance(result.get("serverInfo"), dict)
+                                 or result["serverInfo"].get("name") != config.AUTOMATION_SERVER):
+            raise MCPError("AUTOMATION_UNAVAILABLE", AUTOMATION_UNAVAILABLE)
         # MCP requires a notifications/initialized after a successful init.
         try:
             self._post("notifications/initialized", notify=True)
         except MCPError:
-            pass
+            if self._automation:
+                raise
         self._initialized = True
         return result
 
@@ -370,16 +455,35 @@ class HTTPTransport:
             or "session" in msg          # "no valid session", "session expired/not found", …
         )
 
-    def _call_with_reconnect(self, do_call):
+    def _call_with_reconnect(self, do_call, *, replay=True):
         """Run `do_call` after ensuring a handshake, and if it fails with a
         session-state error, drop the session and retry ONCE from a fresh
         handshake. One retry only, so a persistently broken server surfaces the
         real error instead of looping."""
+        if self._automation and not replay:
+            # Only handshake RPCs may reconnect before the tool request has
+            # been sent. Never place tools/call inside this retry boundary.
+            try:
+                self._ensure_initialized()
+            except MCPError as exc:
+                if exc.code != "AUTOMATION_UNAVAILABLE":
+                    raise
+                self._reset_session()
+                self.initialize()
+            try:
+                return do_call()
+            except MCPError:
+                self._reset_session()
+                raise
         self._ensure_initialized()
         try:
             return do_call()
         except MCPError as exc:
-            if not self._is_session_error(exc):
+            if not replay:
+                self._reset_session()
+                raise
+            recoverable = self._automation and exc.code == "AUTOMATION_UNAVAILABLE"
+            if not recoverable and not self._is_session_error(exc):
                 raise
             self._reset_session()
             self.initialize()
@@ -387,11 +491,20 @@ class HTTPTransport:
 
     def list_tools(self):
         result = self._call_with_reconnect(lambda: self._post("tools/list"))
-        return (result or {}).get("tools", [])
+        tools = (result or {}).get("tools", [])
+        if self._automation and (not isinstance(tools, list) or len(tools) != len(AUTOMATION_TOOLS)
+                                 or any(not isinstance(tool, dict) or not isinstance(tool.get("name"), str)
+                                        for tool in tools)
+                                 or {tool["name"] for tool in tools} != AUTOMATION_TOOLS):
+            raise MCPError("AUTOMATION_UNAVAILABLE", "自动化服务公布的工具不符合本次固定工具集。")
+        return tools
 
     def call_tool(self, tool, arguments):
+        if self._automation and tool not in AUTOMATION_TOOLS:
+            raise MCPError("TOOL_NOT_FOUND", "此自动化会话不提供请求的工具。")
         return self._call_with_reconnect(
-            lambda: self._post("tools/call", {"name": tool, "arguments": arguments or {}})
+            lambda: self._post("tools/call", {"name": tool, "arguments": arguments or {}}),
+            replay=not self._automation,
         )
 
     def ping(self):

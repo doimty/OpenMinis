@@ -15,11 +15,13 @@ class WorkflowTests(unittest.TestCase):
 
     def test_root_native_gates_include_device_mcp_and_identity(self):
         self.assertIn("python3 scripts/test_device_mcp_native.py --native", self.source)
+        self.assertIn("python3 scripts/test_automation_mcp_native.py --native", self.source)
         self.assertIn("python3 scripts/test_ios15_root_identity.py --native", self.source)
         self.assertIn("python3 scripts/test_device_mcp_stdio.py -v", self.source)
         root_build = self.source.split("- name: Build isolated Minis Root and bundled helper", 1)[1]
         root_build = root_build.split("\n      - name:", 1)[0]
         self.assertIn("DeviceMCPOffload.m", root_build)
+        self.assertIn("AutomationMCPOffload.m", root_build)
         self.assertIn("-fsyntax-only", root_build)
         self.assertIn("Minis-Swift.h", root_build)
 
@@ -48,8 +50,19 @@ class WorkflowTests(unittest.TestCase):
             "python3 scripts/test_package_jailbreak_deb.py -v",
             "python3 scripts/test_verify_jailbreak_device_report.py -v",
             "python3 scripts/test_audit_standard_ios_build.py -v",
+            "python3 scripts/test_package_automation_deb.py -v",
         ):
             self.assertIn(command, self.source)
+
+    def test_companion_is_built_for_requested_schemes_without_installation(self):
+        block = self.source.split("  automation-companion:", 1)[1].split("\n  baseline:", 1)[0]
+        self.assertIn("scheme: [rootless, roothide]", block)
+        self.assertIn("jailbreak/automation/build.sh", block)
+        self.assertIn("jailbreak/automation/test_native.py --native", block)
+        self.assertIn("scripts/package_automation_deb.py", block)
+        self.assertIn("minis-automation-${{ matrix.scheme }}", block)
+        self.assertNotIn("killall", block)
+        self.assertNotIn("dpkg -i", block)
 
 
 if __name__ == "__main__":
