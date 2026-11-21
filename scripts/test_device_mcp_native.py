@@ -164,12 +164,20 @@ def native():
         runner = IOS / "Diagnostics/RootManagementRunner.swift"
         headers = Path(temp) / "DeviceMCP.h"
         headers.write_text('#include "RootManagementClient.h"\n#include "DeviceMCPOffload.h"\n', encoding="utf-8")
+        # The bundle override lives in MinisApp.swift. Supply only that seam
+        # while type-checking the production localization helper and bridge;
+        # the full Actions app build checks the actual override integration.
+        localization_bundle = Path(temp) / "LocalizationBundle.swift"
+        localization_bundle.write_text(
+            'import Foundation\nextension Bundle { var languageBundle: Bundle? { nil } }\n',
+            encoding="utf-8")
         subprocess.run(["xcrun", "--sdk", "iphoneos", "swiftc", "-typecheck", "-parse-as-library", "-swift-version", "5",
                         "-warnings-as-errors", "-target", "arm64-apple-ios15.0", "-sdk", sdk,
                         "-D", "MINIS_ROOT_MANAGEMENT", "-Xcc", "-DMINIS_ROOT_MANAGEMENT=1", "-Xcc", "-I" + str(runner.parent),
                         "-Xcc", "-I" + str(IOS / "NativeOffloads"), "-import-objc-header", str(headers),
                         str(runner.with_name("RootManagementAuthorization.swift")),
-                        str(runner), str(APPROVAL), str(BRIDGE)], check=True, timeout=180)
+                        str(runner), str(APPROVAL), str(IOS / "Shared/AppLocalization.swift"),
+                        str(localization_bundle), str(BRIDGE)], check=True, timeout=180)
 
 
 if __name__ == "__main__":
