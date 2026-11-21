@@ -1,8 +1,9 @@
+import Darwin
 import Foundation
 
 @main
 enum RootManagementAuthorizationTests {
-    static func main() {
+    @MainActor static func main() async {
         var gate = RootManagementAuthorization()
         precondition(!gate.sessionEnabled && gate.pending == nil && gate.running == nil)
         for operation in RootManagementOperation.allCases {
@@ -35,6 +36,24 @@ enum RootManagementAuthorizationTests {
         precondition(!gate.consume(.identity), "disabling revokes an unused confirmation")
         print("PASS root authorization: disabled default, one exact confirmation, cancel, no replay or parallel work, background/dismissal revocation")
         protocolChecks()
+        await workerCheck()
+    }
+
+    @MainActor private static func workerCheck() async {
+        let build = RootManagementBuildIdentity(info: [
+            "MinisRootManagementEnabled": true,
+            "MinisRootManagementSchema": 1,
+            "MinisRootBuildCommit": String(repeating: "a", count: 40),
+            "MinisRootActionsRunID": "1",
+        ])!
+        let report = await RootManagementRunner.run(
+            .identity, build: build, os: "macOS test harness", bundle: "com.openminis.test"
+        )
+        let transport = report.transport
+        precondition(transport.stage == "client.helper-path" && transport.errorNumber == Int(EINVAL),
+                     "The worker must pass the native thread check and stop at the non-app test executable: \(transport)")
+        precondition(transport.exitCode == -1 && transport.outputBytes == 0 && report.helper == nil && !report.rootObserved)
+        print("PASS production Root runner: MainActor caller reaches native helper-path check off the main thread without spawning")
     }
 
     private static func protocolChecks() {

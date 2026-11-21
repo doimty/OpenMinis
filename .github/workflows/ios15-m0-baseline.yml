@@ -173,12 +173,13 @@ jobs:
             -c src/ios/Diagnostics/RootManagementClient.c -o "$RUNNER_TEMP/root-client-on.o"
           sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
           xcrun --sdk iphoneos swiftc \
-            -typecheck -parse-as-library -swift-version 5 \
+            -typecheck -parse-as-library -swift-version 5 -warnings-as-errors \
             -target arm64-apple-ios15.0 -sdk "$sdk" \
             -module-cache-path "$RUNNER_TEMP/root-module-cache" \
             -D MINIS_ROOT_MANAGEMENT -Xcc -DMINIS_ROOT_MANAGEMENT=1 \
             -import-objc-header src/ios/Diagnostics/RootManagementClient.h \
             src/ios/Diagnostics/RootManagementAuthorization.swift \
+            src/ios/Diagnostics/RootManagementRunner.swift \
             src/ios/Views/Settings/RootManagementView.swift
 
       - name: Init pinned iSH submodule only

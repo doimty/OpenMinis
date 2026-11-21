@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Static root-client contracts and opt-in Actions-only native gate tests.
 
-`--static` does not invoke a compiler. `--native` compiles and executes the
-production authorization reducer and a non-spawning client harness on macOS.
+`--static` does not invoke a compiler. `--native` exercises the production
+authorization reducer and worker handoff and a non-spawning C harness on macOS.
 Neither mode is evidence of an iOS persona transition or device root access.
 """
 from __future__ import annotations
@@ -17,11 +17,14 @@ REPO = Path(__file__).resolve().parents[1]
 CLIENT = REPO / "src/ios/Diagnostics/RootManagementClient.c"
 HEADER = CLIENT.with_suffix(".h")
 MODEL = CLIENT.with_name("RootManagementAuthorization.swift")
+RUNNER = CLIENT.with_name("RootManagementRunner.swift")
 VIEW = REPO / "src/ios/Views/Settings/RootManagementView.swift"
 
 
 def static_checks():
-    client, header, model, view = (p.read_text(encoding="utf-8") for p in (CLIENT, HEADER, MODEL, VIEW))
+    client, header, model, runner, view = (
+        path.read_text(encoding="utf-8") for path in (CLIENT, HEADER, MODEL, RUNNER, VIEW)
+    )
     allowed = re.findall(r'case OMRootOperation\w+: return "([a-z]+)";', client)
     assert allowed == ["identity", "prepare", "check", "cleanup"], allowed
     assert "const char *path" not in header and "const char *command" not in header
@@ -38,15 +41,18 @@ def static_checks():
     assert '#if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT' in client
     assert '#if MINIS_ROOT_MANAGEMENT' in model and '#if MINIS_ROOT_MANAGEMENT && os(iOS)' in view
     for token in ('authorization.consume(operation)', 'authorization.cancel()', 'authorization.revoke()',
-                  'Task.detached', '.onChange(of: scenePhase)', '.onDisappear',
-                  'RootHelperProtocol.validate(data, operation: operation, commit: build.commit)',
-                  'transport.exitCode == 0', 'helper?.euid == 0'):
+                  'await RootManagementRunner.run', '.onChange(of: scenePhase)', '.onDisappear'):
         assert token in view, token
+    assert 'OMRootManagementRun(' not in view
+    for token in ('RootHelperProtocol.validate(data, operation: operation, commit: build.commit)',
+                  'transport.exitCode == 0', 'helper?.euid == 0'):
+        assert token in runner, token
     for token in ('decoded.helperCommit == commit', 'Set(object.keys).isSubset(of: allowedKeys)',
                   'data.count <= 4095', 'decoded.bytes == sampleBytes', 'decoded.removed == true'):
         assert token in model, token
     project = (REPO / "src/ios/Minis.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
-    for name in ("RootManagementClient.c", "RootManagementAuthorization.swift", "RootManagementView.swift"):
+    for name in ("RootManagementClient.c", "RootManagementAuthorization.swift",
+                 "RootManagementRunner.swift", "RootManagementView.swift"):
         assert f"{name} in Sources" in project, name
     print("PASS root management source contracts: fixed enum/bundle executable, runtime persona lookup, bounded worker transport, explicit one-shot gate, scalar/matching-source response")
 
@@ -54,13 +60,18 @@ def static_checks():
 def native_checks():
     with tempfile.TemporaryDirectory(prefix="minis-root-client-") as directory:
         out = Path(directory)
-        subprocess.run(["xcrun", "swiftc", "-swift-version", "5", "-parse-as-library",
-                        "-D", "MINIS_ROOT_MANAGEMENT", str(MODEL),
+        client_object = out / "root-client.o"
+        clang = ["xcrun", "clang", "-std=c11", "-Wall", "-Wextra", "-Werror",
+                 "-DMINIS_ROOT_MANAGEMENT=1", "-I", str(HEADER.parent)]
+        subprocess.run([*clang, "-c", str(CLIENT), "-o", str(client_object)], check=True, timeout=60)
+        subprocess.run(["xcrun", "swiftc", "-swift-version", "5", "-warnings-as-errors",
+                        "-parse-as-library", "-D", "MINIS_ROOT_MANAGEMENT",
+                        "-Xcc", "-DMINIS_ROOT_MANAGEMENT=1", "-import-objc-header", str(HEADER),
+                        str(MODEL), str(RUNNER), str(client_object),
                         str(REPO / "tests/RootManagementAuthorizationTests.swift"),
                         "-o", str(out / "authorization")], check=True, timeout=60)
         subprocess.run([str(out / "authorization")], check=True, timeout=5)
-        subprocess.run(["xcrun", "clang", "-std=c11", "-Wall", "-Wextra", "-Werror",
-                        "-DMINIS_ROOT_MANAGEMENT=1", "-I", str(HEADER.parent), str(CLIENT),
+        subprocess.run([*clang, str(client_object),
                         str(REPO / "tests/RootManagementClientHarness.c"),
                         "-o", str(out / "client")], check=True, timeout=60)
         subprocess.run([str(out / "client")], check=True, timeout=5)

@@ -63,6 +63,7 @@
 		52F025010000000000000001 /* RootManagementClient.c in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000011 /* RootManagementClient.c */; };
 		52F025010000000000000002 /* RootManagementAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000013 /* RootManagementAuthorization.swift */; };
 		52F025010000000000000003 /* RootManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000014 /* RootManagementView.swift */; };
+		52F025010000000000000004 /* RootManagementRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000015 /* RootManagementRunner.swift */; };
 		AA0838C02F3B941A00049557 /* RootfsResetButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */; };
 		AA0838C32F3B941A00049557 /* RootfsManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */; };
 		AA0838CC2F3B941A00049557 /* StorageManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838CD2F3B941A00049557 /* StorageManagementView.swift */; };
@@ -809,6 +810,7 @@
 		52F025010000000000000012 /* RootManagementClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RootManagementClient.h; sourceTree = "<group>"; };
 		52F025010000000000000013 /* RootManagementAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootManagementAuthorization.swift; sourceTree = "<group>"; };
 		52F025010000000000000014 /* RootManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootManagementView.swift; sourceTree = "<group>"; };
+		52F025010000000000000015 /* RootManagementRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootManagementRunner.swift; sourceTree = "<group>"; };
 		AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsManagementView.swift; sourceTree = "<group>"; };
 		AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsResetButton.swift; sourceTree = "<group>"; };
 		AA0838CD2F3B941A00049557 /* StorageManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageManagementView.swift; sourceTree = "<group>"; };
@@ -2067,6 +2069,7 @@
 				52F025010000000000000011 /* RootManagementClient.c */,
 				52F025010000000000000012 /* RootManagementClient.h */,
 				52F025010000000000000013 /* RootManagementAuthorization.swift */,
+				52F025010000000000000015 /* RootManagementRunner.swift */,
 			);
 			path = Diagnostics;
 			sourceTree = "<group>";
@@ -3205,6 +3208,7 @@
 				52F025010000000000000001 /* RootManagementClient.c in Sources */,
 				52F025010000000000000002 /* RootManagementAuthorization.swift in Sources */,
 				52F025010000000000000003 /* RootManagementView.swift in Sources */,
+				52F025010000000000000004 /* RootManagementRunner.swift in Sources */,
 				BB1000100F700000000000AA /* ContextPolicy.swift in Sources */,
 				AADDA9E12F6ECCF400B66649 /* ThumbnailCache.swift in Sources */,
 				E5SRS0001 /* SessionRefreshScheduler.swift in Sources */,
