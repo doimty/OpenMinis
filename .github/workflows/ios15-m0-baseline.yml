@@ -230,6 +230,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.host_file_probe
         run: |
           set -euo pipefail
+          set +e
           xcodebuild \
             -project src/ios/Minis.xcodeproj \
             -scheme Minis \
@@ -243,7 +244,14 @@ jobs:
             OTHER_SWIFT_FLAGS="-DMINIS_HOST_FILE_PROBE" \
             build \
             > "$RUNNER_TEMP/probe-build.log" 2>&1
+          status=$?
+          set -e
           python3 scripts/ios15_build_log.py "$RUNNER_TEMP/probe-build.log" --output-dir "$RUNNER_TEMP/probe-build"
+          if [ "$status" -ne 0 ]; then
+            cat "$RUNNER_TEMP/probe-build/errors.txt"
+            tail -n 80 "$RUNNER_TEMP/probe-build.log"
+          fi
+          test "$status" -eq 0
           app="$RUNNER_TEMP/probe-dd/Build/Products/Debug-iphoneos/Minis.app"
           test -d "$app"
           python3 - "$app/Info.plist" <<'PY'
@@ -560,5 +568,7 @@ jobs:
             ${{ runner.temp }}/input-prompts/**
             ${{ runner.temp }}/retry-probe/**
             ${{ runner.temp }}/responses-api-args/**
+            ${{ runner.temp }}/probe-build.log
+            ${{ runner.temp }}/probe-build/**
           if-no-files-found: warn
           retention-days: 14
