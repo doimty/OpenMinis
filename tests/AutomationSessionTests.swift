@@ -165,13 +165,20 @@ enum AutomationSessionTests {
         precondition(manager.transport() == "{\"enabled\":false}")
         let expiring = manager.requestStart(foreground: true)!
         _ = try manager.confirm(expiring, allow: true, foreground: true, commit: commit, runID: run)
+        let currentSession = manager.activeSessionID()!
+        let stoppedSession = first[0]["session_id"] as! String
+        precondition(currentSession != stoppedSession)
+        let countBeforeOldCallback = manager.eventSnapshot().count
+        manager.stop(reason: "background-budget-ended", matching: stoppedSession)
+        precondition(manager.activeSessionID() == currentSession && manager.secondsRemaining() == 180)
+        precondition(manager.eventSnapshot().count == countBeforeOldCallback)
         clock += 180
         precondition(manager.secondsRemaining() == 0)
         precondition(manager.eventSnapshot().last?["event"] as? String == "expired")
         let budget = manager.requestStart(foreground: true)!
         _ = try manager.confirm(budget, allow: true, foreground: true, commit: commit, runID: run)
         clock += 1
-        manager.stop(reason: "background-budget-ended")
+        manager.stop(reason: "background-budget-ended", matching: manager.activeSessionID()!)
         precondition(manager.eventSnapshot().last?["event"] as? String == "background-budget-ended")
         precondition(notices.first == "com.openminis.automation.stop" && notices.contains("com.openminis.automation.start"))
         manager.clearReport()

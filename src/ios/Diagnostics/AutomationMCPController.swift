@@ -244,9 +244,16 @@ final class AutomationSessionManager: @unchecked Sendable {
         }
     }
 
-    func stop(reason: String = "stopped") {
+    func stop(reason: String = "stopped", matching sessionID: String? = nil) {
         lock.lock(); defer { lock.unlock() }
+        if let sessionID, state.session?.id != sessionID { return }
         revoke(reason: reason)
+    }
+
+    func activeSessionID() -> String? {
+        lock.lock(); defer { lock.unlock() }
+        expireIfNeeded()
+        return state.session?.id
     }
 
     func clearReport() {
@@ -343,6 +350,7 @@ final class AutomationMCPController: NSObject, ObservableObject {
     private weak var approval: UIAlertController?
     private var timer: Timer?
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
+    private var backgroundSessionID: String?
 
     var supported: Bool { build != nil && Bundle.main.bundleIdentifier == "com.openminis.app.root" }
 
@@ -396,9 +404,10 @@ final class AutomationMCPController: NSObject, ObservableObject {
         do {
             let started = try manager.confirm(request, allow: allow, foreground: supported && foregroundWindow === window,
                                               commit: build.commit, runID: build.actionsRunID)
-            if started {
+            if started, let sessionID = manager.activeSessionID() {
+                backgroundSessionID = sessionID
                 backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Minis automation") { [weak self] in
-                    Task { @MainActor in self?.stopForBackgroundBudget() }
+                    Task { @MainActor in self?.stopForBackgroundBudget(sessionID: sessionID) }
                 }
             }
         } catch {
@@ -415,8 +424,9 @@ final class AutomationMCPController: NSObject, ObservableObject {
         refresh()
     }
 
-    private func stopForBackgroundBudget() {
-        manager.stop(reason: "background-budget-ended")
+    private func stopForBackgroundBudget(sessionID: String) {
+        guard backgroundSessionID == sessionID else { return }
+        manager.stop(reason: "background-budget-ended", matching: sessionID)
         refresh()
     }
 
@@ -447,8 +457,10 @@ final class AutomationMCPController: NSObject, ObservableObject {
         secondsRemaining = manager.secondsRemaining()
         reportEventCount = manager.eventSnapshot().count
         if secondsRemaining == 0, backgroundTask != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTask)
+            let finishedTask = backgroundTask
             backgroundTask = .invalid
+            backgroundSessionID = nil
+            UIApplication.shared.endBackgroundTask(finishedTask)
         }
     }
 }
