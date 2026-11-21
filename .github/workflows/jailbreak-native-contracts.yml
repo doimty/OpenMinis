@@ -2,6 +2,12 @@ name: jailbreak-native-contracts
 
 on:
   workflow_dispatch:
+  push:
+    branches: [feat/ios15-trollstore-root-20261121]
+    paths:
+      - .github/workflows/jailbreak-native-contracts.yml
+      - scripts/audit_standard_ios_build.py
+      - scripts/check_standard_native_guards.py
 
 permissions:
   contents: read
