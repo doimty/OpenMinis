@@ -117,12 +117,27 @@ def native():
             "-fptrauth-auth-traps",
             "-fptrauth-vtable-pointer-address-discrimination",
             "-fptrauth-vtable-pointer-type-discrimination",
-            "-fptrauth-objc-isa",
-            "-fptrauth-objc-interface-sel",
         )
         for flag in required_pac_flags:
             assert re.search(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", driver_text), (
                 f"arm64e compatibility build lost required PAC flag: {flag}")
+        disabled_pac_flags = (
+            "-fno-ptrauth-calls",
+            "-fno-ptrauth-returns",
+            "-fno-ptrauth-intrinsics",
+            "-fno-ptrauth-indirect-gotos",
+            "-fno-ptrauth-auth-traps",
+            "-fno-ptrauth-vtable-pointer-address-discrimination",
+            "-fno-ptrauth-vtable-pointer-type-discrimination",
+            "-fno-ptrauth-objc-isa",
+            "-fno-ptrauth-objc-interface-sel",
+        )
+        for flag in disabled_pac_flags:
+            assert not re.search(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", driver_text), (
+                f"arm64e compatibility build explicitly disabled PAC flag: {flag}")
+        assert re.search(
+            r"(?<![\w-])-fno-ptrauth-objc-class-ro(?![\w-])", driver_text
+        ), "arm64e compatibility build omitted the SignedClassRO opt-out"
         assert not re.search(
             r"(?<![\w-])-fptrauth-objc-class-ro(?![\w-])", driver_text
         ), "arm64e compatibility build unexpectedly enabled SignedClassRO"
