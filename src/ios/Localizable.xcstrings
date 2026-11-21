@@ -9820,6 +9820,198 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式回報失敗，但未提供大於 0 的錯誤碼。" } }
       }
     },
+    "Double tap at the given point coordinates" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Double tap at the given point coordinates" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在指定的屏幕点坐标双击。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在指定的螢幕點座標點兩下。" } }
+      }
+    },
+    "Long press at the first point, drag through optional path points, and release at the last point (for moving icons, reordering, etc.)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Long press at the first point, drag through optional path points, and release at the last point (for moving icons, reordering, etc.)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "长按第一个点，沿可选的路径点拖动，并在最后一个点松开，可用于移动图标或调整顺序等操作。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "長按第一個點，沿可選的路徑點拖移，並在最後一個點放開，可用於移動圖示或調整順序等操作。" } }
+      }
+    },
+    "Get device information including model, iOS version, battery level, storage, memory, and jailbreak type/package information" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get device information including model, iOS version, battery level, storage, memory, and jailbreak type/package information" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "读取设备型号、iOS 版本、电量、存储空间、内存，以及越狱类型和软件包信息。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "讀取裝置機型、iOS 版本、電量、儲存空間、記憶體，以及越獄類型和套件資訊。" } }
+      }
+    },
+    "Get the accessibility element at specific screen coordinates" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get the accessibility element at specific screen coordinates" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "读取指定屏幕坐标处的辅助功能元素。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "讀取指定螢幕座標處的輔助使用元素。" } }
+      }
+    },
+    "Get the bundle identifier and name of the currently foreground app" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get the bundle identifier and name of the currently foreground app" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "读取当前前台 App 的包标识符和名称。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "讀取目前前景 App 的套件識別碼和名稱。" } }
+      }
+    },
+    "Get current screen dimensions, scale factor, orientation, and best-effort device_state including locked/screen_on when available" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get current screen dimensions, scale factor, orientation, and best-effort device_state including locked/screen_on when available" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "读取当前屏幕尺寸、缩放比例、方向，以及可取得的 device_state 状态，包括锁屏和屏幕点亮状态。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "讀取目前螢幕尺寸、縮放比例、方向，以及可取得的 device_state 狀態，包括鎖定和螢幕亮起狀態。" } }
+      }
+    },
+    "Get current screen UI elements as a compact clickable/position list from the direct AX compact path." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get current screen UI elements as a compact clickable/position list from the direct AX compact path." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通过直接的 AX 精简查询路径，读取当前屏幕 UI 元素的可点击位置列表。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "透過直接的 AX 精簡查詢路徑，讀取目前螢幕 UI 元素的可點按位置清單。" } }
+      }
+    },
+    "Enter text through Unicode keyboard events. After a failed, expired or disconnected request, inspect the screen before deciding whether any text should be sent again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter text through Unicode keyboard events. After a failed, expired or disconnected request, inspect the screen before deciding whether any text should be sent again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通过 Unicode 键盘事件输入文本。请求失败、过期或断线后，请先查看屏幕，再判断是否需要再次输入任何文本。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "透過 Unicode 鍵盤事件輸入文字。請求失敗、到期或斷線後，請先查看螢幕，再判斷是否需要再次輸入任何文字。" } }
+      }
+    },
+    "Terminate a running app by bundle identifier" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminate a running app by bundle identifier" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按包标识符终止正在运行的 App。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "依套件識別碼終止執行中的 App。" } }
+      }
+    },
+    "Launch an app by bundle identifier and wait until it becomes the frontmost app. Brings it to foreground if already running." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Launch an app by bundle identifier and wait until it becomes the frontmost app. Brings it to foreground if already running." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按包标识符启动 App，并等待它进入前台；若已在运行，则切换到前台。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "依套件識別碼啟動 App，並等待它進入前景；若已在執行，則切換到前景。" } }
+      }
+    },
+    "List installed applications" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "List installed applications" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "列出已安装的 App。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "列出已安裝的 App。" } }
+      }
+    },
+    "List currently running applications" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "List currently running applications" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "列出当前正在运行的 App。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "列出目前執行中的 App。" } }
+      }
+    },
+    "Long press at the given point coordinates" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Long press at the given point coordinates" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在指定的屏幕点坐标长按。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在指定的螢幕點座標長按。" } }
+      }
+    },
+    "Press Home on an already awake, unlocked device. Verify the resulting screen with screenshot or get_ui_elements. Wake and unlock the device manually if needed." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Press Home on an already awake, unlocked device. Verify the resulting screen with screenshot or get_ui_elements. Wake and unlock the device manually if needed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在屏幕已点亮且设备已解锁时按下主屏幕按钮。使用 screenshot 或 get_ui_elements 检查结果；如有需要，请先手动唤醒并解锁设备。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在螢幕已亮起且裝置已解鎖時按下主畫面按鈕。使用 screenshot 或 get_ui_elements 檢查結果；如有需要，請先手動喚醒並解鎖裝置。" } }
+      }
+    },
+    "Press a special keyboard key" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Press a special keyboard key" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按下指定的特殊键盘按键。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "按下指定的特殊鍵盤按鍵。" } }
+      }
+    },
+    "Take a screenshot. The image is returned at the screen's point size (one image pixel equals one screen point), so any coordinate read off the image can be passed straight to tap_screen/swipe_screen with no scale conversion — do not divide by the Retina scale. Returns MCP image content, not text: result.content[0].type is image, mimeType is image/jpeg, and data contains the base64 JPEG payload, which targets about 400KB by adjusting quality only, never by resizing." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Take a screenshot. The image is returned at the screen's point size (one image pixel equals one screen point), so any coordinate read off the image can be passed straight to tap_screen/swipe_screen with no scale conversion — do not divide by the Retina scale. Returns MCP image content, not text: result.content[0].type is image, mimeType is image/jpeg, and data contains the base64 JPEG payload, which targets about 400KB by adjusting quality only, never by resizing." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "截取屏幕。图像按屏幕的点尺寸返回，1 个图像像素等于 1 个屏幕点。从图像读取的坐标可以直接用于 tap_screen 或 swipe_screen，无需转换，也不要除以 Retina 缩放比例。返回 MCP 图像内容：result.content[0].type 为 image，mimeType 为 image/jpeg，data 包含 Base64 JPEG。仅调整画质、保持尺寸，目标大小约 400 KB。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "擷取螢幕。影像依螢幕的點尺寸傳回，1 個影像像素等於 1 個螢幕點。從影像讀取的座標可以直接用於 tap_screen 或 swipe_screen，無須轉換，也不要除以 Retina 縮放比例。傳回 MCP 影像內容：result.content[0].type 為 image，mimeType 為 image/jpeg，data 包含 Base64 JPEG。僅調整畫質、保持尺寸，目標大小約 400 KB。" } }
+      }
+    },
+    "Swipe from one point to another on screen. Coordinates are screen points, the same space as screenshot pixels — no scale conversion needed." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Swipe from one point to another on screen. Coordinates are screen points, the same space as screenshot pixels — no scale conversion needed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从一个屏幕点滑动到另一个屏幕点。坐标以屏幕点为单位，与截图像素使用相同的坐标空间，无需缩放转换。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "從一個螢幕點滑動到另一個螢幕點。座標以螢幕點為單位，與截圖像素使用相同的座標空間，無須縮放轉換。" } }
+      }
+    },
+    "Find a UI element by its text/accessibility label and tap it, instead of computing raw coordinates yourself. Matches against an element's accessibility text (label/title/identifier/value). Prefer this over tap_screen for reliable, layout-independent tapping. Returns tapped=true with the matched element, or tapped=false with a reason when no element matches." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Find a UI element by its text/accessibility label and tap it, instead of computing raw coordinates yourself. Matches against an element's accessibility text (label/title/identifier/value). Prefer this over tap_screen for reliable, layout-independent tapping. Returns tapped=true with the matched element, or tapped=false with a reason when no element matches." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按文本或辅助功能标签查找并点击 UI 元素，无需自行计算坐标。匹配辅助功能的标签、标题、标识符或值，适合界面布局变化时使用。匹配并点击后返回 tapped=true 和对应元素；没有匹配时返回 tapped=false 及原因。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "依文字或輔助使用標籤尋找並點按 UI 元素，無須自行計算座標。比對輔助使用的標籤、標題、識別碼或值，適合介面配置變動時使用。符合並點按後傳回 tapped=true 和對應元素；沒有符合項目時傳回 tapped=false 及原因。" } }
+      }
+    },
+    "Tap the screen at the given point coordinates. Coordinates read off a screenshot are used as-is: screenshots are returned at point size, so no scale conversion is needed." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tap the screen at the given point coordinates. Coordinates read off a screenshot are used as-is: screenshots are returned at point size, so no scale conversion is needed." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在指定的屏幕点坐标点击。截图按点尺寸返回，从截图读取的坐标可直接使用，无需缩放转换。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在指定的螢幕點座標點按。截圖依點尺寸傳回，從截圖讀取的座標可直接使用，無須縮放轉換。" } }
+      }
+    },
+    "Type text character by character through Unicode keyboard events. No automatic HID fallback or retry is performed; verify the screen after any uncertain result." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Type text character by character through Unicode keyboard events. No automatic HID fallback or retry is performed; verify the screen after any uncertain result." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通过 Unicode 键盘事件逐字符输入文本，不会自动改用 HID 或重试。结果不确定时，请先检查屏幕。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "透過 Unicode 鍵盤事件逐字元輸入文字，不會自動改用 HID 或重試。結果不確定時，請先檢查螢幕。" } }
+      }
+    },
+    "Poll the UI until an element matching the given text/label/role is no longer present (or until timeout). Use this to wait for a loading spinner, overlay, or transition view to go away before continuing. Returns disappeared=true with waited_ms, or disappeared=false on timeout." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Poll the UI until an element matching the given text/label/role is no longer present (or until timeout). Use this to wait for a loading spinner, overlay, or transition view to go away before continuing. Returns disappeared=true with waited_ms, or disappeared=false on timeout." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "持续查询 UI，直到匹配指定文本、标签或角色的元素消失，或达到超时。可用于等待加载指示、遮罩或过渡界面结束。消失后返回 disappeared=true 和 waited_ms；超时返回 disappeared=false。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "持續查詢 UI，直到符合指定文字、標籤或角色的元素消失，或達到逾時。可用於等待載入指示、覆蓋層或過渡介面結束。消失後傳回 disappeared=true 和 waited_ms；逾時傳回 disappeared=false。" } }
+      }
+    },
+    "Poll the UI until an element matching the given text/label/role appears (or until timeout). Use this to synchronize automation after an action that triggers a screen transition or async load, instead of sleeping or repeatedly calling get_ui_elements. Returns found=true with waited_ms once it appears, or found=false on timeout." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Poll the UI until an element matching the given text/label/role appears (or until timeout). Use this to synchronize automation after an action that triggers a screen transition or async load, instead of sleeping or repeatedly calling get_ui_elements. Returns found=true with waited_ms once it appears, or found=false on timeout." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "持续查询 UI，直到匹配指定文本、标签或角色的元素出现，或达到超时。适合在页面切换或异步加载后等待界面就绪，无需休眠或反复调用 get_ui_elements。出现后返回 found=true 和 waited_ms；超时返回 found=false。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "持續查詢 UI，直到符合指定文字、標籤或角色的元素出現，或達到逾時。適合在頁面切換或非同步載入後等待介面就緒，無須休眠或反覆呼叫 get_ui_elements。出現後傳回 found=true 和 waited_ms；逾時傳回 found=false。" } }
+      }
+    },
+    "Copy automation session report" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy automation session report" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制自动化会话报告" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "複製自動化工作階段報告" } }
+      }
+    },
+    "Clear automation session report" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear automation session report" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除自动化会话报告" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "清除自動化工作階段報告" } }
+      }
+    },
     "Cross-app automation" : {
       "extractionState" : "manual",
       "localizations" : {

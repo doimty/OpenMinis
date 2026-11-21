@@ -34,12 +34,14 @@ def verify(folder, scheme):
     entitlements = plistlib.loads(entitlement_output) if entitlement_output.strip() else {}
     assert entitlements == {}, "the tweak inherits its host; do not sign it as a privileged App"
     symbols = run("xcrun", "nm", "-U", str(dylib))
+    undefined = run("xcrun", "nm", "-u", str(dylib))
+    links = run("xcrun", "otool", "-L", str(dylib))
+    (folder / "native-readback.txt").write_text(links + "\n" + symbols + "\nUNDEFINED SYSTEM IMPORTS\n" + undefined, encoding="utf-8")
     defined_classes = re.findall(r"_OBJC_CLASS_\$_(\w+)", symbols)
     assert defined_classes and all(name.startswith("OMMAV_") for name in defined_classes), defined_classes
-    assert "_MCP" not in symbols and "_IOSMCP" not in symbols, "upstream C symbols must be namespaced"
-    undefined = run("xcrun", "nm", "-u", str(dylib))
+    defined_names = {line.split()[-1] for line in symbols.splitlines() if len(line.split()) >= 3}
+    assert not any(name.startswith(("_MCP", "_IOSMCP")) for name in defined_names), "upstream C symbols must be namespaced"
     assert not re.search(r"\b_OMMA\w*\b", undefined), "unresolved project-owned symbol: " + undefined
-    links = run("xcrun", "otool", "-L", str(dylib))
     if scheme == "roothide":
         assert "@loader_path/.jbroot/usr/lib/libroothide.dylib" in links
     else:
@@ -56,7 +58,6 @@ def verify(folder, scheme):
         "filter_sha256": digest(folder / "MinisAutomation.plist"), "source_lock_sha256": digest(folder / "source-lock.json"),
         "document_sha256": {name: digest(folder / name) for name in docs}, "device_runtime_verified": False}
     (folder / "build.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    (folder / "native-readback.txt").write_text(links + "\n" + symbols + "\nUNDEFINED SYSTEM IMPORTS\n" + undefined, encoding="utf-8")
     return manifest
 
 

@@ -45,14 +45,14 @@ for arch in arm64 arm64e; do
   for source in "$work/source/"*.m; do
     xcrun --sdk iphoneos clang "${flags[@]}" -c "$source" -o "$work/$arch/$(basename "${source%.m}").o"
   done
-  libraries=()
-  if [ "$scheme" = roothide ]; then libraries+=(-L "$work/include" -lroothide); fi
-  xcrun --sdk iphoneos clang -target "${arch}-apple-ios15.0" -isysroot "$sdk" -dynamiclib \
+  linkargs=(-target "${arch}-apple-ios15.0" -isysroot "$sdk" -dynamiclib)
+  if [ "$scheme" = roothide ]; then linkargs+=(-L "$work/include" -lroothide); fi
+  xcrun --sdk iphoneos clang "${linkargs[@]}" \
     -Wl,-install_name,@rpath/MinisAutomation.dylib -Wl,-undefined,dynamic_lookup \
     -framework Foundation -framework CoreFoundation -framework IOKit -framework UIKit \
     -framework CoreGraphics -framework QuartzCore -framework MobileCoreServices \
     -framework AVFoundation -framework Security -framework Vision -framework ImageIO \
-    "${libraries[@]}" "$work/$arch/"*.o -o "$work/$arch/MinisAutomation.dylib"
+    "$work/$arch/"*.o -o "$work/$arch/MinisAutomation.dylib"
 done
 xcrun lipo -create "$work/arm64/MinisAutomation.dylib" "$work/arm64e/MinisAutomation.dylib" \
   -output "$output/MinisAutomation.dylib"

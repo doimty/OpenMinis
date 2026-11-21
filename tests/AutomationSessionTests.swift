@@ -10,6 +10,7 @@ enum AutomationSessionTests {
     static func main() throws {
         try authorization()
         try files()
+        try lifecycle()
         print("Production automation session: explicit confirmation, denial, expiry, stop, secure entropy, no replay/restore, and private atomic file policy: PASS")
     }
 
@@ -128,6 +129,54 @@ enum AutomationSessionTests {
     }
 
     private static func requireAbsent(_ session: AutomationSession?) { precondition(session == nil) }
+
+    private static func lifecycle() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("minis-automation-lifecycle-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = AutomationSessionFile(directory: root.appendingPathComponent("control").path, owner: getuid())
+        var oldState = AutomationSessionState()
+        let oldRequest = oldState.requestStart(foreground: true)!
+        let oldGrant = try oldState.confirm(oldRequest, allow: true, foreground: true, now: tick - 10, commit: commit, runID: run)!
+        let staleBytes = try store.publish(oldGrant)
+        var clock = tick
+        var notices: [String] = []
+        let manager = AutomationSessionManager(file: store, now: { clock }, notifier: { notices.append($0) })
+        precondition(manager.transport() == "{\"enabled\":false}" && manager.eventSnapshot().isEmpty)
+        precondition(!store.matches(staleBytes))
+        let start = manager.requestStart(foreground: true)!
+        let started = try manager.confirm(start, allow: true, foreground: true, commit: commit, runID: run)
+        precondition(started && manager.secondsRemaining() == 180)
+        let first = manager.eventSnapshot()
+        precondition(first.count == 1 && first[0]["event"] as? String == "started")
+        precondition(first[0]["created"] as? Double == tick && first[0]["expires"] as? Double == tick + 180)
+        let transport = try JSONSerialization.jsonObject(with: Data(manager.transport().utf8)) as! [String: Any]
+        precondition(transport["enabled"] as? Bool == true && transport["session"] as? String == first[0]["session_id"] as? String)
+        let exported = String(data: try JSONSerialization.data(withJSONObject: first), encoding: .utf8)!
+        precondition(!exported.contains("token") && !exported.contains("Authorization") && !exported.contains("Bearer"))
+        manager.clearReport()
+        precondition(manager.eventSnapshot().count == 1)
+        clock += 2
+        manager.stop()
+        manager.stop()
+        let stopped = manager.eventSnapshot()
+        precondition(stopped.count == 2 && stopped[1]["event"] as? String == "stopped")
+        precondition(stopped[0]["session_id"] as? String == stopped[1]["session_id"] as? String)
+        precondition(manager.transport() == "{\"enabled\":false}")
+        let expiring = manager.requestStart(foreground: true)!
+        _ = try manager.confirm(expiring, allow: true, foreground: true, commit: commit, runID: run)
+        clock += 180
+        precondition(manager.secondsRemaining() == 0)
+        precondition(manager.eventSnapshot().last?["event"] as? String == "expired")
+        let budget = manager.requestStart(foreground: true)!
+        _ = try manager.confirm(budget, allow: true, foreground: true, commit: commit, runID: run)
+        clock += 1
+        manager.stop(reason: "background-budget-ended")
+        precondition(manager.eventSnapshot().last?["event"] as? String == "background-budget-ended")
+        precondition(notices.first == "com.openminis.automation.stop" && notices.contains("com.openminis.automation.start"))
+        manager.clearReport()
+        precondition(manager.eventSnapshot().isEmpty)
+    }
 
     private static func expectPolicyError(_ operation: () throws -> Void) {
         do {

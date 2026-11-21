@@ -205,12 +205,22 @@ final class AutomationSessionManager: @unchecked Sendable {
     static let shared = AutomationSessionManager()
     private let lock = NSLock()
     private var state = AutomationSessionState()
-    private let file = AutomationSessionFile()
+    private let file: AutomationSessionFile
+    private let now: () -> Double
+    private let notifier: (String) -> Void
     private var published: Data?
+    private var events: [[String: Any]] = []
 
-    private init() {
+    private convenience init() {
+        self.init(file: AutomationSessionFile(), now: AutomationContinuousClock.now, notifier: Self.notify)
+    }
+
+    init(file: AutomationSessionFile, now: @escaping () -> Double, notifier: @escaping (String) -> Void) {
+        self.file = file
+        self.now = now
+        self.notifier = notifier
         try? file.remove()
-        Self.notify("com.openminis.automation.stop")
+        notifier("com.openminis.automation.stop")
     }
 
     func requestStart(foreground: Bool) -> UUID? {
@@ -222,27 +232,41 @@ final class AutomationSessionManager: @unchecked Sendable {
     func confirm(_ request: UUID, allow: Bool, foreground: Bool, commit: String, runID: String) throws -> Bool {
         lock.lock(); defer { lock.unlock() }
         guard let grant = try state.confirm(request, allow: allow, foreground: foreground,
-                                            now: AutomationContinuousClock.now(), commit: commit, runID: runID) else { return false }
+                                            now: now(), commit: commit, runID: runID) else { return false }
         do {
             published = try file.publish(grant)
-            Self.notify("com.openminis.automation.start")
+            record(grant, event: "started", observed: now())
+            notifier("com.openminis.automation.start")
             return true
         } catch {
-            revoke()
+            revoke(reason: "invalidated")
             throw error
         }
     }
 
-    func stop() {
+    func stop(reason: String = "stopped") {
         lock.lock(); defer { lock.unlock() }
-        revoke()
+        revoke(reason: reason)
+    }
+
+    func clearReport() {
+        lock.lock(); defer { lock.unlock() }
+        expireIfNeeded()
+        guard state.session == nil, state.pending == nil else { return }
+        events.removeAll()
+    }
+
+    func eventSnapshot() -> [[String: Any]] {
+        lock.lock(); defer { lock.unlock() }
+        expireIfNeeded()
+        return events
     }
 
     func secondsRemaining() -> Int {
         lock.lock(); defer { lock.unlock() }
         expireIfNeeded()
         guard let grant = state.session else { return 0 }
-        return max(0, Int(ceil(grant.expires - AutomationContinuousClock.now())))
+        return max(0, Int(ceil(grant.expires - now())))
     }
 
     func transport() -> String {
@@ -257,19 +281,34 @@ final class AutomationSessionManager: @unchecked Sendable {
     }
 
     private func expireIfNeeded() {
-        let hadSession = state.session != nil
-        if state.current(at: AutomationContinuousClock.now()) == nil {
-            if hadSession { revoke() }
+        guard let grant = state.session else { return }
+        let observed = now()
+        if !observed.isFinite || observed < grant.created {
+            revoke(reason: "invalidated")
+        } else if observed >= grant.expires {
+            revoke(reason: "expired")
         } else if published == nil || !file.matches(published!) {
-            revoke()
+            revoke(reason: "invalidated")
         }
     }
 
-    private func revoke() {
+    private func revoke(reason: String) {
+        if let grant = state.session {
+            let observed = now()
+            let event = observed.isFinite && observed >= grant.expires ? "expired" : reason
+            record(grant, event: event, observed: observed)
+        }
         state.stop()
         published = nil
         try? file.remove()
-        Self.notify("com.openminis.automation.stop")
+        notifier("com.openminis.automation.stop")
+    }
+
+    private func record(_ grant: AutomationSession, event: String, observed: Double) {
+        guard observed.isFinite, observed >= 0 else { return }
+        events.append(["session_id": grant.id, "event": event, "created": grant.created,
+                       "expires": grant.expires, "observed": observed, "tools_version": grant.toolsVersion])
+        if events.count > 64 { events.removeFirst(events.count - 64) }
     }
 
     private static func notify(_ name: String) {
@@ -298,6 +337,7 @@ final class AutomationMCPController: NSObject, ObservableObject {
     @Published private(set) var secondsRemaining = 0
     @Published private(set) var confirming = false
     @Published private(set) var errorKey: String?
+    @Published private(set) var reportEventCount = 0
     private let manager = AutomationSessionManager.shared
     private let build = RootManagementBuildIdentity(info: Bundle.main.infoDictionary ?? [:])
     private weak var approval: UIAlertController?
@@ -358,7 +398,7 @@ final class AutomationMCPController: NSObject, ObservableObject {
                                               commit: build.commit, runID: build.actionsRunID)
             if started {
                 backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Minis automation") { [weak self] in
-                    Task { @MainActor in self?.stop() }
+                    Task { @MainActor in self?.stopForBackgroundBudget() }
                 }
             }
         } catch {
@@ -375,8 +415,37 @@ final class AutomationMCPController: NSObject, ObservableObject {
         refresh()
     }
 
+    private func stopForBackgroundBudget() {
+        manager.stop(reason: "background-budget-ended")
+        refresh()
+    }
+
+    func clearReport() {
+        manager.clearReport()
+        refresh()
+    }
+
+    var report: String? {
+        guard let build else { return nil }
+#if targetEnvironment(simulator)
+        let runtime = "simulator"
+#elseif targetEnvironment(macCatalyst)
+        let runtime = "mac-catalyst"
+#else
+        let runtime = ProcessInfo.processInfo.isiOSAppOnMac ? "ios-app-on-mac" : "physical-device"
+#endif
+        let object: [String: Any] = ["schema": 1, "kind": "minis-automation-session",
+                                     "bundleIdentifier": Bundle.main.bundleIdentifier ?? "",
+                                     "build": ["commit": build.commit, "actionsRunID": build.actionsRunID],
+                                     "runtime": runtime, "osVersion": ProcessInfo.processInfo.operatingSystemVersionString,
+                                     "appUID": getuid(), "appEUID": geteuid(), "events": manager.eventSnapshot()]
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
     @objc func refresh() {
         secondsRemaining = manager.secondsRemaining()
+        reportEventCount = manager.eventSnapshot().count
         if secondsRemaining == 0, backgroundTask != .invalid {
             UIApplication.shared.endBackgroundTask(backgroundTask)
             backgroundTask = .invalid

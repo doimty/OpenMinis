@@ -188,6 +188,13 @@ private struct AutomationMCPSettingsSection: View {
             if let error = controller.errorKey {
                 Text(AppLocalizedDynamic(error)).font(.caption).foregroundStyle(.orange)
             }
+            if controller.reportEventCount > 0 {
+                Button(AppLocalized("Copy automation session report")) {
+                    if let report = controller.report { UIPasteboard.general.string = report }
+                }
+                Button(AppLocalized("Clear automation session report")) { controller.clearReport() }
+                    .disabled(controller.secondsRemaining > 0 || controller.confirming)
+            }
         } header: {
             Text(AppLocalized("Cross-app automation"))
         } footer: {

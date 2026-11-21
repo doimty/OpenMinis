@@ -169,6 +169,10 @@ def prepare(output):
     texts["AppManager.m"] = patch_apps(texts["AppManager.m"])
     for name in ("HIDManager.m", "TextInputManager.m"):
         texts[name] = texts[name].replace("usleep(", "OMMAInteractionSleep(")
+        texts[name] = texts[name].replace("OMMARequestAlive()", "OMMAInteractionAlive()")
+        texts[name] = '#import "MinisAutomationInteraction.h"\n' + texts[name]
+    texts["AppManager.m"] = texts["AppManager.m"].replace("OMMARequestAlive()", "OMMAInteractionAlive()")
+    texts["AppManager.m"] = '#import "MinisAutomationInteraction.h"\n' + texts["AppManager.m"]
     # The upstream logger can include error strings derived from user input.
     # The companion's metadata receipt is its audit surface; disable debug
     # preference logging rather than silently inheriting another setting.

@@ -31,9 +31,9 @@ def static():
             for name in re.findall(r"@implementation\s+(\w+)", text): assert name.startswith("OMMAV_"), name
         hid = (folder / "HIDManager.m").read_text(encoding="utf-8")
         text = (folder / "OMMAV_TextInputManager.m").read_text(encoding="utf-8")
-        assert "phase != TouchPhaseEnded && !OMMARequestAlive()" in hid
+        assert "phase != TouchPhaseEnded && !OMMAInteractionAlive()" in hid
         assert "OMMADispatchAsync(_hidQueue" in hid and "OMMADispatchAsync(_inputQueue" in text
-        assert "if (down && !OMMARequestAlive())" in text and "if (!OMMARequestAlive()) return NO;" in text
+        assert "if (down && !OMMAInteractionAlive())" in text and "if (!OMMAInteractionAlive()) return NO;" in text
         assert 'if ([self typeTextViaHID:text' not in text
         assert "usleep(" not in hid and "usleep(" not in text
         assert "OMMAInteractionSleep(" in hid and "OMMAInteractionSleep(" in text

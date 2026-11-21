@@ -11,6 +11,8 @@ on:
       - scripts/test_automation_mcp_native.py
       - src/ios/Diagnostics/AutomationMCPController.swift
       - tests/AutomationSessionTests.swift
+      - scripts/verify_automation_device_evidence.py
+      - scripts/test_verify_automation_device_evidence.py
       - jailbreak/automation/**
       - scripts/package_automation_deb.py
       - scripts/test_package_automation_deb.py
@@ -37,6 +39,7 @@ jobs:
           "$RUNNER_TEMP/automation-python/bin/pip" install --disable-pip-version-check httpx==0.28.1
           "$RUNNER_TEMP/automation-python/bin/python" scripts/test_automation_mcp_transport.py -v
           python3 scripts/test_package_automation_deb.py -v
+          python3 scripts/test_verify_automation_device_evidence.py -v
           python3 jailbreak/automation/test_native.py --static
 
   native:
@@ -103,6 +106,7 @@ jobs:
             ${{ runner.temp }}/automation-deb/manifest.json
             ${{ runner.temp }}/automation-build/build.json
             ${{ runner.temp }}/automation-build/source-lock.json
+            ${{ runner.temp }}/automation-build/native-readback.txt
             ${{ runner.temp }}/automation-build/*.log
           if-no-files-found: warn
           retention-days: 14

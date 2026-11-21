@@ -84,6 +84,7 @@ jobs:
           python3 scripts/test_automation_mcp_native.py
           python3 scripts/test_device_mcp_stdio.py -v
           python3 scripts/test_verify_jailbreak_device_report.py -v
+          python3 scripts/test_verify_automation_device_evidence.py -v
           python3 scripts/test_package_jailbreak_deb.py -v
           python3 scripts/test_audit_standard_ios_build.py -v
           python3 scripts/test_package_automation_deb.py -v
@@ -109,6 +110,7 @@ jobs:
         run: |
           python scripts/test_package_jailbreak_deb.py -v
           python scripts/test_verify_jailbreak_device_report.py -v
+          python scripts/test_verify_automation_device_evidence.py -v
           python scripts/test_device_mcp_stdio.py -v
           python scripts/test_package_automation_deb.py -v
 
@@ -151,6 +153,7 @@ jobs:
             ${{ runner.temp }}/automation-deb/manifest.json
             ${{ runner.temp }}/automation-build/build.json
             ${{ runner.temp }}/automation-build/source-lock.json
+            ${{ runner.temp }}/automation-build/native-readback.txt
             ${{ runner.temp }}/automation-build/*.log
           if-no-files-found: warn
           retention-days: 14
