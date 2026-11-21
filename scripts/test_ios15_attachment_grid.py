@@ -167,14 +167,19 @@ class SourceContractTests(unittest.TestCase):
         for kind in ("case .image:", "case .video:", "case .document:"):
             self.assertIn(kind, queued)
 
-    def test_steer_clips_native_white_editor_before_padding(self):
+    def test_legacy_steer_editor_is_its_only_filled_surface(self):
         source = section(STEER.read_text(encoding="utf-8"), "struct SubAgentActionsCard: View", "private var isBlank")
-        self.assertIn("ComposerSurface.roundedShape()", source)
-        self.assertRegex(source, r"\.focused\(\$focused\)\s*//[^\n]*\n\s*\.clipShape\(editorShape\)\s*\.padding")
-        self.assertIn(".background(editorShape.fill(Color(UIColor.tertiarySystemFill)))", source)
-        self.assertEqual(source.count(".clipShape(editorShape)"), 2)
-        for fragment in ("lineLimit: 1...4", ".font(.system(size: 13))", ".layoutPriority(1)",
-                         "SubAgentUserSteer.send(draft, childSessionId: childSessionId)",
+        field = section(source, "private var directionField: some View", "var body: some View")
+        self.assertIn("ComposerSurface.roundedShape()", field)
+        modern, legacy = field.split("if #available(iOS 16.0, *) {", 1)[1].split("} else {", 1)
+        self.assertIn(".background(shape.fill(Color(UIColor.tertiarySystemFill)))", modern)
+        self.assertNotRegex(legacy, r"\.(background|padding|fill)\s*\(")
+        self.assertIn("editor.clipShape(shape)", legacy)
+        self.assertIn("lineWidth: 1 / max(displayScale, 1)", legacy)
+        self.assertIn(".allowsHitTesting(false)", legacy)
+        self.assertIn(".accessibilityHidden(true)", legacy)
+        for fragment in ("lineLimit: 1...4", ".font(.system(size: 13))", ".focused($focused)",
+                         ".layoutPriority(1)", "SubAgentUserSteer.send(draft, childSessionId: childSessionId)",
                          'draft = ""', "sentCount += 1", "focused = false", ".disabled(isBlank)"):
             self.assertIn(fragment, source)
 

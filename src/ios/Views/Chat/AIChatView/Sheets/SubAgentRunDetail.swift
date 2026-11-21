@@ -596,8 +596,29 @@ struct SubAgentActionsCard: View {
     @State private var confirmStop = false
     @FocusState private var focused: Bool
 
-    private var editorShape: RoundedRectangle {
-        ComposerSurface.roundedShape()
+    @Environment(\.displayScale) private var displayScale
+
+    @ViewBuilder
+    private var directionField: some View {
+        let shape = ComposerSurface.roundedShape()
+        let editor = CompatMultilineTextField(AppLocalized("Send a course correction…"), text: $draft, lineLimit: 1...4)
+            .font(.system(size: 13))
+            .focused($focused)
+        if #available(iOS 16.0, *) {
+            editor
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .background(shape.fill(Color(UIColor.tertiarySystemFill)))
+                .clipShape(shape)
+        } else {
+            // The legacy TextEditor draws its own opaque surface. Padding it
+            // inside a second fill made a thick ring in dark mode.
+            editor.clipShape(shape)
+                .overlay {
+                    shape.strokeBorder(Color(UIColor.separator), lineWidth: 1 / max(displayScale, 1))
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+        }
     }
 
     var body: some View {
@@ -605,19 +626,7 @@ struct SubAgentActionsCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 if canSteer {
                     HStack(alignment: .bottom, spacing: 8) {
-                        CompatMultilineTextField(AppLocalized("Send a course correction…"), text: $draft, lineLimit: 1...4)
-                            .font(.system(size: 13))
-                            .focused($focused)
-                            // Clip the iOS 15 TextEditor's own white surface BEFORE padding.
-                            .clipShape(editorShape)
-                            .padding(.horizontal, 10).padding(.vertical, 7)
-                            .background(editorShape.fill(Color(UIColor.tertiarySystemFill)))
-                            .clipShape(editorShape)
-                            // iOS 15 falls back to TextEditor, which is greedy in
-                            // BOTH axes: without an explicit flexible frame it
-                            // claims its ideal width and pushes the send button
-                            // past the card's trailing edge (T-subagent-composer-
-                            // overflow). Claim only the space the button leaves.
+                        directionField
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .layoutPriority(1)
                         Button {
