@@ -16,6 +16,7 @@ import struct
 import sys
 import tarfile
 import tempfile
+import uuid
 from pathlib import Path
 
 from package_ios15_ipa import PackageError, sha256_file
@@ -31,6 +32,11 @@ FILTER = "MinisAutomation.plist"
 DOCUMENTS = ("LICENSE.ios-mcp", "NOTICE.ios-mcp", "THIRD_PARTY_NOTICES.ios-mcp.md",
              "LICENSE.RootHide", "source-lock.json", "build.json")
 MAX_DYLIB_BYTES = 64 * 1024 * 1024
+CPU_TYPE_ARM64 = 0x0100000C
+LC_SEGMENT_64 = 0x19
+LC_UUID = 0x1B
+LC_DYLD_CHAINED_FIXUPS = 0x80000034
+OBJC_IMAGEINFO_SIGNED_CLASS_RO = 0x10
 
 
 def require(condition, message):
@@ -49,17 +55,16 @@ def strict_json(data):
                       parse_constant=lambda _: (_ for _ in ()).throw(PackageError("non-finite JSON number")))
 
 
-def native_slices(data):
-    """Check both real signed device slices; Debian architecture is separate."""
+def _native_readback(data):
     require(0 < len(data) <= MAX_DYLIB_BYTES, "invalid companion dylib size")
     require(data[:4] == b"\xca\xfe\xba\xbe" and len(data) >= 48, "expected universal arm64/arm64e dylib")
     count = struct.unpack_from(">I", data, 4)[0]
     require(count == 2, "expected exactly two native slices")
-    records, ranges = {}, []
+    records, metadata, ranges = {}, {}, []
     for index in range(count):
         cpu, subtype, offset, size, alignment = struct.unpack_from(">5I", data, 8 + index * 20)
         arch = {0: "arm64", 2: "arm64e"}.get(subtype & 0x00FFFFFF)
-        require(cpu == 0x0100000C and arch is not None and arch not in records,
+        require(cpu == CPU_TYPE_ARM64 and arch is not None and arch not in records,
                 "unexpected or duplicate native architecture")
         require(alignment <= 30 and offset >= 48 and offset % (1 << alignment) == 0
                 and size >= 32 and offset + size <= len(data), "invalid native slice bounds")
@@ -73,6 +78,8 @@ def native_slices(data):
         require(0 < command_count <= 4096 and command_count * 8 <= command_bytes <= size - 32,
                 "invalid native load command table")
         position, minimum, identity, signature = 32, None, None, False
+        macho_uuid, chained_fixups = None, False
+        imageinfo_version, imageinfo_flags = None, None
         for _ in range(command_count):
             require(position + 8 <= 32 + command_bytes, "truncated native load command")
             command, length = struct.unpack_from("<2I", image, position)
@@ -93,6 +100,32 @@ def native_slices(data):
                 name = image[position + name_offset:position + length].split(b"\0", 1)[0]
                 identity = name.decode("utf-8")
                 require(identity.endswith("/" + DYLIB), "unexpected companion install name")
+            elif command == LC_UUID:
+                require(macho_uuid is None and length >= 24, "invalid or duplicate LC_UUID")
+                identifier = bytes(image[position + 8:position + 24])
+                require(identifier != b"\0" * 16, f"{arch} has an empty LC_UUID")
+                macho_uuid = str(uuid.UUID(bytes=identifier))
+            elif command == LC_DYLD_CHAINED_FIXUPS:
+                require(not chained_fixups and length >= 16, "invalid or duplicate LC_DYLD_CHAINED_FIXUPS")
+                data_offset, data_size = struct.unpack_from("<2I", image, position + 8)
+                require(data_offset >= 32 + command_bytes and data_size > 0
+                        and data_offset + data_size <= size, "invalid LC_DYLD_CHAINED_FIXUPS data")
+                chained_fixups = True
+            elif command == LC_SEGMENT_64:
+                require(length >= 72, "truncated LC_SEGMENT_64")
+                section_count = struct.unpack_from("<I", image, position + 64)[0]
+                require(section_count <= (length - 72) // 80, "invalid Mach-O section table")
+                for section_index in range(section_count):
+                    section = position + 72 + section_index * 80
+                    section_name = image[section:section + 16].split(b"\0", 1)[0]
+                    if section_name != b"__objc_imageinfo":
+                        continue
+                    require(imageinfo_flags is None, "duplicate __objc_imageinfo metadata")
+                    section_size = struct.unpack_from("<Q", image, section + 40)[0]
+                    section_offset = struct.unpack_from("<I", image, section + 48)[0]
+                    require(section_size >= 8 and section_offset + section_size <= size,
+                            "__objc_imageinfo is out of bounds")
+                    imageinfo_version, imageinfo_flags = struct.unpack_from("<2I", image, section_offset)
             elif command == 0x1D:
                 require(not signature and length >= 16, "invalid or duplicate native signature")
                 sig_offset, sig_bytes = struct.unpack_from("<2I", image, position + 8)
@@ -103,9 +136,32 @@ def native_slices(data):
             position += length
         require(position == 32 + command_bytes and minimum == (15, 0, 0) and identity is not None and signature,
                 "missing signed iOS 15.0 companion evidence")
+        require(macho_uuid is not None, f"{arch} is missing a nonempty LC_UUID")
+        require(imageinfo_version is not None, f"{arch} is missing __objc_imageinfo metadata")
+        require(imageinfo_version == 0, f"{arch} requires __objc_imageinfo version 0")
+        require(not imageinfo_flags & OBJC_IMAGEINFO_SIGNED_CLASS_RO,
+                f"{arch} emits SignedClassRO metadata that iOS 15 objc4 cannot consume")
+        require(arch != "arm64e" or chained_fixups, "arm64e is missing LC_DYLD_CHAINED_FIXUPS")
         records[arch] = "15.0"
+        metadata[arch] = {
+            "uuid": macho_uuid,
+            "chained_fixups": chained_fixups,
+            "objc_imageinfo_version": imageinfo_version,
+            "objc_imageinfo_flags": imageinfo_flags,
+            "signed_class_ro": bool(imageinfo_flags & OBJC_IMAGEINFO_SIGNED_CLASS_RO),
+        }
     require(set(records) == {"arm64", "arm64e"}, "missing native architecture")
-    return records
+    return records, metadata
+
+
+def native_slices(data):
+    """Check both real signed device slices; Debian architecture is separate."""
+    return _native_readback(data)[0]
+
+
+def macho_metadata(data):
+    """Return the hardened metadata read from the actual universal dylib bytes."""
+    return _native_readback(data)[1]
 
 
 def validate_build(folder, scheme, commit, run_id):
@@ -126,9 +182,13 @@ def validate_build(folder, scheme, commit, run_id):
                 f"missing or unsafe companion output: {name}")
     data = (folder / DYLIB).read_bytes()
     slices = native_slices(data)
+    actual_metadata = macho_metadata(data)
     require(set(manifest.get("architectures", [])) == set(slices) and manifest.get("native_floors") == slices
             and manifest.get("dylib_bytes") == len(data) and manifest.get("dylib_sha256") == hashlib.sha256(data).hexdigest(),
             "native companion bytes or floor differ from Actions evidence")
+    require(json.dumps(manifest.get("macho_slices"), sort_keys=True, separators=(",", ":"))
+            == json.dumps(actual_metadata, sort_keys=True, separators=(",", ":")),
+            "manifest macho_slices does not exactly match actual companion dylib")
     require(sha256_file(folder / FILTER) == manifest.get("filter_sha256")
             and plistlib.loads((folder / FILTER).read_bytes()) == {"Filter": {"Bundles": ["com.apple.springboard"]}},
             "companion may only inject into SpringBoard")

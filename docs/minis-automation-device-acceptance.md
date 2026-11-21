@@ -13,6 +13,10 @@
 
 保留两个包及各自相邻的 `manifest.json`，不要混用历史产物。核对 `source_commit`、`actions_run_id`、scheme 和实际 DEB SHA-256。普通版 App、TrollStore IPA 或旧 helper 身份报告不能代替这两个 DEB 的安装验证。
 
+自 2026-11-21 的 SpringBoard 安全模式 A/B 之后，还必须核对 companion 的 `automation-build/build.json`：`macho_slices.arm64e.signed_class_ro` 必须为 `false`，`objc_imageinfo_flags` 应为 `0x40`，`uuid` 非空，且 `chained_fixups` 为 `true`。这组值来自最终签名后的 fat dylib，不接受只检查编译命令。旧产物中的 `0x50` 是目前最强的 iOS 15.1.1 崩溃候选；若拿到的包仍为 `0x50`，不要安装。
+
+新系统会接受这种 unsigned class-RO 镜像，但会在 SpringBoard 进程中进入 class-RO 兼容模式。运行验收必须同时区分“iOS 15 能加载并完成自动化”和“iOS 16+ 能加载并完成自动化”；没有后者的真机证据时，只能确认构建下限定和兼容策略，不能宣称加固状态等价。
+
 安装 companion 后，通过设备已有越狱工具的用户界面重启 SpringBoard，使 tweak 加载。本指南不执行或提供自动重启系统进程的命令。之后手动唤醒、解锁设备，打开 Minis Root。
 
 选一个没有私人数据、支持编辑文本且其输入框能由辅助功能树读回的独立测试 App。测试 App 不能是 Minis 或 SpringBoard。先人工准备好一个空输入区，记录它的实际 bundle ID。不能假设某个系统 App、按钮名称或坐标一定存在。

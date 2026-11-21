@@ -22,6 +22,8 @@ bash jailbreak/automation/build.sh roothide "$RUNNER_TEMP/automation-roothide"
 
 只需要 Xcode、系统 SDK、clang、lipo、codesign 和 Python；不用 Theos/Logos，也不会执行设备安装或 respring。`build.sh` 读取 `GITHUB_SHA` 和 `GITHUB_RUN_ID`，输出已签名的通用 arm64/arm64e dylib、SpringBoard filter、`build.json`、`source-lock.json`、日志及许可证。Rootless 运行依赖 tweak injection runtime；RootHide 另依赖 `roothide` 核心。重启 SpringBoard 后才加载新 tweak，应由用户在安装工具中手动执行。
 
+arm64e slice 单独使用 `-fno-ptrauth-objc-class-ro`，输出 iOS 15 可消费的 legacy class-RO 布局；其它 arm64e PAC 保持开启。`verify_build.py` 与 DEB 打包器都会从最终二进制读取每个 fat slice 的 UUID、`__objc_imageinfo` 和 chained-fixups 元数据，并要求 `SignedClassRO=false`。较新的 objc4 会用进程级 class-RO 兼容模式接受该镜像，完整 SignedClassRO 不能由单个 arm64e slice 同时兼容 iOS 15 与 OS 新语义。
+
 ```sh
 python3 jailbreak/automation/test_native.py --static
 ```

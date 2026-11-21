@@ -1,6 +1,6 @@
 # Minis Automation：跨 App 自动化接续方案
 
-状态：2026-11-21 的实现契约与源码依据。主要服务端、Minis 授权界面、MCP 接线、图像落盘和验收校验器已进入源码，仍在 GitHub Actions 验证与修复；没有本轮真机成功结论。下文保留设计取舍，当前具体实现以 `jailbreak/automation/`、`AutomationMCPController.swift` 和 Python MCP 源码为准。
+状态：2026-11-21 的实现契约与源码依据。主要服务端、Minis 授权界面、MCP 接线、图像落盘和验收校验器已进入源码。iOS 15.1.1 RootHide 真机已经确认旧 companion 会使 SpringBoard 进入安全模式，停用 `MinisAutomation` 后恢复正常；arm64e Objective-C class-RO 元数据是目前最强的兼容性解释，但崩溃报告没有直接列出 companion 镜像，仍须由同提交 Actions 构建和后续真机复测确认。当前没有跨 App 自动化成功结论。下文保留设计取舍，当前具体实现以 `jailbreak/automation/`、`AutomationMCPController.swift` 和 Python MCP 源码为准。
 
 ## 目标与现状
 
@@ -11,6 +11,10 @@
 最短实现路径是在 SpringBoard 中运行独立的 `Minis Automation` companion，复用钉定版本 iOS MCP 的设备实现，增加本项目的有限授权层。Minis 通过现有 HTTP MCP 客户端访问本机服务；授权有效期不依赖 Minis 是否始终处于前台。保持当前四工具的逐次前台确认，并为跨 App 会话使用独立的开始、停止和到期机制。
 
 已实现的原生会话固定为 180 秒，reader 最多接受 600 秒的协议上限，但 UI 不提供延长或自动续期。companion 使用纯 Xcode/Clang 构造函数注册控制入口，无 Logos hook、PreferenceLoader 或 Theos 构建依赖；只依赖现有 tweak 注入环境，RootHide 另依赖官方 `roothide` 核心库。`prepare_sources.py` 校验原始上游每文件哈希，生成独立命名空间与受限执行源码；`build.sh`、`verify_build.py` 和 `package_automation_deb.py` 检查两架构最低系统、签名、链接、过滤器及归档。
+
+iOS 15.1.1 的崩溃报告显示，SpringBoard 在 companion 启动约 1.09 秒后于 `systemhook → dlopen → libinjector → objc map_images` 触发 `SIGSEGV`；关闭 companion 后安全模式退出，构成决定性真机 A/B。旧 arm64e 最终产物的 `__objc_imageinfo.flags` 为 `0x50`，其中第 4 位是 `SignedClassRO`。iOS 15 的 `objc4-838` 世代不消费这个新语义，而较新的 `objc4-841.13` 才把它当作 signed class-RO。修复只对 arm64e 增加 `-fno-ptrauth-objc-class-ro`，保留 calls、returns、isa 和其他 data-pointer PAC；最终产物必须为 `SignedClassRO=false`、仍有每架构 UUID，并在 arm64e 保留 `LC_DYLD_CHAINED_FIXUPS`。CI 还会用同 SDK 编译 arm64、默认 arm64e、兼容 arm64e 三个 Objective-C 小类，断言只有第 4 位发生变化，并用 `clang -###` 精确检查其余 PAC 选项仍为正启用。
+
+这是一项真实的兼容取舍：较新的 objc4 会识别 unsigned arm64e class-RO，并在整个 SpringBoard 进程中关闭 class-RO 指针认证，以兼容该镜像；其它 PAC 不受这个开关影响。iOS 16+ 的启动与功能因此保留，但 class-RO 强化会进入兼容模式。若未来要求 iOS 16+ 也保持完整 SignedClassRO，必须另做按系统代际选择两套 arm64e 镜像的加载层；当前单个 arm64e slice 无法同时编码两种 class-RO 行为。
 
 同一 boot 内已停止的授权 ID 和时间高水位不能被旧 START 恢复；旧请求 ticket 不会借新会话继续。HID、Unicode 输入和 App 切换在执行前重查有效会话与锁屏状态，长按等待按不超过 10ms 的片段检查撤销，释放触点/按键始终放行。这些是生产代码和门禁覆盖的契约；真实 SpringBoard 的私有 API 行为仍需设备证据。
 

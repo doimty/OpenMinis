@@ -6,6 +6,7 @@ output="${2:?absolute fresh output directory required}"
 case "$scheme" in rootless|roothide) ;; *) exit 2 ;; esac
 case "$output" in /*) ;; *) printf 'Output directory must be absolute\n' >&2; exit 2 ;; esac
 test "$(uname -s)" = Darwin
+test "${GITHUB_ACTIONS:-}" = true
 task_root="$(cd -- "$(dirname -- "$0")" && pwd)"
 test -n "${GITHUB_SHA:-}" -a -n "${GITHUB_RUN_ID:-}"
 mkdir -p "$output"
@@ -41,6 +42,12 @@ for arch in arm64 arm64e; do
     -O2 -Wall -Wextra -Wno-unused-function -Wno-deprecated-declarations -Wno-nullability-completeness
     -I "$work/source" -I "$work/include"
     "-DOMMA_BUILD_COMMIT=\"$GITHUB_SHA\"" "-DOMMA_BUILD_RUN_ID=\"$GITHUB_RUN_ID\"")
+  if [ "$arch" = arm64e ]; then
+    # iOS 15's objc4 predates SignedClassRO image metadata. Keep arm64e PAC
+    # for calls, returns, isa, and other data pointers, but use the legacy
+    # class RO layout. Newer runtimes accept it in a compatibility mode.
+    flags+=(-fno-ptrauth-objc-class-ro)
+  fi
   if [ "$scheme" = roothide ]; then flags+=(-DMCP_ROOTHIDE=1); else flags+=(-DMCP_ROOTLESS=1); fi
   for source in "$work/source/"*.m; do
     xcrun --sdk iphoneos clang "${flags[@]}" -c "$source" -o "$work/$arch/$(basename "${source%.m}").o"

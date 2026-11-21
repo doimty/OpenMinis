@@ -10,11 +10,16 @@ import sys
 import tempfile
 
 from prepare_sources import prepare
+from verify_build import OBJC_IMAGEINFO_SIGNED_CLASS_RO, macho_metadata
 
 ROOT = Path(__file__).resolve().parent
 
 
 def static():
+    build = (ROOT / "build.sh").read_text(encoding="utf-8")
+    assert 'test "${GITHUB_ACTIONS:-}" = true' in build
+    assert 'if [ "$arch" = arm64e ]; then' in build
+    assert "flags+=(-fno-ptrauth-objc-class-ro)" in build
     with tempfile.TemporaryDirectory(prefix="minis-automation-source-") as temporary:
         folder = Path(temporary) / "generated"
         lock = prepare(folder)
@@ -47,6 +52,81 @@ def native():
         raise SystemExit("Native compilation runs only on GitHub Actions macOS.")
     with tempfile.TemporaryDirectory(prefix="minis-automation-native-") as temporary:
         folder = Path(temporary)
+        source = folder / "ClassROProbe.m"
+        source.write_text(
+            "__attribute__((objc_root_class))\n"
+            "@interface OMMAAClassROProbe\n"
+            "@end\n"
+            "@implementation OMMAAClassROProbe\n"
+            "@end\n",
+            encoding="utf-8",
+        )
+        sdk = subprocess.check_output(
+            ["xcrun", "--sdk", "iphoneos", "--show-sdk-path"], text=True
+        ).strip()
+        arm64_object = folder / "ClassROProbe.arm64.o"
+        default_object = folder / "ClassROProbe.default.o"
+        compatible_object = folder / "ClassROProbe.ios15.o"
+        compiler = [
+            "xcrun", "clang", "-target", "arm64e-apple-ios15.0", "-isysroot", sdk,
+            "-fobjc-arc", "-fblocks", "-Wall", "-Wextra", "-Werror", "-c", str(source),
+        ]
+        arm64_compiler = compiler.copy()
+        arm64_compiler[3] = "arm64-apple-ios15.0"
+        subprocess.run(
+            arm64_compiler + ["-o", str(arm64_object)],
+            check=True,
+            timeout=120,
+        )
+        subprocess.run(compiler + ["-o", str(default_object)], check=True, timeout=120)
+        subprocess.run(
+            compiler + ["-fno-ptrauth-objc-class-ro", "-o", str(compatible_object)],
+            check=True,
+            timeout=120,
+        )
+        arm64_metadata = macho_metadata(arm64_object)["arm64"]
+        default_metadata = macho_metadata(default_object)["arm64e"]
+        compatible_metadata = macho_metadata(compatible_object)["arm64e"]
+        arm64_flags = arm64_metadata["objc_imageinfo_flags"]
+        default_flags = default_metadata["objc_imageinfo_flags"]
+        compatible_flags = compatible_metadata["objc_imageinfo_flags"]
+        assert not arm64_flags & OBJC_IMAGEINFO_SIGNED_CLASS_RO, (
+            f"arm64 unexpectedly emitted SignedClassRO: {arm64_flags:#x}")
+        assert default_flags & OBJC_IMAGEINFO_SIGNED_CLASS_RO, (
+            f"default arm64e metadata did not exercise SignedClassRO: {default_flags:#x}")
+        assert not compatible_flags & OBJC_IMAGEINFO_SIGNED_CLASS_RO, (
+            "-fno-ptrauth-objc-class-ro did not clear SignedClassRO: "
+            f"{compatible_flags:#x}")
+        assert default_flags & ~OBJC_IMAGEINFO_SIGNED_CLASS_RO == compatible_flags, (
+            "the compatibility flag changed unrelated image flags: "
+            f"{default_flags:#x} -> {compatible_flags:#x}")
+
+        driver = subprocess.run(
+            compiler + ["-fno-ptrauth-objc-class-ro", "-###"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        driver_text = driver.stdout + driver.stderr
+        required_pac_flags = (
+            "-fptrauth-calls",
+            "-fptrauth-returns",
+            "-fptrauth-intrinsics",
+            "-fptrauth-indirect-gotos",
+            "-fptrauth-auth-traps",
+            "-fptrauth-vtable-pointer-address-discrimination",
+            "-fptrauth-vtable-pointer-type-discrimination",
+            "-fptrauth-objc-isa",
+            "-fptrauth-objc-interface-sel",
+        )
+        for flag in required_pac_flags:
+            assert re.search(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", driver_text), (
+                f"arm64e compatibility build lost required PAC flag: {flag}")
+        assert not re.search(
+            r"(?<![\w-])-fptrauth-objc-class-ro(?![\w-])", driver_text
+        ), "arm64e compatibility build unexpectedly enabled SignedClassRO"
+
         fixture = folder / "fixture"
         fixture.mkdir(mode=0o700)
         binary = folder / "session-tests"

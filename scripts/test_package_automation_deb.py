@@ -15,7 +15,8 @@ COMMIT = "a" * 40
 RUN_ID = "44902887891"
 
 
-def slice_image(subtype, minimum="15.0", *, signature=True):
+def slice_image(subtype, minimum="15.0", *, signature=True, imageinfo_version=0, imageinfo_flags=0x40,
+                include_imageinfo=True, include_uuid=True, chained_fixups=True):
     parts = [int(part) for part in minimum.split(".")]
     encoded = (parts[0] << 16) | (parts[1] << 8)
     floor = struct.pack("<6I", 0x32, 24, 2, encoded, encoded, 0)
@@ -23,15 +24,49 @@ def slice_image(subtype, minimum="15.0", *, signature=True):
     identity_length = ((24 + len(name) + 7) // 8) * 8
     identity = struct.pack("<6I", 0xD, identity_length, 24, 0, 0x10000, 0x10000) + name
     identity += b"\0" * (identity_length - len(identity))
-    commands = floor + identity
+    uuid = bytes.fromhex("00112233445566778899aabbccddee") + bytes([subtype])
+    uuid_command = struct.pack("<2I", companion.LC_UUID, 24) + uuid
+    section_count = 1 if include_imageinfo else 0
+    segment_length = 72 + section_count * 80
+    has_chained_fixups = (subtype & 0x00FFFFFF) == 2 and chained_fixups
+    command_bytes = 24 + (24 if include_uuid else 0) + identity_length + segment_length
+    command_bytes += 16 if has_chained_fixups else 0
+    command_bytes += 16 if signature else 0
+    imageinfo_offset = 32 + command_bytes
+    payload = struct.pack("<2I", imageinfo_version, imageinfo_flags) if include_imageinfo else b""
+    fixups_offset = imageinfo_offset + len(payload)
+    if has_chained_fixups:
+        payload += b"\x01\0\0\0\x08\0\0\0"
+    signature_offset = imageinfo_offset + len(payload)
     if signature:
-        commands += struct.pack("<4I", 0x1D, 16, 32 + len(commands) + 16, 8)
-    header = struct.pack("<8I", 0xFEEDFACF, 0x0100000C, subtype, 6, 3 if signature else 2, len(commands), 0, 0)
-    return header + commands + (b"\xfa\xde\x0c\xc0\0\0\0\x08" if signature else b"")
+        payload += b"\xfa\xde\x0c\xc0\0\0\0\x08"
+    segment = struct.pack("<II16sQQQQIIII", companion.LC_SEGMENT_64, segment_length, b"__DATA",
+                          0x1000, 0x1000, 0, 32 + command_bytes + len(payload), 7, 3, section_count, 0)
+    if include_imageinfo:
+        segment += struct.pack("<16s16sQQIIIIIIII", b"__objc_imageinfo", b"__DATA",
+                               0x1000, 8, imageinfo_offset, 3, 0, 0, 0, 0, 0, 0)
+    commands = floor
+    if include_uuid:
+        commands += uuid_command
+    commands += identity + segment
+    if has_chained_fixups:
+        commands += struct.pack("<4I", companion.LC_DYLD_CHAINED_FIXUPS, 16, fixups_offset, 8)
+    if signature:
+        commands += struct.pack("<4I", 0x1D, 16, signature_offset, 8)
+    command_count = 3 + (1 if include_uuid else 0) + (1 if has_chained_fixups else 0) + (1 if signature else 0)
+    header = struct.pack("<8I", 0xFEEDFACF, companion.CPU_TYPE_ARM64, subtype, 6,
+                         command_count, len(commands), 0, 0)
+    return header + commands + payload
 
 
-def universal(*, minimum="15.0", signature=True):
-    first, second = slice_image(0, minimum, signature=signature), slice_image(2, minimum, signature=signature)
+def universal(*, minimum="15.0", signature=True, imageinfo_version=0, imageinfo_flags=0x40,
+              include_imageinfo=True, include_uuid=True, chained_fixups=True):
+    first = slice_image(0, minimum, signature=signature, imageinfo_version=imageinfo_version,
+                        imageinfo_flags=imageinfo_flags, include_imageinfo=include_imageinfo,
+                        include_uuid=include_uuid, chained_fixups=chained_fixups)
+    second = slice_image(2, minimum, signature=signature, imageinfo_version=imageinfo_version,
+                         imageinfo_flags=imageinfo_flags, include_imageinfo=include_imageinfo,
+                         include_uuid=include_uuid, chained_fixups=chained_fixups)
     start, next_start = 64, 64 + ((len(first) + 15) // 16) * 16
     table = (struct.pack(">2I", 0xCAFEBABE, 2)
              + struct.pack(">5I", 0x0100000C, 0, start, len(first), 4)
@@ -46,7 +81,8 @@ class CompanionPackageTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.build_dir = self.root / "build"
         self.build_dir.mkdir()
-        (self.build_dir / companion.DYLIB).write_bytes(universal())
+        dylib = universal()
+        (self.build_dir / companion.DYLIB).write_bytes(dylib)
         (self.build_dir / companion.FILTER).write_bytes(
             plistlib.dumps({"Filter": {"Bundles": ["com.apple.springboard"]}}))
         for name in companion.DOCUMENTS:
@@ -59,7 +95,8 @@ class CompanionPackageTests(unittest.TestCase):
                          "source_commit": COMMIT, "actions_run_id": RUN_ID, "upstream_commit": companion.UPSTREAM,
                          "dylib_name": companion.DYLIB, "filter_name": companion.FILTER,
                          "signature_verified": True, "signature_entitlements": {},
-                         "architectures": ["arm64", "arm64e"], "native_floors": {"arm64": "15.0", "arm64e": "15.0"}}
+                         "architectures": ["arm64", "arm64e"], "native_floors": {"arm64": "15.0", "arm64e": "15.0"},
+                         "macho_slices": companion.macho_metadata(dylib)}
         self.save()
 
     def save(self):
@@ -112,6 +149,33 @@ class CompanionPackageTests(unittest.TestCase):
                 self.save()
                 with self.assertRaisesRegex(companion.PackageError, "signed iOS 15.0"):
                     companion.validate_build(self.build_dir, "rootless", COMMIT, RUN_ID)
+
+    def test_rehashed_signed_class_ro_is_rejected_from_actual_bytes(self):
+        data = universal(imageinfo_flags=0x50)
+        (self.build_dir / companion.DYLIB).write_bytes(data)
+        self.save()
+        with self.assertRaisesRegex(companion.PackageError, "SignedClassRO"):
+            companion.validate_build(self.build_dir, "rootless", COMMIT, RUN_ID)
+
+    def test_required_macho_metadata_cannot_be_hidden_by_rehashing(self):
+        cases = (
+            ({"include_imageinfo": False}, "__objc_imageinfo"),
+            ({"imageinfo_version": 1}, "version 0"),
+            ({"include_uuid": False}, "LC_UUID"),
+            ({"chained_fixups": False}, "LC_DYLD_CHAINED_FIXUPS"),
+        )
+        for options, message in cases:
+            with self.subTest(options=options):
+                (self.build_dir / companion.DYLIB).write_bytes(universal(**options))
+                self.save()
+                with self.assertRaisesRegex(companion.PackageError, message):
+                    companion.validate_build(self.build_dir, "rootless", COMMIT, RUN_ID)
+
+    def test_manifest_macho_metadata_must_match_actual_bytes(self):
+        self.manifest.pop("macho_slices")
+        self.save()
+        with self.assertRaisesRegex(companion.PackageError, "macho_slices"):
+            companion.validate_build(self.build_dir, "rootless", COMMIT, RUN_ID)
 
     def test_filter_cannot_inject_into_other_app_even_with_updated_hash(self):
         (self.build_dir / companion.FILTER).write_bytes(plistlib.dumps({"Filter": {"Bundles": ["com.apple.Preferences"]}}))
