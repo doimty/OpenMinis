@@ -2,7 +2,7 @@
 """Static root-client contracts and opt-in Actions-only native gate tests.
 
 `--static` does not invoke a compiler. `--native` exercises the production
-authorization reducer and worker handoff and a non-spawning C harness on macOS.
+authorization reducer, worker handoff and non-spawning C harnesses on macOS.
 Neither mode is evidence of an iOS persona transition or device root access.
 """
 from __future__ import annotations
@@ -15,6 +15,7 @@ import tempfile
 
 REPO = Path(__file__).resolve().parents[1]
 CLIENT = REPO / "src/ios/Diagnostics/RootManagementClient.c"
+HELPER_PATH_HARNESS = REPO / "tests/RootManagementHelperPathHarness.c"
 HEADER = CLIENT.with_suffix(".h")
 MODEL = CLIENT.with_name("RootManagementAuthorization.swift")
 RUNNER = CLIENT.with_name("RootManagementRunner.swift")
@@ -33,7 +34,9 @@ def static_checks():
                   "OM_ROOT_OUTPUT_CAPACITY 4096", "POSIX_SPAWN_CLOEXEC_DEFAULT", "WNOHANG"):
         assert token in client, token
     assert '"/Applications/MinisRoot.app"' in client
+    assert '"/var/jb/Applications/MinisRoot.app"' in client
     assert '"/private/var/jb/Applications/MinisRoot.app"' in client
+    assert "installed_bundles" in client and "realpath(installed_bundles[index]" in client
     assert "getenv(" not in client and "environ" not in client.replace("environment", "")
     assert "system(" not in client and "popen(" not in client and '"/bin/sh"' not in client
     assert 'set_persona(&attributes, 99, 1)' in client
@@ -77,6 +80,11 @@ def native_checks():
                         str(REPO / "tests/RootManagementClientHarness.c"),
                         "-o", str(out / "client")], check=True, timeout=60)
         subprocess.run([str(out / "client")], check=True, timeout=5)
+        fixture = out / "path-fixture"
+        fixture.mkdir()
+        subprocess.run([*clang, str(HELPER_PATH_HARNESS), "-o", str(out / "helper-path")],
+                       check=True, timeout=60)
+        subprocess.run([str(out / "helper-path"), str(fixture)], check=True, timeout=5)
 
 
 def main():

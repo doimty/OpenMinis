@@ -59,6 +59,15 @@ class RootIdentityTests(unittest.TestCase):
     def test_templates_are_exact_and_share_stays_sandboxed(self):
         root.validate_templates()
         self.assertTrue(root.expected_entitlements("app")["com.apple.private.persona-mgmt"])
+        for role in ("app", "helper"):
+            entitlements = root.expected_entitlements(role)
+            for key in ("platform-application", "com.apple.private.security.no-sandbox",
+                        "com.apple.private.security.storage.AppBundles",
+                        "com.apple.private.security.storage.AppDataContainers"):
+                with self.subTest(role=role, key=key):
+                    self.assertIs(entitlements[key], True)
+        self.assertIs(root.expected_entitlements("app")["uicache.app-data-container-required"], True)
+        self.assertNotIn("uicache.app-data-container-required", root.expected_entitlements("helper"))
         share = root.expected_entitlements("share")
         self.assertNotIn("com.apple.private.persona-mgmt", share)
         self.assertNotIn("com.apple.private.security.no-sandbox", share)
@@ -69,6 +78,8 @@ class RootIdentityTests(unittest.TestCase):
             self.assertNotIn("com.apple.private.security.no-sandbox", entitlements)
             self.assertNotIn("platform-application", entitlements)
             self.assertNotIn("com.apple.private.persona-mgmt", entitlements)
+            self.assertNotIn("uicache.app-data-container-required", entitlements)
+            self.assertNotIn("com.apple.private.security.storage.AppBundles", entitlements)
             self.assertEqual(entitlements["application-identifier"], root.ROOT_ID + root.ROOT_ROLE_SUFFIXES[role])
             self.assertEqual(entitlements["com.apple.security.application-groups"], [root.ROOT_GROUP])
 

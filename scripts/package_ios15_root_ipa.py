@@ -101,7 +101,9 @@ def expected_entitlements(role: str) -> dict:
     if role == "helper":
         return {"get-task-allow": False,
                 "com.apple.private.security.no-sandbox": True,
-                "platform-application": True}
+                "platform-application": True,
+                "com.apple.private.security.storage.AppBundles": True,
+                "com.apple.private.security.storage.AppDataContainers": True}
     if role not in {"app", "share", "fileprovider", "widget"}:
         raise PackageError(f"unknown root signature role: {role}")
     bundle_suffix = ROOT_ROLE_SUFFIXES[role]
@@ -115,7 +117,11 @@ def expected_entitlements(role: str) -> dict:
     if role == "app":
         values.update({"com.apple.private.security.no-sandbox": True,
                        "platform-application": True,
+                       "com.apple.private.security.storage.AppBundles": True,
                        "com.apple.private.security.storage.AppDataContainers": True,
+                       # RootHide uicache otherwise treats no-sandbox apps as
+                       # containerless. Minis keeps its own Library and data.
+                       "uicache.app-data-container-required": True,
                        "com.apple.private.persona-mgmt": True})
     return values
 

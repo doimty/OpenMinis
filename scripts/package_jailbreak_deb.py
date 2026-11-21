@@ -203,8 +203,11 @@ def control_members(manifest: dict, scheme: str, installed_kib: int) -> dict:
     arch, app, uicache = SCHEMES[scheme]
     floor, run = manifest["package_floor"], manifest["actions_run_id"]
     version = f"{manifest['marketing_version']}+ci{run}+ios{floor}"
+    dependencies = f"firmware (>= {floor}), uikittools"
+    if scheme == "roothide":
+        dependencies += ", roothide"
     control = (f"Package: {ROOT_ID}\nName: Minis Root\nVersion: {version}\nArchitecture: {arch}\n"
-               f"Depends: firmware (>= {floor}), uikittools\nMaintainer: OpenMinis\nSection: Applications\n"
+               f"Depends: {dependencies}\nMaintainer: OpenMinis\nSection: Applications\n"
                f"Installed-Size: {installed_kib}\nDescription: Minis with device tools on jailbroken iOS\n"
                f"X-Minis-Source-Commit: {manifest['source_commit']}\nX-Minis-Actions-Run: {run}\n"
                f"X-Minis-Install-Floor: {floor}\nX-Minis-Package-Schema: 1\nX-Minis-Jailbreak-Scheme: {scheme}\n")

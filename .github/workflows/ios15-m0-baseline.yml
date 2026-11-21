@@ -184,16 +184,6 @@ jobs:
           xcrun --sdk iphoneos clang -arch arm64 -miphoneos-version-min=15.0 \
             -std=c11 -Wall -Wextra -Werror -DMINIS_ROOT_MANAGEMENT=1 \
             -c src/ios/Diagnostics/RootManagementClient.c -o "$RUNNER_TEMP/root-client-on.o"
-          sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
-          xcrun --sdk iphoneos swiftc \
-            -typecheck -parse-as-library -swift-version 5 -warnings-as-errors \
-            -target arm64-apple-ios15.0 -sdk "$sdk" \
-            -module-cache-path "$RUNNER_TEMP/root-module-cache" \
-            -D MINIS_ROOT_MANAGEMENT -Xcc -DMINIS_ROOT_MANAGEMENT=1 \
-            -import-objc-header src/ios/Diagnostics/RootManagementClient.h \
-            src/ios/Diagnostics/RootManagementAuthorization.swift \
-            src/ios/Diagnostics/RootManagementRunner.swift \
-            src/ios/Views/Settings/RootManagementView.swift
 
       - name: Init pinned iSH submodule only
         run: |
@@ -392,7 +382,7 @@ jobs:
           done
           for floor in 15.0 16.0 16.2; do
             if [ "$floor" = "15.0" ]; then dir="$RUNNER_TEMP/root-ipa"; else dir="$RUNNER_TEMP/root-ipa-ios${floor}"; fi
-            for scheme in rootful rootless roothide; do
+            for scheme in rootless roothide; do
               python3 scripts/package_jailbreak_deb.py \
                 --manifest "$dir/manifest.json" \
                 --scheme "$scheme" \

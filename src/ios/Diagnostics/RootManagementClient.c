@@ -41,6 +41,30 @@ static int64_t monotonic_ms(void) {
     return (int64_t)value.tv_sec * 1000 + value.tv_nsec / 1000000;
 }
 
+static int roothide_bundle_matches(const char *bundle) {
+    /* RootHide's dpkg creates .jbroot beside each Mach-O. Its public jbroot
+     * API maps the fixed logical install path to this boot's randomized root.
+     * Load it only for the RootHide fallback; other installations need no
+     * additional library, and no caller can supply a path to this function. */
+    const char suffix[] = "/.jbroot/usr/lib/libroothide.dylib";
+    char library[PATH_MAX];
+    size_t length = strlen(bundle);
+    if (length + sizeof(suffix) > sizeof(library)) return 0;
+    memcpy(library, bundle, length);
+    memcpy(library + length, suffix, sizeof(suffix));
+    void *handle = dlopen(library, RTLD_NOW | RTLD_LOCAL);
+    if (!handle) return 0;
+    typedef const char *(*jbroot_fn)(const char *);
+    jbroot_fn resolve_root = (jbroot_fn)dlsym(handle, "jbroot");
+    const char *installed = resolve_root ? resolve_root("/Applications/MinisRoot.app") : NULL;
+    char canonical[PATH_MAX];
+    int matches = installed && realpath(installed, canonical) && strcmp(bundle, canonical) == 0;
+    /* jbroot returns library-owned cached memory. Finish comparing before
+     * releasing the library; never free or retain the returned pointer. */
+    dlclose(handle);
+    return matches;
+}
+
 static int helper_path(char path[PATH_MAX]) {
     char executable[PATH_MAX];
     uint32_t capacity = sizeof(executable);
@@ -52,12 +76,24 @@ static int helper_path(char path[PATH_MAX]) {
     const char *bundle = strrchr(path, '/');
     if (!bundle) return EINVAL;
     if (strcmp(bundle + 1, "Minis.app") != 0) {
-        const char *rootful = "/Applications/MinisRoot.app";
-        const char *rootless = "/var/jb/Applications/MinisRoot.app";
-        const char *rootlessCanonical = "/private/var/jb/Applications/MinisRoot.app";
-        if (strcmp(path, rootful) != 0 && strcmp(path, rootless) != 0 &&
-            strcmp(path, rootlessCanonical) != 0)
-            return EINVAL;
+        /* /var/jb may resolve into preboot. Compare the two canonical bundle
+         * directories, but leave the helper itself unresolved for lstat. */
+        static const char *const installed_bundles[] = {
+            "/Applications/MinisRoot.app",
+            "/var/jb/Applications/MinisRoot.app",
+            "/private/var/jb/Applications/MinisRoot.app",
+        };
+        char installed_bundle[PATH_MAX];
+        int matched = 0;
+        const size_t count = sizeof(installed_bundles) / sizeof(installed_bundles[0]);
+        for (size_t index = 0; index < count; ++index) {
+            if (realpath(installed_bundles[index], installed_bundle) &&
+                strcmp(path, installed_bundle) == 0) {
+                matched = 1;
+                break;
+            }
+        }
+        if (!matched && !roothide_bundle_matches(path)) return EINVAL;
     }
     const char suffix[] = "/minis-rootprobe";
     if (strlen(path) + sizeof(suffix) > PATH_MAX) return ENAMETOOLONG;

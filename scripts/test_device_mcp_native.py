@@ -3,8 +3,8 @@ import argparse
 import importlib.util
 import json
 import io
-import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -138,19 +138,38 @@ class DeviceProtocolTests(unittest.TestCase):
 
     def test_device_mcp_ui_has_simplified_and_traditional_chinese(self):
         catalog = json.loads((IOS / "Localizable.xcstrings").read_text(encoding="utf-8"))["strings"]
-        keys = (
+        keys = {
             "Allow device tool requests", "Show device tools", "Copy device activity report",
             "Clear device activity report", "This device", "Minis device tools",
+            "Deny", "Allow once", "Allow once: %@?",
+            "Allows model, screen size and display brightness requests while Minis is in the foreground. Each call asks you to allow it once. Leaving the app turns this off.",
             "Share this device’s model and iOS version with the requesting tool?",
             "Share the screen dimensions and scale with the requesting tool?",
             "Share the current display brightness with the requesting tool?",
             "Set display brightness?",
-        )
-        for key in keys:
+            "The matching bundled helper reported UID 0 and EUID 0 for this operation.",
+            "Root execution has not been verified by this result.",
+        }
+        keys.update(device_server.TOOLS.values())
+        # Root operation titles and protocol failures remain stable English
+        # values for reports; their presentation resolves through the catalog.
+        view = (IOS / "Views/Settings/RootManagementView.swift").read_text(encoding="utf-8")
+        keys.update(re.findall(r'(?:Text|Section|row|Toggle|Button|navigationTitle)\("([^"\\]*)"', view))
+        for path in ("Diagnostics/RootManagementAuthorization.swift", "Diagnostics/RootManagementRunner.swift"):
+            source = (IOS / path).read_text(encoding="utf-8")
+            keys.update(re.findall(r'(?:return |validationError = )"([^"\\]+[ .][^"\\]*)"', source))
+            keys.update(re.findall(r'return \(nil, "([^"\\]+)"\)', source))
+        keys.discard("iOS")  # Product name, identical in every language.
+        for key in sorted(keys):
             with self.subTest(key=key):
                 localizations = catalog[key]["localizations"]
-                self.assertIn("zh-Hans", localizations)
-                self.assertIn("zh-Hant", localizations)
+                for locale in ("en", "zh-Hans", "zh-Hant"):
+                    unit = localizations[locale]["stringUnit"]
+                    self.assertEqual(unit["state"], "translated")
+                    self.assertTrue(unit["value"].strip())
+                    self.assertEqual(unit["value"].count("%@"), key.count("%@"))
+                    if locale != "en":
+                        self.assertNotEqual(unit["value"], key)
 
 
 def native():
@@ -177,7 +196,8 @@ def native():
                         "-Xcc", "-I" + str(IOS / "NativeOffloads"), "-import-objc-header", str(headers),
                         str(runner.with_name("RootManagementAuthorization.swift")),
                         str(runner), str(APPROVAL), str(IOS / "Shared/AppLocalization.swift"),
-                        str(localization_bundle), str(BRIDGE)], check=True, timeout=180)
+                        str(localization_bundle), str(BRIDGE),
+                        str(IOS / "Views/Settings/RootManagementView.swift")], check=True, timeout=180)
 
 
 if __name__ == "__main__":

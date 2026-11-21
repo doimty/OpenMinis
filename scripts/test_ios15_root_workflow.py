@@ -23,11 +23,13 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("-fsyntax-only", root_build)
         self.assertIn("Minis-Swift.h", root_build)
 
-    def test_three_root_floors_and_all_jailbreak_schemes_are_packaged(self):
+    def test_three_root_floors_and_requested_jailbreak_schemes_are_packaged(self):
         self.assertIn('--minimum-os "15.0"', self.source)
         self.assertIn('for floor in 16.0 16.2', self.source)
-        for scheme in ("rootful", "rootless", "roothide"):
+        for scheme in ("rootless", "roothide"):
             self.assertIn(f'--scheme "$scheme"', self.source)
+        self.assertIn("for scheme in rootless roothide; do", self.source)
+        self.assertNotIn("for scheme in rootful rootless roothide; do", self.source)
         self.assertIn("scripts/package_jailbreak_deb.py", self.source)
         self.assertIn("deb-*/manifest.json", self.source)
 

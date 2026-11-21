@@ -230,7 +230,7 @@ struct MCPToolsSheet: View {
                                 Text(tool.name)
                                     .font(.body.monospaced())
                                 if !tool.description.isEmpty {
-                                    Text(tool.description)
+                                    Text(AppLocalizedDynamic(tool.description))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(3)

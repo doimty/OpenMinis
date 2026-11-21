@@ -39,7 +39,7 @@ struct RootManagementView: View {
                 ))
                 .disabled(buildIdentity == nil || authorization.running != nil)
                 ForEach(RootManagementOperation.allCases) { operation in
-                    Button(operation.title) {
+                    Button(AppLocalizedDynamic(operation.title)) {
                         if authorization.request(operation) { confirmation = operation }
                     }
                         .disabled(buildIdentity == nil || !authorization.sessionEnabled ||
@@ -48,7 +48,7 @@ struct RootManagementView: View {
                 if let running = authorization.running {
                     HStack {
                         ProgressView()
-                        Text(running.title)
+                        Text(AppLocalizedDynamic(running.title))
                             .font(.system(size: 12))
                     }
                 }
@@ -60,7 +60,7 @@ struct RootManagementView: View {
 
             if let report {
                 Section("Last operation") {
-                    row("Requested", report.requestedOperation.rawValue)
+                    row("Requested operation", AppLocalizedDynamic(report.requestedOperation.title))
                     row("App UID · EUID", "\(report.transport.appUID) · \(report.transport.appEUID)")
                     row("Client stage", report.transport.stage)
                     row("Client errno", "\(report.transport.errorNumber)")
@@ -74,11 +74,11 @@ struct RootManagementView: View {
                         if let bytes = helper.bytes { row("File bytes", "\(bytes)") }
                     }
                     if let error = report.validationError {
-                        Text(error).foregroundStyle(.orange)
+                        Text(AppLocalizedDynamic(error)).foregroundStyle(.orange)
                     }
-                    Text(report.rootObserved
+                    Text(AppLocalizedDynamic(report.rootObserved
                          ? "The matching bundled helper reported UID 0 and EUID 0 for this operation."
-                         : "Root execution has not been verified by this result.")
+                         : "Root execution has not been verified by this result."))
                         .font(.system(size: 12))
                         .foregroundStyle(report.rootObserved ? .primary : .secondary)
                     if report.transport.timedOut || report.transport.terminationSignal != 0 {
@@ -98,8 +98,8 @@ struct RootManagementView: View {
         // separate from the grant so that this cannot consume/cancel the
         // pending operation before the primary button's action runs.
         .alert(item: $confirmation) { operation in
-            Alert(title: Text("Allow once: \(operation.title)?"),
-                  message: Text(operation.explanation),
+            Alert(title: Text(AppLocalized("Allow once: \(AppLocalizedDynamic(operation.title))?")),
+                  message: Text(AppLocalizedDynamic(operation.explanation)),
                   primaryButton: .default(Text("Allow once")) { execute(operation) },
                   secondaryButton: .cancel { authorization.cancel() })
         }
@@ -111,7 +111,7 @@ struct RootManagementView: View {
 
     private func row(_ label: String, _ value: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(label).font(.system(size: 13))
+            Text(AppLocalizedDynamic(label)).font(.system(size: 13))
             Spacer(minLength: 8)
             Text(value)
                 .font(.system(size: 12, design: .monospaced))

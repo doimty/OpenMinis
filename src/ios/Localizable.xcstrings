@@ -9412,6 +9412,414 @@
         }
       }
     },
+    "Deny" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Deny" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "拒绝" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "拒絕" } }
+      }
+    },
+    "Allow once: %@?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow once: %@?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "允许执行一次“%@”吗？" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "允許執行一次「%@」嗎？" } }
+      }
+    },
+    "Read the model and system version after confirmation on the device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Read the model and system version after confirmation on the device." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在设备上确认后，读取型号和系统版本。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在裝置上確認後，讀取機型和系統版本。" } }
+      }
+    },
+    "Read the screen size in points and its scale after confirmation on the device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Read the screen size in points and its scale after confirmation on the device." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在设备上确认后，读取屏幕尺寸（点）和缩放比例。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在裝置上確認後，讀取螢幕尺寸（點）和縮放比例。" } }
+      }
+    },
+    "Read display brightness (0 to 1) after confirmation on the device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Read display brightness (0 to 1) after confirmation on the device." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在设备上确认后，读取屏幕亮度（0 到 1）。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在裝置上確認後，讀取螢幕亮度（0 到 1）。" } }
+      }
+    },
+    "Set display brightness to an integer percentage after confirmation on the device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Set display brightness to an integer percentage after confirmation on the device." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在设备上确认后，以整数百分比设置屏幕亮度。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在裝置上確認後，以整數百分比設定螢幕亮度。" } }
+      }
+    },
+    "Root Management" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Root Management" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Root 管理" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Root 管理" } }
+      }
+    },
+    "Runs a bundled helper for one explicitly confirmed operation. The available operations inspect identity and create, read back or remove only a fixed diagnostic sample. Each operation needs a new confirmation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Runs a bundled helper for one explicitly confirmed operation. The available operations inspect identity and create, read back or remove only a fixed diagnostic sample. Each operation needs a new confirmation." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "内置辅助程序可检查运行身份，或创建、读回和删除固定的诊断样本。每次操作都需要单独确认。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "內建輔助程式可檢查執行身分，或建立、讀回及刪除固定的診斷樣本。每次操作都需要個別確認。" } }
+      }
+    },
+    "Build" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Build" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "构建信息" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "建置資訊" } }
+      }
+    },
+    "Bundle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Bundle" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "应用包标识符" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "App 套件識別碼" } }
+      }
+    },
+    "Source commit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Source commit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "源码提交" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "原始碼提交" } }
+      }
+    },
+    "Actions run" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Actions run" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Actions 运行编号" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Actions 執行編號" } }
+      }
+    },
+    "Root build identity is missing or invalid. Operations are disabled." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Root build identity is missing or invalid. Operations are disabled." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Root 构建信息缺失或无效，已停用相关操作。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Root 建置資訊遺失或無效，已停用相關操作。" } }
+      }
+    },
+    "Enable for this visit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enable for this visit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅本次启用" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "僅本次啟用" } }
+      }
+    },
+    "Restricted operations" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restricted operations" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "受限操作" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "受限操作" } }
+      }
+    },
+    "The grant is kept only in this view. Leaving the page or backgrounding revokes unused permission. A started operation may already have changed the fixed sample." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The grant is kept only in this view. Leaving the page or backgrounding revokes unused permission. A started operation may already have changed the fixed sample." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "授权仅在此页面有效。离开页面或将 App 切到后台会撤销尚未使用的授权。已开始的操作可能已经改动了样本。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "授權僅在此頁面有效。離開頁面或將 App 切到背景，會撤銷尚未使用的授權。已開始的操作可能已經更動樣本。" } }
+      }
+    },
+    "Last operation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last operation" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次操作" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "上次操作" } }
+      }
+    },
+    "Requested operation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Requested operation" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请求的操作" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "請求的操作" } }
+      }
+    },
+    "App UID · EUID" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "App UID · EUID" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主应用 UID · EUID" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "主 App UID · EUID" } }
+      }
+    },
+    "Client stage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Client stage" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "客户端阶段" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "用戶端階段" } }
+      }
+    },
+    "Client errno" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Client errno" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "客户端错误码" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "用戶端錯誤碼" } }
+      }
+    },
+    "Exit · signal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Exit · signal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出码 · 信号" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "結束碼 · 訊號" } }
+      }
+    },
+    "Helper UID · EUID" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Helper UID · EUID" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序 UID · EUID" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式 UID · EUID" } }
+      }
+    },
+    "Helper stage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Helper stage" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序阶段" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式階段" } }
+      }
+    },
+    "Helper errno" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Helper errno" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序错误码" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式錯誤碼" } }
+      }
+    },
+    "Sample ID" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sample ID" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "样本标识符" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "樣本識別碼" } }
+      }
+    },
+    "File inode" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "File inode" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件 inode" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "檔案 inode" } }
+      }
+    },
+    "File bytes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "File bytes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件字节数" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "檔案位元組數" } }
+      }
+    },
+    "The matching bundled helper reported UID 0 and EUID 0 for this operation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The matching bundled helper reported UID 0 and EUID 0 for this operation." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "与当前构建匹配的内置辅助程序报告：本次操作的 UID 和 EUID 均为 0。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "與目前建置相符的內建輔助程式回報：本次操作的 UID 和 EUID 均為 0。" } }
+      }
+    },
+    "Root execution has not been verified by this result." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Root execution has not been verified by this result." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此结果未能验证本次操作以 root 身份执行。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此結果無法驗證本次操作是否以 root 身分執行。" } }
+      }
+    },
+    "The operation did not complete normally. Its filesystem outcome is unknown; inspect the fixed sample before retrying." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The operation did not complete normally. Its filesystem outcome is unknown; inspect the fixed sample before retrying." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "操作未正常完成，无法确定文件是否已改动。请先检查固定样本，再决定是否重试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "操作未正常完成，無法確定檔案是否已更動。請先檢查固定樣本，再決定是否重試。" } }
+      }
+    },
+    "Copy scalar report" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy scalar report" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制标量报告" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "複製純量報告" } }
+      }
+    },
+    "Read helper identity" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Read helper identity" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "读取辅助程序身份" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "讀取輔助程式身分" } }
+      }
+    },
+    "Create fixed root sample" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create fixed root sample" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建固定 Root 样本" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "建立固定 Root 樣本" } }
+      }
+    },
+    "Read back fixed root sample" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Read back fixed root sample" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "读回固定 Root 样本" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "讀回固定 Root 樣本" } }
+      }
+    },
+    "Remove fixed root sample" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove fixed root sample" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除固定 Root 样本" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "刪除固定 Root 樣本" } }
+      }
+    },
+    "Run the bundled helper once to report its UID and EUID. It does not open or change the sample." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Run the bundled helper once to report its UID and EUID. It does not open or change the sample." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "运行一次内置辅助程序以读取其 UID 和 EUID。此次操作不会打开或修改样本。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "執行一次內建輔助程式以讀取其 UID 和 EUID。這項操作不會開啟或修改樣本。" } }
+      }
+    },
+    "Create only the known sample in /private/var/mobile/Library/OpenMinisRootProbe. An existing file with different content or permissions is refused." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create only the known sample in /private/var/mobile/Library/OpenMinisRootProbe. An existing file with different content or permissions is refused." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅在 /private/var/mobile/Library/OpenMinisRootProbe 中创建固定样本。若现有文件的内容或权限不符，将拒绝操作。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "僅在 /private/var/mobile/Library/OpenMinisRootProbe 中建立固定樣本。若現有檔案的內容或權限不符，將拒絕操作。" } }
+      }
+    },
+    "Read only the known sample and compare its exact marker, ownership and permissions. No file content is shown." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Read only the known sample and compare its exact marker, ownership and permissions. No file content is shown." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅读取固定样本，逐项核对标记、所有者和权限。不显示文件内容。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "僅讀取固定樣本，逐項核對標記、擁有者及權限。不顯示檔案內容。" } }
+      }
+    },
+    "Verify and remove only the known sample. The empty root-owned directory is kept." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Verify and remove only the known sample. The empty root-owned directory is kept." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅核对并删除固定样本，保留归 root 所有的空目录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "僅核對並刪除固定樣本，保留由 root 擁有的空目錄。" } }
+      }
+    },
+    "The client did not obtain a complete helper report." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The client did not obtain a complete helper report." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "客户端未收到辅助程序的完整报告。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "用戶端未收到輔助程式的完整報告。" } }
+      }
+    },
+    "The helper response was not the bounded scalar protocol." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper response was not the bounded scalar protocol." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序响应不符合标量协议的格式或大小限制。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式回應不符合純量通訊協定的格式或大小限制。" } }
+      }
+    },
+    "The helper schema or source commit does not match this installed app." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper schema or source commit does not match this installed app." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序的报告格式版本或源码提交与已安装的 App 不符。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式的報告格式版本或原始碼提交與已安裝的 App 不符。" } }
+      }
+    },
+    "The helper response did not correspond to the requested operation." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper response did not correspond to the requested operation." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序的响应与请求的操作不符。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式的回應與請求的操作不符。" } }
+      }
+    },
+    "The helper returned an unexpected sample identity." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper returned an unexpected sample identity." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序返回的样本标识符与预期不符。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式傳回的樣本識別碼與預期不符。" } }
+      }
+    },
+    "The helper returned invalid file identity metadata." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper returned invalid file identity metadata." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序返回的文件标识信息无效。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式傳回的檔案識別資訊無效。" } }
+      }
+    },
+    "The helper success response did not report root identity and a zero error." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper success response did not report root identity and a zero error." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序返回成功，但未同时报告 root 身份和错误码 0。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式回報成功，但未同時回報 root 身分和錯誤碼 0。" } }
+      }
+    },
+    "The helper did not confirm the fixed sample identity." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper did not confirm the fixed sample identity." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序未确认固定样本的标识符。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式未確認固定樣本的識別碼。" } }
+      }
+    },
+    "The helper did not confirm the complete fixed sample metadata." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper did not confirm the complete fixed sample metadata." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序未能确认固定样本的完整元数据。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式未能確認固定樣本的完整中繼資料。" } }
+      }
+    },
+    "The helper did not confirm removal of the fixed sample." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper did not confirm removal of the fixed sample." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序未确认固定样本已删除。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式未確認固定樣本已刪除。" } }
+      }
+    },
+    "The helper failure response did not include a positive error number." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The helper failure response did not include a positive error number." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "辅助程序报告失败，但未提供大于 0 的错误码。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式回報失敗，但未提供大於 0 的錯誤碼。" } }
+      }
+    },
     "Allow device tool requests" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9456,8 +9864,8 @@
       "extractionState" : "manual",
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Allows model, screen size and display brightness requests while Minis is in the foreground. Each call asks you to allow it once. Leaving the app turns this off." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "允许 Minis 在前台读取设备型号、屏幕尺寸和显示亮度。每次调用都会请求一次确认。离开 App 后会自动关闭。" } },
-        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "允許 Minis 在前景讀取裝置型號、螢幕尺寸和顯示亮度。每次呼叫都會請求一次確認。離開 App 後會自動關閉。" } }
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Minis 在前台时，工具可以请求读取设备型号、屏幕尺寸和亮度，也可以请求调节亮度。每次调用都需要单独确认。离开 App 后会自动关闭。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Minis 在前景時，工具可以請求讀取裝置機型、螢幕尺寸和亮度，也可以請求調整亮度。每次呼叫都需要個別確認。離開 App 後會自動關閉。" } }
       }
     },
     "Minis device tools" : {

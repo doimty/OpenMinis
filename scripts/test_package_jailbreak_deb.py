@@ -126,7 +126,8 @@ class DebTests(unittest.TestCase):
                 control = dict(line.split(": ", 1) for line in controls["control"][1].decode().splitlines())
                 self.assertEqual(control["Package"], "com.openminis.app.root")
                 self.assertEqual(control["Architecture"], architecture)
-                self.assertEqual(control["Depends"], "firmware (>= 16.2), uikittools")
+                self.assertEqual(control["Depends"], "firmware (>= 16.2), uikittools"
+                                 + (", roothide" if scheme == "roothide" else ""))
                 self.assertEqual(control["X-Minis-Actions-Run"], RUN_ID)
                 self.assertEqual(control["X-Minis-Source-Commit"], COMMIT)
                 self.assertEqual(control["X-Minis-Install-Floor"], "16.2")
@@ -214,6 +215,20 @@ class DebTests(unittest.TestCase):
         self.save()
         with self.assertRaisesRegex(deb.PackageError, "signature evidence"):
             self.package()
+
+    def test_refuses_missing_roothide_access_or_app_data_container_signature(self):
+        original = json.loads(json.dumps(self.manifest["signature_entitlements"]))
+        for role, keys in ((".", ("com.apple.private.security.storage.AppBundles",
+                                  "uicache.app-data-container-required")),
+                           (root.HELPER_NAME, ("com.apple.private.security.storage.AppBundles",
+                                               "com.apple.private.security.storage.AppDataContainers"))):
+            for key in keys:
+                with self.subTest(role=role, key=key):
+                    self.manifest["signature_entitlements"] = json.loads(json.dumps(original))
+                    self.manifest["signature_entitlements"][role].pop(key)
+                    self.save()
+                    with self.assertRaisesRegex(deb.PackageError, "signature evidence"):
+                        self.package("roothide")
 
     def test_rechecks_actual_macho_floor_even_if_ipa_and_executable_hashes_are_replaced(self):
         modified = image("16.1")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect physical-device MCP receipts. Every device operation retains its normal confirmation."""
+"""采集真机 MCP 回执；每次设备操作仍需在前台单独确认。"""
 
 import argparse
 import json
@@ -114,37 +114,37 @@ def capture(output, *, runner=run_command, inform=speak):
 
     with new_output(output) as receipts:
         inform(f"正在保存原始 MCP JSONL：{output}")
-        inform("请保持 Minis 在前台。在 This device 中启用设备工具并清空此前的活动报告。")
+        inform("请保持 Minis 在前台。在“设置 → MCP 集成 → 本机”（This device）中启用设备工具并清空此前的活动报告。")
         inform("正常会出现九次原生确认；只拒绝第 4 次。回执包含设备型号、系统版本、屏幕尺寸、亮度及请求 UUID。")
         try:
             field = percent_argument(record_command(receipts, ["refresh", SERVER]))
-            call(receipts, "get_device_info", "allowed", "1/9 读取设备信息：点 Allow once。")
-            call(receipts, "get_screen_info", "allowed", "2/9 读取屏幕尺寸：点 Allow once。")
-            baseline = native_brightness(call(receipts, "get_brightness", "allowed", "3/9 读取原亮度：点 Allow once。"))
+            call(receipts, "get_device_info", "allowed", "1/9 读取设备信息：点“允许一次”（Allow once）。")
+            call(receipts, "get_screen_info", "allowed", "2/9 读取屏幕尺寸：点“允许一次”（Allow once）。")
+            baseline = native_brightness(call(receipts, "get_brightness", "allowed", "3/9 读取原亮度：点“允许一次”（Allow once）。"))
             original_percent = int(math.floor(baseline * 100 + 0.5))
             target = 70 if baseline <= 0.5 else 30
             inform(f"原亮度 {baseline * 100:.2f}%（恢复值 {original_percent}%）；测试值 {target}%。")
             restoration_needed = True
-            call(receipts, "set_brightness", "denied", f"4/9 请求改成 {target}%：这一次务必点 Deny。", {field: target})
-            unchanged = native_brightness(call(receipts, "get_brightness", "allowed", "5/9 确认拒绝后亮度未变：点 Allow once。"))
+            call(receipts, "set_brightness", "denied", f"4/9 请求改成 {target}%：这一次务必点“拒绝”（Deny）。", {field: target})
+            unchanged = native_brightness(call(receipts, "get_brightness", "allowed", "5/9 确认拒绝后亮度未变：点“允许一次”（Allow once）。"))
             require(abs(unchanged - baseline) <= TOLERANCE, "拒绝后的读数与原亮度不符。")
-            write = native_brightness(call(receipts, "set_brightness", "allowed", f"6/9 允许改成 {target}%：点 Allow once。", {field: target}))
-            changed = native_brightness(call(receipts, "get_brightness", "allowed", "7/9 读回新的亮度：点 Allow once。"))
+            write = native_brightness(call(receipts, "set_brightness", "allowed", f"6/9 允许改成 {target}%：点“允许一次”（Allow once）。", {field: target}))
+            changed = native_brightness(call(receipts, "get_brightness", "allowed", "7/9 读回新的亮度：点“允许一次”（Allow once）。"))
             require(max(abs(write - target / 100), abs(changed - target / 100)) <= TOLERANCE, "写入或独立读回未达到测试亮度。")
-            write = native_brightness(call(receipts, "set_brightness", "allowed", f"8/9 恢复原亮度 {original_percent}%：点 Allow once。", {field: original_percent}))
-            final = native_brightness(call(receipts, "get_brightness", "allowed", "9/9 独立读回恢复结果：点 Allow once。"))
+            write = native_brightness(call(receipts, "set_brightness", "allowed", f"8/9 恢复原亮度 {original_percent}%：点“允许一次”（Allow once）。", {field: original_percent}))
+            final = native_brightness(call(receipts, "get_brightness", "allowed", "9/9 独立读回恢复结果：点“允许一次”（Allow once）。"))
             require(max(abs(write - baseline), abs(final - baseline)) <= TOLERANCE, "最终读回与原亮度不符。")
             restoration_needed = False
         finally:
             if restoration_needed:
                 inform(f"采集中断，未确认亮度已恢复。请用控制中心手动恢复到 {original_percent}%。未重试操作，已采集回执保留在 {output}。")
-    inform(f"原始回执文件：{output}。请在 Settings → MCP Integrations → This device 中复制设备活动报告，另存为 device.json。")
+    inform(f"原始回执文件：{output}。请在“设置 → MCP 集成 → 本机”中点“复制设备活动报告”，另存为 device.json。")
     inform("两份文件一起交给离线校验器，才可核对从 MCP 到原生操作的完整链路。")
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, required=True, help="new receipt JSONL path in an existing writable directory; never overwritten")
+    parser.add_argument("--output", type=Path, required=True, help="现有可写目录中的新 JSONL 回执路径；不会覆盖已有文件")
     args = parser.parse_args(argv)
     try:
         capture(args.output.expanduser())
