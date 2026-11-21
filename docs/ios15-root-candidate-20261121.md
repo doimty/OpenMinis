@@ -78,7 +78,7 @@ gh run download "<RUN_ID>" --repo doimty/OpenMinis `
 | iOS 16.0–16.1 | `16.0` | `root-ipa-ios16.0/Minis-<VERSION>-ios16.0-root-<COMMIT8>.ipa` | 分享、File Provider |
 | iOS 16.2 及更高 | `16.2` | `root-ipa-ios16.2/Minis-<VERSION>-ios16.2-root-<COMMIT8>.ipa` | 分享、File Provider、Widget |
 
-floor 是安装和打包下限，不代表表内每个系统版本均已通过运行验证。当前 Root 候选按 Debug 配置构建。另一个 `minis-standard-release-audit` artifact 只包含普通版 Release 的 `xcodebuild.log` 和 `audit.json`；`m1-ios15-probe` 是诊断证据，它们都不是这里的 Root 安装包。
+floor 是安装和打包下限，不代表表内每个系统版本均已通过运行验证。当前 Root IPA 与 DEB 按 Release 配置构建，release gate 同时校验 manifest 中的 `build_configuration`。另一个 `minis-standard-release-audit` artifact 只包含普通版 Release 的 `xcodebuild.log` 和 `audit.json`；`m1-ios15-probe` 是诊断证据，它们都不是这里的 Root 安装包。
 
 越狱版再按**现有越狱/bootstrap 的包架构**选择 scheme；不能只根据设备 CPU、iOS 版本或某个越狱品牌名称推断。两种 DEB 均位于 `deb-<FLOOR>-<SCHEME>/`，例如 15.0 档 rootless 是 `deb-15.0-rootless/`。
 

@@ -305,6 +305,8 @@ def verify_main_ips(
         require(manifest.get("file_access_profile") == "root-helper", f"{floor} root profile mismatch")
         require(manifest.get("package_floor") == floor and manifest.get("minimum_os") == floor,
                 f"{floor} root package floor mismatch")
+        require(manifest.get("build_configuration") == "Release",
+                f"{floor} root package must come from the Release configuration")
         version = manifest.get("marketing_version")
         require(isinstance(version, str) and re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", version) is not None,
                 f"{floor} root marketing version is invalid")
@@ -554,6 +556,7 @@ def verify_bundle(bundle_root: Path, commit: str, run_id: str, output_dir: Path)
         "schema": 1,
         "source_commit": commit,
         "actions_run_id": run_id,
+        "build": {"configuration": "Release"},
         "artifact_names": {
             "main": MAIN_ARTIFACT,
             **COMPANION_ARTIFACTS,
@@ -574,9 +577,27 @@ def verify_bundle(bundle_root: Path, commit: str, run_id: str, output_dir: Path)
             "exact_file_names": True,
             "manifest_hashes": True,
             "main_package_identities_and_floors": True,
+            "main_release_configuration": True,
             "main_deb_payload_readback": True,
             "companion_build_and_archive_readback": True,
             "source_commit_and_actions_run_matched": True,
+        },
+        "runtime_validation": {
+            "device_runtime_verified": False,
+            "ios15": {
+                "package_supported": True,
+                "runtime_status": "pending_post_download_device_acceptance",
+                "required_evidence_tool": "scripts/verify_automation_device_evidence.py",
+            },
+            "ios16_plus": {
+                "package_supported": True,
+                "runtime_status": "unverified",
+                "reason": "no physical iOS 16+ device evidence in this release run",
+            },
+            "arm64e_class_ro": {
+                "layout": "compatibility_unsigned_class_ro",
+                "runtime_status": "unverified_on_ios16_plus",
+            },
         },
     }
     output_dir.mkdir(parents=True, exist_ok=True)

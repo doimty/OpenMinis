@@ -1,8 +1,8 @@
 #if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT
 #import <UIKit/UIKit.h>
 #import "DeviceMCPOffload.h"
+#import "DeviceMCPNativeBridge.h"
 #import "NativeOffloadUtils.h"
-#import "Minis-Swift.h"
 #include "kernel/native_offload.h"
 #include <string.h>
 #include <stdatomic.h>

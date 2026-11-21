@@ -151,6 +151,26 @@ def option(tokens, key):
     return tokens[tokens.index(key) + 1] if key in tokens and tokens.index(key) + 1 < len(tokens) else None
 
 
+def response_file_belongs_to_build(path: Path, objects: Path, derived: Path, *, link_command: bool) -> bool:
+    """Accept target inputs plus Swift package linker response files from this build."""
+    if path.parent == objects:
+        return True
+    if not link_command:
+        return False
+    intermediates = (derived / "Build/Intermediates.noindex").resolve()
+    try:
+        relative = path.relative_to(intermediates)
+    except ValueError:
+        return False
+    parts = relative.parts
+    if len(parts) != 6 or not parts[0].endswith(".build"):
+        return False
+    module = parts[0][:-len(".build")]
+    return (parts[1] == "Release-iphoneos" and parts[2] == parts[0]
+            and parts[3] == "Objects-normal" and parts[4] == "arm64"
+            and parts[5] == f"{module}-linker-args.resp")
+
+
 def reject_features(tokens):
     compact = [token for token in tokens if token not in {"-Xcc", "-Xfrontend"}]
     for index, token in enumerate(compact):
@@ -206,7 +226,9 @@ def compile_evidence(app: Path, derived: Path, log: Path) -> dict:
             if not token.startswith("@") or not token.endswith((".resp", ".SwiftFileList")):
                 continue
             path = Path(token[1:]).resolve()
-            require(path.parent == objects and path.is_file(), "compiler response file is missing or unrelated to this build")
+            require(path.is_file() and response_file_belongs_to_build(
+                path, objects, derived, link_command=link_command),
+                "compiler response file is missing or unrelated to this build")
             if path.suffix == ".SwiftFileList":
                 require(path.name == "Minis.SwiftFileList" and swift_command, "unrelated Swift input file list")
                 sources.update(Path(name).name for name in shlex.split(path.read_text(encoding="utf-8")))

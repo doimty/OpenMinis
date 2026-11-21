@@ -147,6 +147,32 @@ class AuditTests(unittest.TestCase):
         with self.assertRaisesRegex(audit.PackageError, "unrelated to this build"):
             self.evidence()
 
+    def test_accepts_swift_package_linker_args_from_the_same_release_link(self):
+        dependency_objects = (self.dd / "Build/Intermediates.noindex/SwiftMath.build"
+                              / "Release-iphoneos/SwiftMath.build/Objects-normal/arm64")
+        dependency_objects.mkdir(parents=True)
+        dependency_args = dependency_objects / "SwiftMath-linker-args.resp"
+        dependency_args.write_text("-Xlinker -rpath -Xlinker @loader_path/Frameworks")
+        old = self.log.read_text()
+        link = next(line for line in old.splitlines() if str(self.app / "Minis").replace("\\", "/") in line)
+        self.log.write_text(old.replace(link, link + " @" + dependency_args.as_posix()))
+
+        result = self.evidence()
+
+        self.assertIn(dependency_args.name, result["compiler_and_link_input_hashes"])
+        self.assertFalse(result["root_defines_seen"])
+
+    def test_rejects_unrelated_response_file_on_the_release_link(self):
+        unrelated = self.dd / "unrelated/SwiftMath-linker-args.resp"
+        unrelated.parent.mkdir()
+        unrelated.write_text("-Xlinker -rpath -Xlinker @loader_path/Frameworks")
+        old = self.log.read_text()
+        link = next(line for line in old.splitlines() if str(self.app / "Minis").replace("\\", "/") in line)
+        self.log.write_text(old.replace(link, link + " @" + unrelated.as_posix()))
+
+        with self.assertRaisesRegex(audit.PackageError, "unrelated to this build"):
+            self.evidence()
+
 
 if __name__ == "__main__":
     unittest.main()

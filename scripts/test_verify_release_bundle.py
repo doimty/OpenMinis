@@ -60,6 +60,7 @@ class ReleaseBundleTests(unittest.TestCase):
                 "minimum_os": floor,
                 "marketing_version": VERSION,
                 "file_access_profile": "root-helper",
+                "build_configuration": "Release",
                 "source_commit": COMMIT,
                 "actions_run_id": RUN_ID,
                 "root_management_schema": 1,
@@ -198,6 +199,14 @@ class ReleaseBundleTests(unittest.TestCase):
         self.assertEqual(len(index["packages"]["main_ipas"]), 3)
         self.assertEqual(len(index["packages"]["main_debs"]), 6)
         self.assertEqual(len(index["packages"]["companion_debs"]), 2)
+        self.assertEqual(index["build"]["configuration"], "Release")
+        self.assertTrue(index["verification"]["main_release_configuration"])
+        self.assertFalse(index["runtime_validation"]["device_runtime_verified"])
+        self.assertEqual(index["runtime_validation"]["ios15"]["runtime_status"],
+                         "pending_post_download_device_acceptance")
+        self.assertEqual(index["runtime_validation"]["ios16_plus"]["runtime_status"], "unverified")
+        self.assertEqual(index["runtime_validation"]["arm64e_class_ro"]["runtime_status"],
+                         "unverified_on_ios16_plus")
         self.assertTrue((self.output / "release-index.json").is_file())
         sums = (self.output / "SHA256SUMS").read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(sums), 30)
@@ -214,6 +223,14 @@ class ReleaseBundleTests(unittest.TestCase):
         manifest["plugins_kept"] = ["MinisShare.appex"]
         write_json(manifest_path, manifest)
         with self.assertRaisesRegex(release.BundleError, "extensions differ"):
+            self.verify()
+
+    def test_rejects_debug_root_build(self) -> None:
+        manifest_path = self.root / "main/root-ipa/manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["build_configuration"] = "Debug"
+        write_json(manifest_path, manifest)
+        with self.assertRaisesRegex(release.BundleError, "Release configuration"):
             self.verify()
 
     def test_rejects_cross_run_companion_evidence(self) -> None:
@@ -246,6 +263,9 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("actions/cache/restore@", root)
         self.assertIn("git submodule update --init --recursive deps/ish", root)
         self.assertIn("-destination 'generic/platform=iOS'", root)
+        self.assertIn("-configuration Release", root)
+        self.assertNotIn("-configuration Debug", root)
+        self.assertGreaterEqual(root.count("--configuration Release"), 2)
         self.assertIn('OTHER_SWIFT_FLAGS="-DMINIS_ROOT_MANAGEMENT', root)
         self.assertIn("roothelper/main.c", root)
         self.assertIn("for floor in 16.0 16.2; do", root)

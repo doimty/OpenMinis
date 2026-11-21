@@ -416,8 +416,11 @@ def verify_root_archive(
 
 
 def package_root_app(source_app: Path, helper: Path, output_dir: Path, *,
-                     commit: str, run_id: str, minimum_os: str = "15.0") -> dict:
+                     commit: str, run_id: str, minimum_os: str = "15.0",
+                     configuration: str = "Release") -> dict:
     validate_build_identity(commit, run_id)
+    if configuration not in {"Debug", "Release"}:
+        raise PackageError(f"unsupported Root build configuration: {configuration}")
     validate_templates()
     if minimum_os not in ROOT_PRODUCT_FLOORS:
         raise PackageError(f"unsupported Root package floor: {minimum_os}")
@@ -469,7 +472,8 @@ def package_root_app(source_app: Path, helper: Path, output_dir: Path, *,
         "bundle_id": ROOT_ID, "app_group_id": ROOT_GROUP,
         "minimum_os": info.get("MinimumOSVersion"),
         "marketing_version": info.get("CFBundleShortVersionString"),
-        "file_access_profile": "root-helper", "purpose": "TrollStore root-helper candidate; device acceptance required",
+        "build_configuration": configuration,
+        "file_access_profile": "root-helper", "purpose": "Root release product; device acceptance required",
         "source_commit": commit, "actions_run_id": run_id, "root_management_schema": SCHEMA,
         "package_floor": minimum_os,
         "host_file_probe_build": info["MinisHostFileProbeBuild"],
@@ -497,7 +501,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", type=Path)
     parser.add_argument("--derived-data", type=Path)
-    parser.add_argument("--configuration", default="Debug")
+    parser.add_argument("--configuration", default="Release", choices=("Debug", "Release"))
     parser.add_argument("--helper", type=Path, required=True)
     parser.add_argument("--minimum-os", choices=tuple(ROOT_PRODUCT_FLOORS), default="15.0")
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -508,7 +512,7 @@ def main() -> int:
         source = resolve_app(args.app, args.derived_data, args.configuration)
         result = package_root_app(source, args.helper, args.output_dir,
                                   commit=args.source_commit, run_id=args.actions_run_id,
-                                  minimum_os=args.minimum_os)
+                                  minimum_os=args.minimum_os, configuration=args.configuration)
     except (PackageError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

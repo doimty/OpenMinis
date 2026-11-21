@@ -12,6 +12,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 IOS = ROOT / "src/ios"
 SOURCE = IOS / "Diagnostics/AutomationMCPController.swift"
+BRIDGE_HEADER = IOS / "NativeOffloads/AutomationMCPBridge.h"
 
 
 class AutomationSourceTests(unittest.TestCase):
@@ -31,12 +32,13 @@ class AutomationSourceTests(unittest.TestCase):
     def test_transport_has_no_guest_grant_or_persisted_user_configuration(self):
         offload = (IOS / "NativeOffloads/AutomationMCPOffload.m").read_text(encoding="utf-8")
         self.assertTrue(offload.startswith("#if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT"))
-        self.assertLess(
-            offload.index("#import <UIKit/UIKit.h>"),
-            offload.index('#import "Minis-Swift.h"'),
-        )
+        self.assertIn('#import "AutomationMCPBridge.h"', offload)
+        self.assertNotIn('#import "Minis-Swift.h"', offload)
         self.assertIn("if (argc != 1) return NOFF_EXIT_INVALID_ARGS", offload)
         self.assertIn("[AutomationMCPBridge transport]", offload)
+        header = BRIDGE_HEADER.read_text(encoding="utf-8")
+        self.assertIn("@interface AutomationMCPBridge : NSObject", header)
+        self.assertIn("+ (NSString *)transport;", header)
         self.assertNotIn("requestStart", offload)
         store = (IOS / "Agent/Session/MCPStore.swift").read_text(encoding="utf-8")
         self.assertIn('reservedAutomationServerName = "minis-automation"', store)

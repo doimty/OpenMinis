@@ -243,6 +243,7 @@ class RootNativeProofTests(unittest.TestCase):
             self.assertFalse((app / root.HELPER_NAME).exists())
             self.assertFalse(manifest["root_runtime_verified"])
             self.assertFalse(manifest["device_runtime_verified"])
+            self.assertEqual(manifest["build_configuration"], "Release")
             self.assertTrue(manifest["root_helper_included"])
             self.assertEqual(manifest["root_helper_operations"], ["identity", "prepare", "check", "cleanup"])
             self.assertEqual(manifest["root_helper_mode"], "0755")

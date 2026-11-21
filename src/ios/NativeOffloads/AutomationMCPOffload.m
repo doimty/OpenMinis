@@ -1,8 +1,7 @@
 #if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT
-#import <UIKit/UIKit.h>
 #import "AutomationMCPOffload.h"
+#import "AutomationMCPBridge.h"
 #import "NativeOffloadUtils.h"
-#import "Minis-Swift.h"
 #include "kernel/native_offload.h"
 #include <errno.h>
 #include <unistd.h>

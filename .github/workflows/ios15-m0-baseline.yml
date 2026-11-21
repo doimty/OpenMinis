@@ -288,7 +288,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/root-build"
           set +e
           xcodebuild \
-            -project src/ios/Minis.xcodeproj -scheme Minis -configuration Debug \
+            -project src/ios/Minis.xcodeproj -scheme Minis -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/root-dd" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO \
@@ -328,6 +328,7 @@ jobs:
             roothelper/main.c -o "$RUNNER_TEMP/root-build/minis-rootprobe"
           python3 scripts/package_ios15_root_ipa.py \
             --derived-data "$RUNNER_TEMP/root-dd" \
+            --configuration Release \
             --helper "$RUNNER_TEMP/root-build/minis-rootprobe" \
             --minimum-os "15.0" \
             --output-dir "$RUNNER_TEMP/root-ipa" \
@@ -335,6 +336,7 @@ jobs:
           for floor in 16.0 16.2; do
             python3 scripts/package_ios15_root_ipa.py \
               --derived-data "$RUNNER_TEMP/root-dd" \
+              --configuration Release \
               --helper "$RUNNER_TEMP/root-build/minis-rootprobe" \
               --minimum-os "$floor" \
               --output-dir "$RUNNER_TEMP/root-ipa-ios${floor}" \

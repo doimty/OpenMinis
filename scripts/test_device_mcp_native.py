@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 IOS = ROOT / "src/ios"
 APPROVAL = IOS / "Diagnostics/DeviceMCPApproval.swift"
 BRIDGE = IOS / "Diagnostics/DeviceMCPNativeBridge.swift"
+BRIDGE_HEADER = IOS / "NativeOffloads/DeviceMCPNativeBridge.h"
 CONFIG = IOS / "default_mount/usr/local/lib/minis-mcp-cli/utils/config.py"
 SPEC = importlib.util.spec_from_file_location("device_test_config", CONFIG)
 config = importlib.util.module_from_spec(SPEC)
@@ -127,11 +128,14 @@ class DeviceProtocolTests(unittest.TestCase):
         self.assertIn('native_offload_add_handler("minis-device-call", device_mcp_call)', offload)
         self.assertIn('"com.openminis.app.root"', offload)
         self.assertTrue(offload.startswith("#if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT"))
-        self.assertLess(
-            offload.index("#import <UIKit/UIKit.h>"),
-            offload.index('#import "Minis-Swift.h"'),
-        )
+        self.assertIn('#import "DeviceMCPNativeBridge.h"', offload)
+        self.assertNotIn('#import "Minis-Swift.h"', offload)
+        header = BRIDGE_HEADER.read_text(encoding="utf-8")
+        self.assertIn("+ (BOOL)available;", header)
+        self.assertIn("+ (NSDictionary<NSString *, id> *)request:(NSString *)identifier", header)
+        self.assertIn("epoch:(uint64_t)epoch;", header)
         self.assertIn("#if MINIS_ROOT_MANAGEMENT && os(iOS)", BRIDGE.read_text(encoding="utf-8"))
+        self.assertIn("@objc(request:operation:value:epoch:)", BRIDGE.read_text(encoding="utf-8"))
 
     def test_reserved_server_cannot_enter_the_native_store_or_sync(self):
         store = (IOS / "Agent/Session/MCPStore.swift").read_text(encoding="utf-8")
