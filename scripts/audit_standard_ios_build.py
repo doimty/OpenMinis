@@ -160,9 +160,11 @@ def prestrip_symbols(path: Path, *, reject_all=False) -> str:
     names = {fields[-1] for line in result.stdout.splitlines() if len(fields := line.split()) >= 3}
     require(not names.intersection(SYMBOLS), f"Root/MCP implementation found in {path.name}")
     if reject_all:
-        require(not any(len(fields := line.split()) >= 3 and fields[-2] in {"T", "t"}
-                        and not re.fullmatch(r"ltmp[0-9]+", fields[-1]) for line in result.stdout.splitlines()),
-                f"guarded translation unit emitted executable code: {path.name}")
+        unexpected = [fields[-1] for line in result.stdout.splitlines()
+                      if len(fields := line.split()) >= 3 and fields[-2] in {"T", "t"}
+                      and not re.fullmatch(r"ltmp[0-9]+", fields[-1])]
+        require(not unexpected,
+                f"guarded translation unit emitted executable code: {path.name}: {', '.join(unexpected)}")
     return sha256_file(path)
 
 

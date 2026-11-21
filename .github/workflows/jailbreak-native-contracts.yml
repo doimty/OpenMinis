@@ -1,0 +1,34 @@
+name: jailbreak-native-contracts
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Root native contracts
+    runs-on: macos-26-intel
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Production guard object probe
+        run: python3 scripts/check_standard_native_guards.py --output-dir "$RUNNER_TEMP/native-guards"
+      - name: Production Root path and authorization gates
+        run: |
+          python3 tests/test_root_management_contract.py --native
+          python3 scripts/test_device_mcp_native.py --native
+      - name: Upload object probe and symbols
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: root-native-object-probe
+          path: ${{ runner.temp }}/native-guards
+          if-no-files-found: error
+          retention-days: 14
