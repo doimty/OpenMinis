@@ -78,9 +78,11 @@ struct MCPServerConfig: Codable, Identifiable, Hashable {
 final class MCPStore: ObservableObject {
     static let shared = MCPStore()
     nonisolated static let reservedDeviceServerName = "minis-device"
+    nonisolated static let reservedAutomationServerName = "minis-automation"
 
     nonisolated static func isReservedServerName(_ name: String) -> Bool {
-        name.caseInsensitiveCompare(reservedDeviceServerName) == .orderedSame
+        name.caseInsensitiveCompare(reservedDeviceServerName) == .orderedSame ||
+        name.caseInsensitiveCompare(reservedAutomationServerName) == .orderedSame
     }
 
     @Published private(set) var servers: [MCPServerConfig] = []

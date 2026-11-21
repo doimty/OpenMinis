@@ -29,6 +29,7 @@ struct MCPIntegrationsView: View {
         List {
 #if MINIS_ROOT_MANAGEMENT
             if DeviceMCPController.shared.supported { DeviceMCPSettingsSection() }
+            if AutomationMCPController.shared.supported { AutomationMCPSettingsSection() }
 #endif
             if store.servers.isEmpty {
                 emptyState
@@ -164,6 +165,39 @@ struct MCPIntegrationsView: View {
 }
 
 #if MINIS_ROOT_MANAGEMENT
+private struct AutomationMCPSettingsSection: View {
+    @ObservedObject private var controller = AutomationMCPController.shared
+    @State private var tools = false
+
+    var body: some View {
+        Section {
+            if controller.secondsRemaining > 0 {
+                HStack {
+                    Text(AppLocalized("Time remaining"))
+                    Spacer()
+                    Text("\(controller.secondsRemaining / 60):\(String(format: "%02d", controller.secondsRemaining % 60))")
+                        .font(.body.monospacedDigit())
+                        .accessibilityLabel(AppLocalized("Time remaining"))
+                }
+                Button(AppLocalized("Show automation tools")) { tools = true }
+                Button(AppLocalized("Stop automation session"), role: .destructive) { controller.stop() }
+            } else {
+                Button(AppLocalized("Start automation session")) { controller.requestStart() }
+                    .disabled(controller.confirming)
+            }
+            if let error = controller.errorKey {
+                Text(AppLocalizedDynamic(error)).font(.caption).foregroundStyle(.orange)
+            }
+        } header: {
+            Text(AppLocalized("Cross-app automation"))
+        } footer: {
+            Text(AppLocalized("Requires Minis Automation on a jailbroken device. A confirmed session lasts up to 3 minutes and can observe the full screen and operate other apps. It continues when Minis leaves the foreground, and stops when you end it or time runs out. iOS may suspend Minis or end its background time sooner. No session starts or renews automatically."))
+        }
+        .sheet(isPresented: $tools) { MCPToolsSheet(serverName: AutomationMCPController.serverName) }
+        .onAppear { controller.refresh() }
+    }
+}
+
 private struct DeviceMCPSettingsSection: View {
     @ObservedObject private var controller = DeviceMCPController.shared
     @State private var tools = false

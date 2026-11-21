@@ -9820,6 +9820,86 @@
         "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "輔助程式回報失敗，但未提供大於 0 的錯誤碼。" } }
       }
     },
+    "Cross-app automation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cross-app automation" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "跨 App 自动化" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "跨 App 自動化" } }
+      }
+    },
+    "Time remaining" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Time remaining" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剩余时间" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "剩餘時間" } }
+      }
+    },
+    "Show automation tools" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show automation tools" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示自动化工具" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "顯示自動化工具" } }
+      }
+    },
+    "Start automation session" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start automation session" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始自动化会话" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "開始自動化工作階段" } }
+      }
+    },
+    "Stop automation session" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stop automation session" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "停止自动化会话" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "停止自動化工作階段" } }
+      }
+    },
+    "Start automation session?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start automation session?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始自动化会话吗？" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "要開始自動化工作階段嗎？" } }
+      }
+    },
+    "Start for 3 minutes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start for 3 minutes" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启用 3 分钟" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "啟用 3 分鐘" } }
+      }
+    },
+    "For 3 minutes, Minis tools can observe the full screen and UI, take screenshots, tap, swipe, type, and switch or close other apps. This stays authorized when Minis is in the background. Already completed actions cannot be undone. You can stop the session at any time." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "For 3 minutes, Minis tools can observe the full screen and UI, take screenshots, tap, swipe, type, and switch or close other apps. This stays authorized when Minis is in the background. Already completed actions cannot be undone. You can stop the session at any time." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "接下来的 3 分钟内，Minis 工具可以观察整个屏幕和界面、截图、点击、滑动、输入，以及切换或关闭其他 App。Minis 进入后台后，这项授权仍然有效。已完成的操作无法撤销，你可以随时停止会话。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "接下來 3 分鐘內，Minis 工具可以觀察整個螢幕和介面、截圖、點按、滑動、輸入，以及切換或關閉其他 App。Minis 進入背景後，這項授權仍然有效。已完成的操作無法復原，你可以隨時停止工作階段。" } }
+      }
+    },
+    "Requires Minis Automation on a jailbroken device. A confirmed session lasts up to 3 minutes and can observe the full screen and operate other apps. It continues when Minis leaves the foreground, and stops when you end it or time runs out. iOS may suspend Minis or end its background time sooner. No session starts or renews automatically." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Requires Minis Automation on a jailbroken device. A confirmed session lasts up to 3 minutes and can observe the full screen and operate other apps. It continues when Minis leaves the foreground, and stops when you end it or time runs out. iOS may suspend Minis or end its background time sooner. No session starts or renews automatically." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "需要在越狱设备上安装 Minis Automation。确认后的会话最长持续 3 分钟，可以观察整个屏幕并操作其他 App。Minis 离开前台后，授权仍有效；手动停止或到期后结束。iOS 可能提前暂停 Minis 或结束其后台执行时间。会话不会自动开始或续期。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "需要在越獄裝置上安裝 Minis Automation。確認後的工作階段最長持續 3 分鐘，可以觀察整個螢幕並操作其他 App。Minis 離開前景後，授權仍有效；手動停止或到期後結束。iOS 可能提早暫停 Minis 或結束其背景執行時間。工作階段不會自動開始或續期。" } }
+      }
+    },
+    "The automation session could not be created securely. Check the companion installation and try again." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The automation session could not be created securely. Check the companion installation and try again." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法安全创建自动化会话，请检查配套组件的安装后重试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法安全建立自動化工作階段，請檢查配套元件的安裝後再試。" } }
+      }
+    },
     "Allow device tool requests" : {
       "extractionState" : "manual",
       "localizations" : {

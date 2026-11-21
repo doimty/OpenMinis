@@ -73,6 +73,7 @@
 #if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT
 #import "RootManagementClient.h"
 #import "DeviceMCPOffload.h"
+#import "AutomationMCPOffload.h"
 #endif
 
 // rclone static library (deps/frameworks/Rclone.xcframework) — see RcloneBridge.swift

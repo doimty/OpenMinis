@@ -8,6 +8,9 @@ on:
       - .github/workflows/jailbreak-native-contracts.yml
       - scripts/audit_standard_ios_build.py
       - scripts/check_standard_native_guards.py
+      - scripts/test_automation_mcp_native.py
+      - src/ios/Diagnostics/AutomationMCPController.swift
+      - tests/AutomationSessionTests.swift
 
 permissions:
   contents: read
@@ -30,6 +33,7 @@ jobs:
         run: |
           python3 tests/test_root_management_contract.py --native
           python3 scripts/test_device_mcp_native.py --native
+          python3 scripts/test_automation_mcp_native.py --native
       - name: Upload object probe and symbols
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

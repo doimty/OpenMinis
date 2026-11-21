@@ -23,11 +23,13 @@ TARGETS = {
     "MinisFileProvider": (".FileProvider", "16.0", "FileProvider/FileProvider.entitlements", "com.apple.fileprovider-nonui"),
     "AgentWidgetExtension": (".AgentWidget", "16.2", "AgentWidget/AgentWidget.entitlements", "com.apple.widgetkit-extension"),
 }
-C_INPUTS = {"RootManagementClient.c", "DeviceMCPOffload.m", "HostFileAccessProbe.c", "ISHKernel.m"}
-SWIFT_INPUTS = {"RootManagementAuthorization.swift", "RootManagementRunner.swift", "DeviceMCPNativeBridge.swift"}
+C_INPUTS = {"RootManagementClient.c", "DeviceMCPOffload.m", "AutomationMCPOffload.m", "HostFileAccessProbe.c", "ISHKernel.m"}
+SWIFT_INPUTS = {"RootManagementAuthorization.swift", "RootManagementRunner.swift", "DeviceMCPNativeBridge.swift",
+                "AutomationMCPController.swift"}
 FEATURES = {"MINIS_ROOT_MANAGEMENT", "MINIS_HOST_FILE_PROBE"}
 SYMBOLS = {"_OMRootManagementRun", "_OMRootManagementClientVersion", "_device_mcp_offload_register",
-           "_OMHostFileProbeReadSample", "_OMHostFileProbeSamplePath", "_OBJC_CLASS_$_DeviceMCPNativeBridge"}
+           "_automation_mcp_offload_register", "_OMHostFileProbeReadSample", "_OMHostFileProbeSamplePath",
+           "_OBJC_CLASS_$_DeviceMCPNativeBridge", "_OBJC_CLASS_$_AutomationMCPBridge"}
 # Xcode's scheme enables coverage even for Release. Clang emits this one
 # runtime reference function in an otherwise empty translation unit. The
 # Actions native guard probe verifies coverage-on/off objects and a real

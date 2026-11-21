@@ -67,6 +67,8 @@
 		52F025010000000000000030 /* DeviceMCPApproval.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000034 /* DeviceMCPApproval.swift */; };
 		52F025010000000000000031 /* DeviceMCPNativeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000035 /* DeviceMCPNativeBridge.swift */; };
 		52F025010000000000000032 /* DeviceMCPOffload.m in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000036 /* DeviceMCPOffload.m */; };
+		52F025010000000000000040 /* AutomationMCPController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000042 /* AutomationMCPController.swift */; };
+		52F025010000000000000041 /* AutomationMCPOffload.m in Sources */ = {isa = PBXBuildFile; fileRef = 52F025010000000000000043 /* AutomationMCPOffload.m */; };
 		AA0838C02F3B941A00049557 /* RootfsResetButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */; };
 		AA0838C32F3B941A00049557 /* RootfsManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */; };
 		AA0838CC2F3B941A00049557 /* StorageManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0838CD2F3B941A00049557 /* StorageManagementView.swift */; };
@@ -822,6 +824,9 @@
 		52F025010000000000000035 /* DeviceMCPNativeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceMCPNativeBridge.swift; sourceTree = "<group>"; };
 		52F025010000000000000036 /* DeviceMCPOffload.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DeviceMCPOffload.m; sourceTree = "<group>"; };
 		52F025010000000000000037 /* DeviceMCPOffload.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DeviceMCPOffload.h; sourceTree = "<group>"; };
+		52F025010000000000000042 /* AutomationMCPController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationMCPController.swift; sourceTree = "<group>"; };
+		52F025010000000000000043 /* AutomationMCPOffload.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AutomationMCPOffload.m; sourceTree = "<group>"; };
+		52F025010000000000000044 /* AutomationMCPOffload.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AutomationMCPOffload.h; sourceTree = "<group>"; };
 		AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsManagementView.swift; sourceTree = "<group>"; };
 		AA0838BF2F3B941A00049557 /* RootfsResetButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsResetButton.swift; sourceTree = "<group>"; };
 		AA0838CD2F3B941A00049557 /* StorageManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageManagementView.swift; sourceTree = "<group>"; };
@@ -2084,6 +2089,7 @@
 				52F025010000000000000015 /* RootManagementRunner.swift */,
 				52F025010000000000000034 /* DeviceMCPApproval.swift */,
 				52F025010000000000000035 /* DeviceMCPNativeBridge.swift */,
+				52F025010000000000000042 /* AutomationMCPController.swift */,
 			);
 			path = Diagnostics;
 			sourceTree = "<group>";
@@ -2255,6 +2261,8 @@
 				E5L2000A0 /* DeviceOffload.h */,
 				52F025010000000000000036 /* DeviceMCPOffload.m */,
 				52F025010000000000000037 /* DeviceMCPOffload.h */,
+				52F025010000000000000043 /* AutomationMCPOffload.m */,
+				52F025010000000000000044 /* AutomationMCPOffload.h */,
 				E5L2000A1 /* DeviceOffload.m */,
 				E5L2000B0 /* HomeKitOffload.h */,
 				E5L2000B1 /* HomeKitOffload.m */,
@@ -3229,6 +3237,8 @@
 				52F025010000000000000030 /* DeviceMCPApproval.swift in Sources */,
 				52F025010000000000000031 /* DeviceMCPNativeBridge.swift in Sources */,
 				52F025010000000000000032 /* DeviceMCPOffload.m in Sources */,
+				52F025010000000000000040 /* AutomationMCPController.swift in Sources */,
+				52F025010000000000000041 /* AutomationMCPOffload.m in Sources */,
 				BB1000100F700000000000AA /* ContextPolicy.swift in Sources */,
 				AADDA9E12F6ECCF400B66649 /* ThumbnailCache.swift in Sources */,
 				E5SRS0001 /* SessionRefreshScheduler.swift in Sources */,
