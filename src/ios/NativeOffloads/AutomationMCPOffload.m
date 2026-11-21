@@ -1,4 +1,5 @@
 #if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT
+#import <UIKit/UIKit.h>
 #import "AutomationMCPOffload.h"
 #import "NativeOffloadUtils.h"
 #import "Minis-Swift.h"

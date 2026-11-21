@@ -31,6 +31,10 @@ class AutomationSourceTests(unittest.TestCase):
     def test_transport_has_no_guest_grant_or_persisted_user_configuration(self):
         offload = (IOS / "NativeOffloads/AutomationMCPOffload.m").read_text(encoding="utf-8")
         self.assertTrue(offload.startswith("#if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT"))
+        self.assertLess(
+            offload.index("#import <UIKit/UIKit.h>"),
+            offload.index('#import "Minis-Swift.h"'),
+        )
         self.assertIn("if (argc != 1) return NOFF_EXIT_INVALID_ARGS", offload)
         self.assertIn("[AutomationMCPBridge transport]", offload)
         self.assertNotIn("requestStart", offload)

@@ -127,6 +127,10 @@ class DeviceProtocolTests(unittest.TestCase):
         self.assertIn('native_offload_add_handler("minis-device-call", device_mcp_call)', offload)
         self.assertIn('"com.openminis.app.root"', offload)
         self.assertTrue(offload.startswith("#if defined(MINIS_ROOT_MANAGEMENT) && MINIS_ROOT_MANAGEMENT"))
+        self.assertLess(
+            offload.index("#import <UIKit/UIKit.h>"),
+            offload.index('#import "Minis-Swift.h"'),
+        )
         self.assertIn("#if MINIS_ROOT_MANAGEMENT && os(iOS)", BRIDGE.read_text(encoding="utf-8"))
 
     def test_reserved_server_cannot_enter_the_native_store_or_sync(self):
