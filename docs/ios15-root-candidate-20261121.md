@@ -58,9 +58,24 @@ Root 版的 `minis-device` 是内置、保留名称的 STDIO MCP server，在“
 
 构建记录：`44899653106` 在原生类型检查中漏带本地化依赖而失败；`44900128255` 的普通 Release 实际编译成功，但审计把 LLVM 覆盖率的 `___llvm_profile_runtime_user` 误判为 Root 实现。后续 Actions 的真实宏关闭/开启对象探针已验证分类修复。`44906639474` 的 companion 首轮发现 macOS Bash 3 空数组和符号子串检查问题，两项均已修正。跨 App lifecycle、锁屏复查和验收报告仍在后续提交继续验证，交付时必须使用同一次最终 run 的主 App 与 companion。
 
-当前完整构建的跟踪入口为 [Actions 44907273441](https://github.com/doimty/OpenMinis/actions/runs/44907273441)，原生/companion 快速门禁为 [Actions 44907227207](https://github.com/doimty/OpenMinis/actions/runs/44907227207)。本文未记录最终成功结论或候选包校验值；后续源码修复必须改用对应新 run 的产物与 manifest。以实际提交和 run 为准，不能混用不同轮次的包。
+最终候选为 [Actions 44931905521](https://github.com/doimty/OpenMinis/actions/runs/44931905521)，提交 `1f0eb3890d300ecbdd2ea08c8af853a70ee8afe0`。该提交修复 Release 下 `-fvisibility=hidden` 把 `OMRootManagementClientVersion` 变成局部符号导致的打包失败：客户端哨兵改为 `used` + `visibility("default")`，打包脚本接受已定义的 `[Tt]` 文本符号并继续拒绝未定义引用。release gate（`Verify final release bundle`）已在该 run 通过，核对 30 个文件、3 份 IPA、6 份主 DEB、2 份 companion DEB 的命名、哈希、manifest 与 `source_commit`/`actions_run_id`；索引中的 `runtime_validation` 记录 iOS 15 待真机验收、iOS 16+ 未验证。旧 run 的产物与下表校验值无关，不能混用。
 
-在对应新 run 成功上传后，从 Actions 页面底部 Artifacts 下载 `minis-ios15-root-candidate`。该 artifact 保留 14 天，目标内容为三份 IPA、六份 DEB 及各自相邻的 `manifest.json`。前述旧 run 不包含本轮 Rootless 路径与汉化收尾修改，不能作为最终候选。下面的路径、版本、run 和文件名均为占位符，必须替换为实际下载内容；测试夹具生成的 IPA、DEB、manifest 或报告不能充当交付产物。
+从该 run 下载 `minis-ios15-root-candidate`（保留 14 天）得到三份 IPA、六份 DEB 及各自相邻的 `manifest.json`；跨 App companion 来自同一 run 的 `minis-automation-rootless` 或 `minis-automation-roothide`。测试夹具生成的 IPA、DEB、manifest 或报告不能充当交付产物。
+
+同一 run 的包级校验值（与 `minis-release-gate` 中的 `release-index.json`、`SHA256SUMS` 一致）：
+
+| 包 | 路径 | SHA-256 |
+| --- | --- | --- |
+| 主 App 15.0 RootHide | `main/deb-15.0-roothide/com.openminis.app.root_1.15+ci44931905521+ios15.0_iphoneos-arm64e.deb` | `ca3fe0f07dcc1b83cfb99d242f88d00e86deaefdfa4240c75900889af67f65ce` |
+| 主 App 15.0 Rootless | `main/deb-15.0-rootless/com.openminis.app.root_1.15+ci44931905521+ios15.0_iphoneos-arm64.deb` | `c7e35a8f1029397a4102616410b3df80599891808254fd9faaf0ca5c41d54d41` |
+| 主 App 16.0 RootHide | `main/deb-16.0-roothide/com.openminis.app.root_1.15+ci44931905521+ios16.0_iphoneos-arm64e.deb` | `1c00b53fe76927bfef850a4fa3c0c64ca8653975d6322213af94652b3e464c28` |
+| 主 App 16.0 Rootless | `main/deb-16.0-rootless/com.openminis.app.root_1.15+ci44931905521+ios16.0_iphoneos-arm64.deb` | `de27c6ec2c9c57bf9f7530cc1f13926d0a08d4e38009d73ecd8bacf5162ddef4` |
+| 主 App 16.2 RootHide | `main/deb-16.2-roothide/com.openminis.app.root_1.15+ci44931905521+ios16.2_iphoneos-arm64e.deb` | `7b16dfc8a4679a4987300c4e60c094c58e8cc5e248e05d47db17159c8dc29aba` |
+| 主 App 16.2 Rootless | `main/deb-16.2-rootless/com.openminis.app.root_1.15+ci44931905521+ios16.2_iphoneos-arm64.deb` | `0c071dfc4f92e49719abf18290ec44812954c66148d5f10845cf4f67a23aea56` |
+| Companion RootHide | `companion-roothide/automation-deb/com.openminis.automation_1.0+ci44931905521_iphoneos-arm64e.deb` | `fd95494dea8391606c4ec295530257e882eb6e4a1ef898c19c7308d61312ffd4` |
+| Companion Rootless | `companion-rootless/automation-deb/com.openminis.automation_1.0+ci44931905521_iphoneos-arm64.deb` | `636bf2515ce0b84d53ad933c07bb83c81f61a808b945956e8830db8247cdb48c` |
+
+三份 IPA 分别为 `main/root-ipa/Minis-1.15-ios15-root-1f0eb389.ipa`、`main/root-ipa-ios16.0/Minis-1.15-ios16.0-root-1f0eb389.ipa`、`main/root-ipa-ios16.2/Minis-1.15-ios16.2-root-1f0eb389.ipa`，对应 SHA-256 为 `f49f6260378ea6a588530158052ed6360426bb1502174f40a82d395fca54ff14`、`32ceb1a099b5f3a3845d956dd9c0205f4242942a5b6a99c1feec67729e0275d4`、`99f1fddb62db32ad8ba698b8e5df2da6fe334fefd16efb5950da2c9be8751db6`。
 
 跨 App 服务还需下载同一 run 的 `minis-automation-rootless` 或 `minis-automation-roothide`。每份包含 `automation-deb/` 中的 companion DEB、manifest，以及 `automation-build/` 中的构建和源锁定证据。主 App 三档按系统选择，companion 只有最低 iOS 15.0 的两种 scheme；两包的 commit、run 和 scheme 必须一致。快速门禁仅构建 companion 和原生回归，不能与另一 run 的主 App 混装作为最终验收组合。
 
